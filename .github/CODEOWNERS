@@ -1,0 +1,4 @@
+# Substituir @arquitetura pelo time/usuario responsavel na organizacao do GitHub.
+# Mudancas em contrato de API (controller/dto) exigem revisao de arquitetura.
+/src/main/java/br/com/finup/controller/   @arquitetura
+/src/main/java/br/com/finup/dto/          @arquitetura
