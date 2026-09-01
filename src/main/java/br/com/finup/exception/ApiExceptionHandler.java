@@ -24,10 +24,10 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * <p>Toda resposta de erro tem os mesmos campos, e o cliente (web e mobile) consegue gerar um tipo
  * a partir do OpenAPI. Nunca devolva erro montado a mao dentro de um controller.
  *
- * <p>Estende {@link ResponseEntityExceptionHandler} de proposito: sem isso, o {@code
- * @ExceptionHandler(Exception.class)} abaixo capturaria tambem as excecoes do proprio Spring MVC
- * (rota inexistente, metodo nao suportado, media type errado) e devolveria 500 no lugar de 404/405.
- * A classe base ja traduz cada uma delas para o status correto em RFC 7807.
+ * <p>Estende {@link ResponseEntityExceptionHandler} de proposito: sem isso, o
+ * {@code @ExceptionHandler(Exception.class)} abaixo capturaria tambem as excecoes do proprio Spring
+ * MVC (rota inexistente, metodo nao suportado, media type errado) e devolveria 500 no lugar de
+ * 404/405. A classe base ja traduz cada uma delas para o status correto em RFC 7807.
  */
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
