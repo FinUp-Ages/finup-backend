@@ -11,14 +11,16 @@ Java 21 · Spring Boot 3.3 · Maven · Docker
 ## Pré-requisitos
 
 - JDK 21
-- Maven 3.9+ (ou use o wrapper `./mvnw` depois de gerá-lo)
 - Docker (opcional, para rodar via container)
+
+Maven **não** precisa estar instalado: use o wrapper `./mvnw` (`mvnw.cmd` no Windows), que baixa a
+versão correta na primeira execução. É a mesma versão usada pelo CI e pelo Dockerfile.
 
 ## Como rodar
 
 ```bash
-# via Maven
-mvn spring-boot:run
+# via Maven Wrapper
+./mvnw spring-boot:run
 
 # ou via Docker
 docker build -t finup-backend .
@@ -36,10 +38,16 @@ Depois de subir:
 ## Como validar antes de abrir um PR
 
 ```bash
-mvn clean verify
+./mvnw clean verify
 ```
 
 O mesmo comando roda no CI a cada Pull Request. Se falhar localmente, vai falhar lá.
+
+`verify` inclui o **Spotless** (`google-java-format`). Se ele reprovar a formatação:
+
+```bash
+./mvnw spotless:apply
+```
 
 ---
 
@@ -71,10 +79,49 @@ Cada pasta tem um `.gitkeep` com uma linha explicando o que vai dentro. **Apague
 ### Convenções
 
 - Todo endpoint recebe e devolve **DTO tipado**, nunca `Map<String, Object>` ou `ResponseEntity<?>`. O contrato OpenAPI só tem valor se os tipos forem concretos — é dele que web e mobile vão gerar seus clientes.
-- Tratamento de erro centralizado no `exception/`, em formato único para toda a API.
+- Tratamento de erro centralizado no `exception/`, em formato único para toda a API — veja
+  [Contrato de erro](#contrato-de-erro). Nunca monte resposta de erro dentro de um controller.
 - Nada de credencial ou chave em código: use variáveis de ambiente (veja `.env.example`).
 
 ---
+
+## Contrato de erro
+
+Todo erro da API sai em **RFC 7807** (`application/problem+json`), montado pelo
+`ApiExceptionHandler` (`exception/`). O controller não trata erro: o service lança
+`BusinessException` (ou uma subclasse, como `ResourceNotFoundException`) e o handler traduz.
+
+```json
+{
+  "type": "https://finup.com.br/erros/validacao",
+  "title": "Requisicao invalida",
+  "status": 400,
+  "detail": "Um ou mais campos estao invalidos.",
+  "timestamp": "2026-09-01T18:22:31.004Z",
+  "traceId": "3f9c1e2a-8d47-4a91-9b0e-27c5d6f81a33",
+  "campos": [
+    { "campo": "valor", "mensagem": "deve ser maior que 0" }
+  ]
+}
+```
+
+`traceId` vai na resposta **e** no log. Erro inesperado nunca devolve a mensagem original ao
+cliente — só o `traceId` para localizar no log.
+
+## Configuração por ambiente
+
+Nenhum valor de ambiente fica em código. O `application.yml` lê variáveis com default de
+desenvolvimento (veja `.env.example`):
+
+| Variável | Default | Para quê |
+|---|---|---|
+| `SERVER_PORT` | `8080` | porta HTTP |
+| `SPRING_PROFILES_ACTIVE` | `dev` | perfil ativo; use `prod` no ambiente implantado |
+| `LOG_LEVEL` | `DEBUG` no perfil `dev`, `INFO` fora dele | nível de log de `br.com.finup` |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | origens do CORS, separadas por vírgula |
+
+Spring Boot **não lê `.env` nativamente**. O arquivo existe para o `docker-compose` (`env_file`) e
+como referência — rodando via `./mvnw`, exporte no shell ou confie nos defaults do perfil `dev`.
 
 ## O que ainda não está aqui (e por quê)
 
@@ -93,12 +140,17 @@ Os pacotes por funcionalidade (transações, score, trilhas, IA...) serão criad
 ## Estrutura de suporte
 
 ```
+.mvn/ + mvnw + mvnw.cmd       Maven Wrapper — não precisa de Maven instalado
 .github/
-├── workflows/ci.yml          build + testes em todo PR
+├── workflows/ci.yml          build + formatação + testes em todo PR
+├── dependabot.yml            atualização semanal de dependências
 ├── PULL_REQUEST_TEMPLATE.md  template de descrição de PR
-└── CODEOWNERS                revisão obrigatória em controller/ e dto/
-Dockerfile                    build multi-stage
+└── CODEOWNERS                revisão obrigatória em controller/, dto/, contracts/ e build
+Dockerfile                    build multi-stage, runtime sem root
+.dockerignore                 o que fica fora do contexto de build
+.editorconfig                 alinha o editor com o google-java-format
 .env.example                  variáveis de ambiente esperadas
 ```
 
-**Antes do primeiro PR:** ajuste o `@arquitetura` no `CODEOWNERS` para o time ou usuário real da organização no GitHub.
+O `CODEOWNERS` só tem efeito com **"Require review from Code Owners"** ligado na branch
+protection — sem isso o GitHub ignora o arquivo em silêncio.
