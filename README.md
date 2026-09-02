@@ -85,6 +85,47 @@ Cada pasta tem um `.gitkeep` com uma linha explicando o que vai dentro. **Apague
 
 ---
 
+## Exemplo de referência: cadastro de usuário
+
+O recurso `Usuario` existe como **exemplo executável do padrão**. Ao criar uma feature nova, copie a
+estrutura dele. Cada arquivo mostra a responsabilidade de uma camada:
+
+| Arquivo | Papel |
+|---|---|
+| `controller/UsuarioController.java` | recebe, `@Valid`, delega, escolhe o status. Sem `try/catch` |
+| `service/UsuarioService.java` | a regra (e-mail duplicado). Não conhece HTTP |
+| `repository/UsuarioRepository.java` | interface — é dela que o service depende |
+| `repository/UsuarioRepositoryEmMemoria.java` | implementação temporária, **sai quando o JPA entrar** |
+| `model/Usuario.java` | entidade imutável, com as invariantes do domínio |
+| `dto/CadastrarUsuarioRequest.java` | entrada + validação + `@Schema` do OpenAPI |
+| `dto/UsuarioResponse.java` | saída. A entidade nunca é exposta |
+| `mapper/UsuarioMapper.java` | conversão entidade ↔ DTO |
+| `exception/EmailJaCadastradoException.java` | erro de negócio com o status que lhe cabe (409) |
+
+Testes correspondentes, também de referência:
+
+- `service/UsuarioServiceTest.java` — unitário, Mockito, sem contexto Spring. É o formato padrão.
+- `controller/UsuarioControllerTest.java` — `@WebMvcTest`, só a camada web.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/usuarios   -H 'Content-Type: application/json'   -d '{"nome":"Ana Souza","email":"ana@exemplo.com"}'
+```
+
+Devolve `201` com `Location`. Repetir a mesma chamada devolve `409`; mandar `email` inválido
+devolve `400` listando os campos.
+
+### O que o exemplo estabelece
+
+- **Versão no caminho desde o primeiro endpoint** (`/api/v1/...`). Adicionar versionamento depois
+  que web e mobile já consomem a API custa muito mais caro.
+- **Injeção por construtor com campo `final`** — nunca `@Autowired` em campo.
+- **`record` para DTO**, classe para entidade.
+- **Nada de `null` cruzando fronteira**: o repositório devolve `Optional`.
+- **Erro é exceção**, não código de retorno. Quem traduz para HTTP é o handler global.
+
+> O exemplo é deletável. Quando o cadastro real de usuário for implementado, ele substitui este —
+> mas a estrutura permanece.
+
 ## Contrato de erro
 
 Todo erro da API sai em **RFC 7807** (`application/problem+json`), montado pelo
