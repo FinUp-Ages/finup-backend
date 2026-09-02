@@ -51,6 +51,57 @@ O mesmo comando roda no CI a cada Pull Request. Se falhar localmente, vai falhar
 
 ---
 
+## Se o build falhar antes de compilar
+
+### `PKIX path building failed` ao baixar dependências
+
+```
+Could not transfer artifact ... from/to central (https://repo.maven.apache.org/maven2):
+PKIX path building failed: unable to find valid certification path to requested target
+```
+
+Alguma ferramenta de segurança na sua máquina está interceptando TLS: ela substitui o certificado
+do Maven Central por um assinado por uma CA própria. O Windows confia nessa CA (por isso navegador
+e `git` funcionam), mas o Java tem um *truststore* próprio, o `cacerts`, que não a conhece.
+
+Para descobrir quem está interceptando:
+
+```bash
+openssl s_client -connect repo.maven.apache.org:443 -servername repo.maven.apache.org </dev/null 2>/dev/null | grep issuer=
+```
+
+**Correção (Windows)** — mandar o Java usar o truststore do Windows, que já confia na CA:
+
+```powershell
+setx MAVEN_OPTS "-Djavax.net.ssl.trustStoreType=Windows-ROOT"
+```
+
+Abra um terminal novo depois. Não é uma flag insegura: os certificados continuam sendo validados,
+apenas contra a lista do sistema em vez da lista embutida no JDK.
+
+> Isto **não** entra no `pom.xml` nem no `.mvn/jvm.config`: `Windows-ROOT` não existe em Linux nem
+> em macOS e quebraria o CI e quem não usa Windows. É configuração de máquina, por isso vive aqui.
+
+Em Linux/macOS, o equivalente é importar a CA com `keytool -importcert` num truststore próprio.
+
+### Spotless reprova arquivos que você não editou
+
+Era falta de `.gitattributes` — já corrigido. O arquivo força **LF em todo o repositório**. Sem ele,
+o resultado dependia do `core.autocrlf` de cada pessoa, e o mesmo código passava para uns e
+reprovava para outros. Se você clonou antes disso, rode uma vez:
+
+```bash
+git add --renormalize .
+./mvnw spotless:apply
+```
+
+### No Windows, use `mvnw.cmd`
+
+Rodar `./mvnw` pelo Git Bash pode falhar ao instalar o Maven (`fail to move MAVEN_HOME`). Use
+`.\mvnw.cmd` no PowerShell — é o script feito para Windows.
+
+---
+
 ## Estrutura de pastas
 
 ```
