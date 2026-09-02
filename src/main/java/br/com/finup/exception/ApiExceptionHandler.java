@@ -76,7 +76,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(Exception.class)
   public ProblemDetail handleUnexpected(Exception ex) {
     ProblemDetail problem =
-        base(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno. Tente novamente mais tarde.");
+        buildProblem(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno. Tente novamente mais tarde.");
     problem.setTitle("Erro interno");
     problem.setType(TYPE_INTERNAL);
     log.error("Erro nao tratado [traceId={}]", problem.getProperties().get("traceId"), ex);
