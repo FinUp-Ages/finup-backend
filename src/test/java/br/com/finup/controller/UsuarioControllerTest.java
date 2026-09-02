@@ -25,9 +25,9 @@ import org.springframework.test.web.servlet.MockMvc;
 /**
  * Exemplo de referencia de teste de controller.
  *
- * <p>{@code @WebMvcTest} sobe so a camada web — sem banco, sem service real. O
- * {@code ApiExceptionHandler} entra junto porque {@code @RestControllerAdvice} faz parte da fatia,
- * entao estes testes verificam de verdade o contrato de erro, e nao uma simulacao dele.
+ * <p>{@code @WebMvcTest} sobe so a camada web — sem banco, sem service real. O {@code
+ * ApiExceptionHandler} entra junto porque {@code @RestControllerAdvice} faz parte da fatia, entao
+ * estes testes verificam de verdade o contrato de erro, e nao uma simulacao dele.
  *
  * <p>{@code @MockitoBean} substituiu o antigo {@code @MockBean}, removido no Spring Boot 4.
  */

@@ -45,8 +45,8 @@ public class Usuario {
   }
 
   /**
-   * E-mail e chave de unicidade: sem normalizar, "Ana@x.com" e "ana@x.com" viram dois cadastros.
-   * A regra mora aqui, e nao no service, para valer em qualquer caminho de criacao.
+   * E-mail e chave de unicidade: sem normalizar, "Ana@x.com" e "ana@x.com" viram dois cadastros. A
+   * regra mora aqui, e nao no service, para valer em qualquer caminho de criacao.
    */
   private static String normalizarEmail(String email) {
     return email.strip().toLowerCase();

@@ -31,8 +31,8 @@ import org.springframework.web.bind.annotation.RestController;
  * para DTO e escolhe o codigo de status. So isso.
  *
  * <p>O que ele <strong>nao</strong> faz: regra de negocio, acesso a dados e tratamento de erro —
- * nao existe {@code try/catch} aqui. O service lanca excecao de negocio e o
- * {@code ApiExceptionHandler} devolve o RFC 7807.
+ * nao existe {@code try/catch} aqui. O service lanca excecao de negocio e o {@code
+ * ApiExceptionHandler} devolve o RFC 7807.
  *
  * <p>Versao no caminho ({@code /api/v1}) desde o primeiro endpoint: adicionar versionamento depois
  * que web e mobile ja consomem a API custa muito mais caro.

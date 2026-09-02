@@ -15,9 +15,9 @@ import org.springframework.stereotype.Repository;
  * <p>Existe para que o exemplo de cadastro rode de ponta a ponta sem banco — os dados somem quando
  * a aplicacao reinicia.
  *
- * <p><strong>Substituir quando o PostgreSQL entrar:</strong> apague esta classe e faca
- * {@link UsuarioRepository} estender {@code JpaRepository<Usuario, UUID>}. Nem o service nem o
- * controller mudam. E esse o motivo de a interface existir.
+ * <p><strong>Substituir quando o PostgreSQL entrar:</strong> apague esta classe e faca {@link
+ * UsuarioRepository} estender {@code JpaRepository<Usuario, UUID>}. Nem o service nem o controller
+ * mudam. E esse o motivo de a interface existir.
  */
 @Repository
 public class UsuarioRepositoryEmMemoria implements UsuarioRepository {
