@@ -5,8 +5,19 @@ on:
   push:
     branches: [main, develop]
 
+# Sem isto o GITHUB_TOKEN herda as permissoes padrao da organizacao, que podem ser de escrita.
+# Este workflow so precisa ler o codigo.
+permissions:
+  contents: read
+
+# Um push novo na mesma branch cancela a execucao anterior em vez de enfileirar.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    name: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,5 +28,17 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Build e testes
-        run: mvn -B clean verify
+      # Mesmo comando do README. `verify` inclui o spotless:check — formatacao errada
+      # reprova o PR, e `./mvnw spotless:apply` corrige.
+      - name: Build, formatacao e testes
+        run: ./mvnw -B clean verify
+
+      # O contrato e o ponto de integracao com finup-web e finup-mobile: publicar o jar
+      # permite baixar o artefato do PR sem reconstruir.
+      - name: Publicar jar
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: finup-backend-jar
+          path: target/*.jar
+          retention-days: 7

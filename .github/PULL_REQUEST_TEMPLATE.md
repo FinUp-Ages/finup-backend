@@ -10,7 +10,7 @@
 - [ ] chore
 
 ## Checklist
-- [ ] Build e testes passando localmente (`mvn clean verify`)
+- [ ] Build e testes passando localmente (`./mvnw clean verify`)
 - [ ] Testes adicionados ou atualizados
 - [ ] Endpoints novos/alterados aparecem corretamente no Swagger
 

@@ -1,1 +1,0 @@
-# Regra de negocio. Uma classe @Service por caso de uso/recurso. Nao conhece HTTP.

@@ -1,0 +1,13 @@
+# Fora do contexto de build: reduz o que sobe para o daemon e evita vazar arquivo local
+# para dentro da imagem.
+target/
+.git/
+.github/
+.idea/
+.vscode/
+*.iml
+.env
+*.log
+contracts/
+README.md
+docker-compose.yml

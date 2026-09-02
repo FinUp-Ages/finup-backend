@@ -1,4 +1,12 @@
-# Substituir @arquitetura pelo time/usuario responsavel na organizacao do GitHub.
-# Mudancas em contrato de API (controller/dto) exigem revisao de arquitetura.
-/src/main/java/br/com/finup/controller/   @arquitetura
-/src/main/java/br/com/finup/dto/          @arquitetura
+# Mudancas em contrato de API (controller/dto) exigem revisao do time de arquitetura.
+# Para o CODEOWNERS ter efeito, a branch protection precisa de "Require review from Code Owners".
+/src/main/java/br/com/finup/controller/   @FinUp-Ages/ages-iii
+/src/main/java/br/com/finup/dto/          @FinUp-Ages/ages-iii
+
+# O contrato OpenAPI publicado e consumido por finup-web e finup-mobile.
+/contracts/                                @FinUp-Ages/ages-iii
+
+# Build, CI e imagem: mudanca aqui afeta todos os times.
+/pom.xml                                   @FinUp-Ages/ages-iii
+/Dockerfile                                @FinUp-Ages/ages-iii
+/.github/                                  @FinUp-Ages/ages-iii

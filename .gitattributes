@@ -1,0 +1,26 @@
+# Fim de linha normalizado.
+#
+# Sem este arquivo, o resultado depende do `core.autocrlf` de cada pessoa: quem está no Windows
+# com o padrão do Git for Windows recebe CRLF, quem está em Linux/macOS recebe LF. O Spotless
+# respeita essa configuração, então o MESMO código passa para um e reprova para outro — e o CI,
+# que roda em Linux, vira desempate arbitrário.
+#
+# LF em tudo, em qualquer sistema.
+* text=auto eol=lf
+
+# Exceções: scripts que o interpretador do Windows exige em CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# O wrapper POSIX precisa de LF mesmo se alguém mudar a regra acima.
+mvnw text eol=lf
+
+# Binários: o Git não deve tentar converter nada.
+*.jar binary
+*.war binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
