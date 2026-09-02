@@ -1,10 +1,10 @@
 package br.com.finup.controller;
 
-import br.com.finup.dto.CadastrarUsuarioRequest;
-import br.com.finup.dto.UsuarioResponse;
-import br.com.finup.mapper.UsuarioMapper;
-import br.com.finup.model.Usuario;
-import br.com.finup.service.UsuarioService;
+import br.com.finup.dto.RegisterUserRequest;
+import br.com.finup.dto.UserResponse;
+import br.com.finup.mapper.UserMapper;
+import br.com.finup.model.User;
+import br.com.finup.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -38,14 +38,14 @@ import org.springframework.web.bind.annotation.RestController;
  * que web e mobile ja consomem a API custa muito mais caro.
  */
 @RestController
-@RequestMapping("/api/v1/usuarios")
-@Tag(name = "Usuarios", description = "Cadastro e consulta de usuarios")
-public class UsuarioController {
+@RequestMapping("/api/v1/users")
+@Tag(name = "Users", description = "Cadastro e consulta de usuarios")
+public class UserController {
 
-  private final UsuarioService usuarioService;
+  private final UserService userService;
 
-  public UsuarioController(UsuarioService usuarioService) {
-    this.usuarioService = usuarioService;
+  public UserController(UserService userService) {
+    this.userService = userService;
   }
 
   @PostMapping
@@ -61,16 +61,14 @@ public class UsuarioController {
         description = "E-mail ja cadastrado",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   })
-  public ResponseEntity<UsuarioResponse> cadastrar(
-      @Valid @RequestBody CadastrarUsuarioRequest requisicao) {
-
-    Usuario usuario = usuarioService.cadastrar(requisicao.nome(), requisicao.email());
-    UsuarioResponse resposta = UsuarioMapper.paraResposta(usuario);
+  public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterUserRequest request) {
+    User user = userService.register(request.name(), request.email());
+    UserResponse response = UserMapper.toResponse(user);
 
     // 201 com Location apontando para o recurso criado: e o que o padrao HTTP espera de um POST
     // que cria, e o que permite ao cliente seguir direto para o GET.
-    URI local = URI.create("/api/v1/usuarios/%s".formatted(resposta.id()));
-    return ResponseEntity.created(local).body(resposta);
+    URI location = URI.create("/api/v1/users/%s".formatted(response.id()));
+    return ResponseEntity.created(location).body(response);
   }
 
   @GetMapping("/{id}")
@@ -82,13 +80,13 @@ public class UsuarioController {
         description = "Usuario inexistente",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   })
-  public UsuarioResponse buscarPorId(@PathVariable UUID id) {
-    return UsuarioMapper.paraResposta(usuarioService.buscarPorId(id));
+  public UserResponse findById(@PathVariable UUID id) {
+    return UserMapper.toResponse(userService.findById(id));
   }
 
   @GetMapping
   @Operation(summary = "Lista os usuarios cadastrados")
-  public List<UsuarioResponse> listar() {
-    return UsuarioMapper.paraRespostas(usuarioService.listar());
+  public List<UserResponse> findAll() {
+    return UserMapper.toResponses(userService.findAll());
   }
 }

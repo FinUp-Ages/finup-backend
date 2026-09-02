@@ -87,32 +87,49 @@ Cada pasta tem um `.gitkeep` com uma linha explicando o que vai dentro. **Apague
 
 ## Exemplo de referência: cadastro de usuário
 
-O recurso `Usuario` existe como **exemplo executável do padrão**. Ao criar uma feature nova, copie a
+O recurso `User` existe como **exemplo executável do padrão**. Ao criar uma feature nova, copie a
 estrutura dele. Cada arquivo mostra a responsabilidade de uma camada:
 
 | Arquivo | Papel |
 |---|---|
-| `controller/UsuarioController.java` | recebe, `@Valid`, delega, escolhe o status. Sem `try/catch` |
-| `service/UsuarioService.java` | a regra (e-mail duplicado). Não conhece HTTP |
-| `repository/UsuarioRepository.java` | interface — é dela que o service depende |
-| `repository/UsuarioRepositoryEmMemoria.java` | implementação temporária, **sai quando o JPA entrar** |
-| `model/Usuario.java` | entidade imutável, com as invariantes do domínio |
-| `dto/CadastrarUsuarioRequest.java` | entrada + validação + `@Schema` do OpenAPI |
-| `dto/UsuarioResponse.java` | saída. A entidade nunca é exposta |
-| `mapper/UsuarioMapper.java` | conversão entidade ↔ DTO |
-| `exception/EmailJaCadastradoException.java` | erro de negócio com o status que lhe cabe (409) |
+| `controller/UserController.java` | recebe, `@Valid`, delega, escolhe o status. Sem `try/catch` |
+| `service/UserService.java` | a regra (e-mail duplicado). Não conhece HTTP |
+| `repository/UserRepository.java` | interface — é dela que o service depende |
+| `repository/InMemoryUserRepository.java` | implementação temporária, **sai quando o JPA entrar** |
+| `model/User.java` | entidade imutável, com as invariantes do domínio |
+| `dto/RegisterUserRequest.java` | entrada + validação + `@Schema` do OpenAPI |
+| `dto/UserResponse.java` | saída. A entidade nunca é exposta |
+| `mapper/UserMapper.java` | conversão entidade ↔ DTO |
+| `exception/EmailAlreadyRegisteredException.java` | erro de negócio com o status que lhe cabe (409) |
 
 Testes correspondentes, também de referência:
 
-- `service/UsuarioServiceTest.java` — unitário, Mockito, sem contexto Spring. É o formato padrão.
-- `controller/UsuarioControllerTest.java` — `@WebMvcTest`, só a camada web.
+- `service/UserServiceTest.java` — unitário, Mockito, sem contexto Spring. É o formato padrão.
+- `controller/UserControllerTest.java` — `@WebMvcTest`, só a camada web.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/usuarios   -H 'Content-Type: application/json'   -d '{"nome":"Ana Souza","email":"ana@exemplo.com"}'
+curl -X POST http://localhost:8080/api/v1/users   -H 'Content-Type: application/json'   -d '{"name":"Ana Souza","email":"ana@exemplo.com"}'
 ```
 
 Devolve `201` com `Location`. Repetir a mesma chamada devolve `409`; mandar `email` inválido
 devolve `400` listando os campos.
+
+### Idioma
+
+**Identificador é código, em inglês. Prosa é conteúdo, em português.**
+
+| | Idioma | Exemplo |
+|---|---|---|
+| Classes, métodos, variáveis, pacotes | inglês | `UserService.register()`, `existsByEmail` |
+| Campos do JSON e caminhos da API | inglês | `/api/v1/users`, `{"name": …, "createdAt": …}` |
+| Nome do método de teste | inglês | `rejectsDuplicateEmail()` |
+| Javadoc e comentários | português | explicam a decisão para quem lê |
+| `@DisplayName` e `@Schema` | português | o relatório de teste e o Swagger são para o time |
+| **Mensagem que chega ao cliente** | **português** | `"Ja existe um usuario cadastrado…"`, `"deve ser um e-mail valido"` |
+
+A regra é essa: se o texto vai ser lido por uma pessoa, português; se é um símbolo do código ou do
+contrato, inglês. Em `record`, o nome do componente **é** o nome do campo JSON — por isso o
+contrato acompanha o código.
 
 ### O que o exemplo estabelece
 
@@ -120,6 +137,8 @@ devolve `400` listando os campos.
   que web e mobile já consomem a API custa muito mais caro.
 - **Injeção por construtor com campo `final`** — nunca `@Autowired` em campo.
 - **`record` para DTO**, classe para entidade.
+- **Sufixo diz a camada**: `*Controller`, `*Service`, `*Repository`, `*Request`, `*Response`,
+  `*Mapper`, `*Exception`. O nome do arquivo já responde onde ele mora.
 - **Nada de `null` cruzando fronteira**: o repositório devolve `Optional`.
 - **Erro é exceção**, não código de retorno. Quem traduz para HTTP é o handler global.
 

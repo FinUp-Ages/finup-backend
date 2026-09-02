@@ -1,6 +1,6 @@
 package br.com.finup.repository;
 
-import br.com.finup.model.Usuario;
+import br.com.finup.model.User;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,13 +13,13 @@ import java.util.UUID;
  *
  * <p>Devolve {@link Optional} em vez de {@code null}: quem chama e obrigado a tratar a ausencia.
  */
-public interface UsuarioRepository {
+public interface UserRepository {
 
-  Usuario salvar(Usuario usuario);
+  User save(User user);
 
-  Optional<Usuario> buscarPorId(UUID id);
+  Optional<User> findById(UUID id);
 
-  boolean existePorEmail(String email);
+  boolean existsByEmail(String email);
 
-  List<Usuario> listarTodos();
+  List<User> findAll();
 }

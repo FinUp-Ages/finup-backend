@@ -33,9 +33,9 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
   private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
-  private static final URI TYPE_VALIDACAO = URI.create("https://finup.com.br/erros/validacao");
-  private static final URI TYPE_NEGOCIO = URI.create("https://finup.com.br/erros/regra-de-negocio");
-  private static final URI TYPE_INTERNO = URI.create("https://finup.com.br/erros/interno");
+  private static final URI TYPE_VALIDATION = URI.create("https://finup.com.br/errors/validation");
+  private static final URI TYPE_BUSINESS = URI.create("https://finup.com.br/errors/business-rule");
+  private static final URI TYPE_INTERNAL = URI.create("https://finup.com.br/errors/internal");
 
   /** Corpo invalido em endpoint anotado com {@code @Valid}. Lista campo a campo o que falhou. */
   @Override
@@ -45,25 +45,26 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
       HttpStatusCode status,
       WebRequest request) {
 
-    List<CampoInvalido> campos =
+    List<InvalidField> fields =
         ex.getBindingResult().getFieldErrors().stream()
-            .map(e -> new CampoInvalido(e.getField(), e.getDefaultMessage()))
-            .sorted(Comparator.comparing(CampoInvalido::campo))
+            .map(e -> new InvalidField(e.getField(), e.getDefaultMessage()))
+            .sorted(Comparator.comparing(InvalidField::field))
             .toList();
 
-    ProblemDetail problem = base(HttpStatus.BAD_REQUEST, "Um ou mais campos estao invalidos.");
+    ProblemDetail problem =
+        buildProblem(HttpStatus.BAD_REQUEST, "Um ou mais campos estao invalidos.");
     problem.setTitle("Requisicao invalida");
-    problem.setType(TYPE_VALIDACAO);
-    problem.setProperty("campos", campos);
+    problem.setType(TYPE_VALIDATION);
+    problem.setProperty("fields", fields);
     return ResponseEntity.badRequest().headers(headers).body(problem);
   }
 
   /** Regra de negocio violada. O status vem da propria excecao. */
   @ExceptionHandler(BusinessException.class)
-  public ProblemDetail handleNegocio(BusinessException ex) {
-    ProblemDetail problem = base(ex.getStatus(), ex.getMessage());
+  public ProblemDetail handleBusiness(BusinessException ex) {
+    ProblemDetail problem = buildProblem(ex.getStatus(), ex.getMessage());
     problem.setTitle(ex.getStatus().getReasonPhrase());
-    problem.setType(TYPE_NEGOCIO);
+    problem.setType(TYPE_BUSINESS);
     return problem;
   }
 
@@ -73,16 +74,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
    * detalhe interno.
    */
   @ExceptionHandler(Exception.class)
-  public ProblemDetail handleInesperado(Exception ex) {
+  public ProblemDetail handleUnexpected(Exception ex) {
     ProblemDetail problem =
         base(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno. Tente novamente mais tarde.");
     problem.setTitle("Erro interno");
-    problem.setType(TYPE_INTERNO);
+    problem.setType(TYPE_INTERNAL);
     log.error("Erro nao tratado [traceId={}]", problem.getProperties().get("traceId"), ex);
     return problem;
   }
 
-  private ProblemDetail base(HttpStatusCode status, String detail) {
+  private ProblemDetail buildProblem(HttpStatusCode status, String detail) {
     ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
     problem.setProperty("timestamp", Instant.now());
     problem.setProperty("traceId", UUID.randomUUID().toString());
@@ -90,5 +91,5 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /** Um campo reprovado na validacao. */
-  public record CampoInvalido(String campo, String mensagem) {}
+  public record InvalidField(String field, String message) {}
 }

@@ -12,15 +12,15 @@ import jakarta.validation.constraints.Size;
  * validacao ficam aqui — o controller nao escreve {@code if} de formato, so anota {@code @Valid} e
  * deixa o {@code ApiExceptionHandler} montar o 400.
  *
- * <p>O {@code @Schema} nao e enfeite: e ele que descreve o campo no OpenAPI que finup-web e
- * finup-mobile consomem.
+ * <p>As mensagens ficam em portugues de proposito: elas chegam ao cliente. Identificador e codigo,
+ * mensagem e conteudo.
  */
 @Schema(description = "Dados para cadastrar um usuario")
-public record CadastrarUsuarioRequest(
+public record RegisterUserRequest(
     @Schema(description = "Nome completo", example = "Ana Souza")
         @NotBlank(message = "e obrigatorio")
         @Size(max = 120, message = "deve ter no maximo 120 caracteres")
-        String nome,
+        String name,
     @Schema(description = "E-mail unico do usuario", example = "ana.souza@exemplo.com")
         @NotBlank(message = "e obrigatorio")
         @Email(message = "deve ser um e-mail valido")

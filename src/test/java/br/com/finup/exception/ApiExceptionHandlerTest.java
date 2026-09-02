@@ -31,53 +31,53 @@ class ApiExceptionHandlerTest {
   @BeforeEach
   void setUp() {
     mockMvc =
-        MockMvcBuilders.standaloneSetup(new ControllerDeTeste())
+        MockMvcBuilders.standaloneSetup(new TestController())
             .setControllerAdvice(new ApiExceptionHandler())
             .build();
   }
 
   @Test
   @DisplayName("corpo invalido vira 400 em RFC 7807 listando os campos reprovados")
-  void corpoInvalidoRetorna400ComCampos() throws Exception {
+  void invalidBodyReturns400WithFields() throws Exception {
     mockMvc
         .perform(
-            post("/teste")
+            post("/test")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"nome\":\"\",\"valor\":-1}"))
+                .content("{\"name\":\"\",\"amount\":-1}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.title").value("Requisicao invalida"))
         .andExpect(jsonPath("$.traceId").exists())
-        .andExpect(jsonPath("$.campos.length()").value(2))
-        .andExpect(jsonPath("$.campos[0].campo").value("nome"))
-        .andExpect(jsonPath("$.campos[1].campo").value("valor"));
+        .andExpect(jsonPath("$.fields.length()").value(2))
+        .andExpect(jsonPath("$.fields[0].field").value("amount"))
+        .andExpect(jsonPath("$.fields[1].field").value("name"));
   }
 
   @Test
   @DisplayName("excecao de negocio usa o status que ela carrega")
-  void excecaoDeNegocioUsaStatusDaExcecao() throws Exception {
+  void businessExceptionUsesItsOwnStatus() throws Exception {
     mockMvc
         .perform(
-            post("/teste")
+            post("/test")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"nome\":\"inexistente\",\"valor\":1}"))
+                .content("{\"name\":\"inexistente\",\"amount\":1}"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.status").value(404))
-        .andExpect(jsonPath("$.detail").value("Conta nao encontrado: inexistente"));
+        .andExpect(jsonPath("$.detail").value("Account nao encontrado: inexistente"));
   }
 
   /** Controller minimo, existe so dentro deste teste. */
   @RestController
-  static class ControllerDeTeste {
+  static class TestController {
 
-    @PostMapping("/teste")
-    void receber(@Valid @RequestBody Entrada entrada) {
-      if ("inexistente".equals(entrada.nome())) {
-        throw new ResourceNotFoundException("Conta", entrada.nome());
+    @PostMapping("/test")
+    void receive(@Valid @RequestBody Input input) {
+      if ("inexistente".equals(input.name())) {
+        throw new ResourceNotFoundException("Account", input.name());
       }
     }
   }
 
   /** DTO de entrada do controller de teste. */
-  record Entrada(@NotBlank String nome, @Positive Integer valor) {}
+  record Input(@NotBlank String name, @Positive Integer amount) {}
 }

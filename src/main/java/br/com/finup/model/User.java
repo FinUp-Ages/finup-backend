@@ -17,38 +17,38 @@ import java.util.UUID;
  * <p>Quando o banco entrar, esta classe recebe {@code @Entity} e o {@code id} recebe {@code @Id}.
  * Nada aqui muda por causa disso — a entidade nao conhece HTTP nem persistencia.
  */
-public class Usuario {
+public class User {
 
   private final UUID id;
-  private final String nome;
+  private final String name;
   private final String email;
-  private final Instant criadoEm;
+  private final Instant createdAt;
 
-  private Usuario(UUID id, String nome, String email, Instant criadoEm) {
+  private User(UUID id, String name, String email, Instant createdAt) {
     this.id = id;
-    this.nome = nome;
+    this.name = name;
     this.email = email;
-    this.criadoEm = criadoEm;
+    this.createdAt = createdAt;
   }
 
   /**
    * Cadastra um usuario novo. O identificador e o instante de criacao sao responsabilidade do
    * dominio, nunca do cliente da API.
    */
-  public static Usuario cadastrar(String nome, String email) {
-    return new Usuario(UUID.randomUUID(), nome.strip(), normalizarEmail(email), Instant.now());
+  public static User register(String name, String email) {
+    return new User(UUID.randomUUID(), name.strip(), normalizeEmail(email), Instant.now());
   }
 
   /** Devolve uma copia com o nome trocado. A instancia original continua valida. */
-  public Usuario comNome(String novoNome) {
-    return new Usuario(this.id, novoNome.strip(), this.email, this.criadoEm);
+  public User withName(String newName) {
+    return new User(this.id, newName.strip(), this.email, this.createdAt);
   }
 
   /**
    * E-mail e chave de unicidade: sem normalizar, "Ana@x.com" e "ana@x.com" viram dois cadastros. A
    * regra mora aqui, e nao no service, para valer em qualquer caminho de criacao.
    */
-  private static String normalizarEmail(String email) {
+  private static String normalizeEmail(String email) {
     return email.strip().toLowerCase();
   }
 
@@ -56,25 +56,25 @@ public class Usuario {
     return id;
   }
 
-  public String getNome() {
-    return nome;
+  public String getName() {
+    return name;
   }
 
   public String getEmail() {
     return email;
   }
 
-  public Instant getCriadoEm() {
-    return criadoEm;
+  public Instant getCreatedAt() {
+    return createdAt;
   }
 
   /** Identidade de entidade e o id — dois usuarios com o mesmo id sao o mesmo usuario. */
   @Override
-  public boolean equals(Object outro) {
-    if (this == outro) {
+  public boolean equals(Object other) {
+    if (this == other) {
       return true;
     }
-    return outro instanceof Usuario usuario && Objects.equals(id, usuario.id);
+    return other instanceof User user && Objects.equals(id, user.id);
   }
 
   @Override
@@ -84,6 +84,6 @@ public class Usuario {
 
   @Override
   public String toString() {
-    return "Usuario[id=%s, email=%s]".formatted(id, email);
+    return "User[id=%s, email=%s]".formatted(id, email);
   }
 }
