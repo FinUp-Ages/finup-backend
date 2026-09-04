@@ -303,3 +303,133 @@ Dockerfile                    build multi-stage, runtime sem root
 
 O `CODEOWNERS` só tem efeito com **"Require review from Code Owners"** ligado na branch
 protection — sem isso o GitHub ignora o arquivo em silêncio.
+
+## Banco de Dados com Docker
+
+O projeto utiliza PostgreSQL 16 executado via Docker Compose para o ambiente local.
+
+### Configuração
+
+Crie um arquivo `.env` na raiz do projeto com base no `.env.example`.
+
+Exemplo:
+
+```env
+SERVER_PORT=8080
+SPRING_PROFILES_ACTIVE=dev
+LOG_LEVEL=DEBUG
+CORS_ALLOWED_ORIGINS=http://localhost:5173
+
+DB_NAME=finup
+DB_USER=finup_user
+DB_PASSWORD=sua_senha_local
+DB_PORT=5432
+```
+
+O arquivo `.env` não deve ser versionado, pois pode conter informações sensíveis.
+
+### Subir o banco
+
+```bash
+docker compose up -d
+```
+
+### Verificar se o banco está funcionando
+
+```bash
+docker compose ps
+```
+
+O container do PostgreSQL deve aparecer em execução e com status `healthy`.
+
+### Visualizar os logs do PostgreSQL
+
+```bash
+docker compose logs db
+```
+
+### Parar o ambiente
+
+```bash
+docker compose down
+```
+
+Os dados permanecem armazenados no volume Docker.
+
+### Recriar o container
+
+```bash
+docker compose up -d --force-recreate
+```
+
+### Apagar o banco local e começar do zero
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+> Atenção: o comando `docker compose down -v` remove o volume do PostgreSQL e apaga os dados armazenados localmente.
+
+### Configuração padrão do banco
+
+- Banco: PostgreSQL 16
+- Host: localhost
+- Porta: 5432
+- Nome do banco: finup
+- Usuário: finup_user
+
+A senha deve ser definida localmente através da variável `DB_PASSWORD`.
+
+### Conexão com o backend
+
+O Docker Compose utiliza as variáveis definidas no `.env`.
+
+Ao executar o Spring Boot diretamente, as variáveis necessárias devem estar disponíveis no ambiente ou podem ser utilizados os valores padrão definidos pelo profile de desenvolvimento.
+
+A conexão local com o PostgreSQL utiliza o formato:
+
+```text
+jdbc:postgresql://localhost:5432/finup
+```
+
+## Inicialização e população do banco de dados
+
+Os scripts SQL responsáveis pela criação e população do banco ficam em:
+
+`database/init`
+
+Eles são executados automaticamente pelo PostgreSQL durante a criação inicial do banco.
+
+### Ordem de execução
+
+1. `01-schema.sql` - cria a estrutura, as tabelas e os relacionamentos do banco.
+2. `02-required-data.sql` - insere os dados obrigatórios da aplicação.
+3. `03-test-data.sql` - insere dados fictícios para desenvolvimento e testes.
+
+### Recriar e popular o banco novamente
+
+Os scripts de inicialização são executados quando o PostgreSQL cria um novo volume.
+
+Para remover o banco local e executar novamente todos os scripts:
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+Para acompanhar a execução dos scripts:
+
+```bash
+docker compose logs db
+```
+
+### Fluxo de inicialização
+
+Ao criar o banco pela primeira vez, o processo ocorre na seguinte ordem:
+
+1. O PostgreSQL é inicializado.
+2. O arquivo `01-schema.sql` cria as tabelas e os relacionamentos.
+3. O arquivo `02-required-data.sql` insere os dados obrigatórios.
+4. O arquivo `03-test-data.sql` insere os dados fictícios de desenvolvimento e testes.
+5. O banco fica disponível para utilização pela aplicação.

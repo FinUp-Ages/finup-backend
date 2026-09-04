@@ -8,6 +8,19 @@ spring:
   # RFC 7807 padrao do Boot, que recua quando existe um ResponseEntityExceptionHandler proprio.
   # O nosso ApiExceptionHandler estende essa classe, entao ja cobre 404 de rota, 405 e afins.
 
+  config:
+    import: optional:file:.env[.properties]
+
+  datasource:
+    url: jdbc:postgresql://localhost:${DB_PORT:5432}/${DB_NAME:finup}
+    username: ${DB_USER:finup_user}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+
 server:
   port: ${SERVER_PORT:8080}
   error:
