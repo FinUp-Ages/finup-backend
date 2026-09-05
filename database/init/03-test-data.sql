@@ -27,6 +27,63 @@ VALUES
 ON CONFLICT (email) DO NOTHING;
 
 -- --------------------------------------------
+-- Perfil financeiro do usuário de teste
+-- --------------------------------------------
+INSERT INTO
+  user_financial_profiles (
+    user_id,
+    monthly_expenses_estimate,
+    income_expense_relation,
+    spending_habit,
+    has_investments,
+    approximate_invested_amount,
+    investment_experience_time
+  )
+SELECT
+  u.id,
+  3000.00,
+  'BALANCED',
+  'MODERATE',
+  TRUE,
+  2000.00,
+  'BEGINNER'
+FROM
+  users u
+WHERE
+  u.email = 'teste@finup.local'
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      user_financial_profiles ufp
+    WHERE
+      ufp.user_id = u.id
+  );
+
+-- --------------------------------------------
+-- Interesse de investimento do usuário
+-- --------------------------------------------
+INSERT INTO
+  user_investment_interests (user_financial_profile_id, investment_type)
+SELECT
+  ufp.id,
+  'CDB'
+FROM
+  user_financial_profiles ufp
+  JOIN users u ON u.id = ufp.user_id
+WHERE
+  u.email = 'teste@finup.local'
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      user_investment_interests uii
+    WHERE
+      uii.user_financial_profile_id = ufp.id
+      AND uii.investment_type = 'CDB'
+  );
+
+-- --------------------------------------------
 -- Método de pagamento
 -- --------------------------------------------
 INSERT INTO

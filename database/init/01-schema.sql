@@ -14,6 +14,28 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS user_financial_profiles (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  monthly_expenses_estimate DECIMAL(12, 2),
+  income_expense_relation VARCHAR(50),
+  spending_habit VARCHAR(50),
+  has_investments BOOLEAN,
+  approximate_invested_amount DECIMAL(12, 2),
+  investment_experience_time VARCHAR(50),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_user_financial_profiles_user FOREIGN KEY (user_id) REFERENCES users (id)
+);
+
+CREATE TABLE IF NOT EXISTS user_investment_interests (
+  id SERIAL PRIMARY KEY,
+  user_financial_profile_id INTEGER NOT NULL,
+  investment_type VARCHAR(50) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_user_investment_interests_profile FOREIGN KEY (user_financial_profile_id) REFERENCES user_financial_profiles (id)
+);
+
 CREATE TABLE IF NOT EXISTS categories (
   id SERIAL PRIMARY KEY,
   user_id INTEGER,
