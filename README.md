@@ -32,8 +32,46 @@ Depois de subir:
 | O quê | URL |
 |---|---|
 | Health check | http://localhost:8080/actuator/health |
+
+## Swagger / OpenAPI
+
+Com a aplicação em execução, a documentação da API fica disponível nestas URLs:
+
+| O quê | URL |
+|---|---|
 | Swagger UI | http://localhost:8080/swagger-ui.html |
 | Contrato OpenAPI | http://localhost:8080/v3/api-docs |
+
+O Swagger UI lê o contrato OpenAPI gerado automaticamente pelo `springdoc` a partir dos
+controllers e DTOs da aplicação. Os metadados gerais da API ficam centralizados em
+`config/OpenApiConfig.java`.
+
+### Como documentar novos endpoints
+
+O `springdoc` descobre automaticamente classes com `@RestController`. Use as anotações do pacote
+`io.swagger.v3.oas.annotations` apenas para complementar o que não puder ser inferido pelos tipos
+Java:
+
+```java
+@Operation(summary = "Lista as transações do usuário")
+@ApiResponse(responseCode = "200", description = "Transações encontradas")
+@GetMapping("/transactions")
+public List<TransactionResponse> list() {
+    // ...
+}
+```
+
+Nos DTOs, `@Schema` pode esclarecer regras e fornecer exemplos de campos:
+
+```java
+public record TransactionResponse(
+        @Schema(example = "42") Long id,
+        @Schema(example = "125.90") BigDecimal amount
+) {}
+```
+
+Evite anotar tudo: nomes claros e DTOs tipados já produzem boa parte do contrato. Depois de criar
+ou alterar um endpoint, confira o resultado no Swagger UI e rode `./mvnw clean verify`.
 
 ## Como validar antes de abrir um PR
 
