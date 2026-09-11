@@ -16,6 +16,14 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
+/**
+ * Garante que o contrato OpenAPI publicado continua identificando o projeto e expondo o recurso de
+ * usuarios.
+ *
+ * <p>E deste contrato que finup-web e finup-mobile geram cliente: se alguem apagar o {@code
+ * OpenApiConfig} ou mudar o path do controller, o CI reprova aqui em vez de a quebra aparecer no
+ * consumidor.
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
 class OpenApiIntegrationTests {
