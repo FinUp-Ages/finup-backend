@@ -9,8 +9,12 @@ import static org.mockito.Mockito.when;
 
 import br.com.finup.exception.EmailAlreadyRegisteredException;
 import br.com.finup.exception.ResourceNotFoundException;
+import br.com.finup.exception.UserAlreadyRegisteredException;
 import br.com.finup.model.User;
 import br.com.finup.repository.UserRepository;
+import br.com.finup.security.AuthenticatedIdentity;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -21,11 +25,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Exemplo de referencia de teste unitario de service.
- *
- * <p>Sem contexto Spring e sem banco: o repositorio e um duble. Roda em milissegundos e falha por
- * um motivo so — a regra de negocio. Se um teste de service precisa de {@code @SpringBootTest},
- * quase sempre o problema e acoplamento no service, nao no teste.
+ * Testes unitarios de service, sem contexto Spring e sem banco: o repositorio e um duble. Roda em
+ * milissegundos e falha por um motivo so — a regra de negocio.
  *
  * <p>Nome do metodo em ingles, {@code @DisplayName} em portugues: o relatorio de teste e para o
  * time ler.
@@ -38,37 +39,47 @@ class UserServiceTest {
   @InjectMocks private UserService userService;
 
   @Test
-  @DisplayName("cadastra usuario quando o e-mail ainda nao existe")
-  void registersWhenEmailIsNew() {
+  @DisplayName("cria usuario quando a identidade do Cognito ainda nao tem registro local")
+  void createsWhenIdentityIsNew() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
+    when(userRepository.existsByCognitoId("cognito-sub-123")).thenReturn(false);
     when(userRepository.existsByEmail("ana@exemplo.com")).thenReturn(false);
     when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-    User user = userService.register("Ana Souza", "ana@exemplo.com");
+    User user = userService.createFromAuthenticatedIdentity(identity);
 
     assertThat(user.getId()).isNotNull();
+    assertThat(user.getCognitoId()).isEqualTo("cognito-sub-123");
     assertThat(user.getName()).isEqualTo("Ana Souza");
     assertThat(user.getEmail()).isEqualTo("ana@exemplo.com");
     assertThat(user.getCreatedAt()).isNotNull();
+    assertThat(user.getUpdatedAt()).isNotNull();
   }
 
   @Test
-  @DisplayName("normaliza o e-mail antes de gravar")
-  void normalizesEmailBeforeSaving() {
-    when(userRepository.existsByEmail(any())).thenReturn(false);
-    when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+  @DisplayName("recusa criacao quando a identidade ja tem usuario local e nao chega a gravar")
+  void rejectsDuplicateCognitoIdentity() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
+    when(userRepository.existsByCognitoId("cognito-sub-123")).thenReturn(true);
 
-    User user = userService.register("  Ana Souza  ", "  Ana@Exemplo.COM ");
+    assertThatThrownBy(() -> userService.createFromAuthenticatedIdentity(identity))
+        .isInstanceOf(UserAlreadyRegisteredException.class)
+        .hasMessageContaining("cognito-sub-123");
 
-    assertThat(user.getEmail()).isEqualTo("ana@exemplo.com");
-    assertThat(user.getName()).isEqualTo("Ana Souza");
+    verify(userRepository, never()).save(any());
   }
 
   @Test
-  @DisplayName("recusa cadastro com e-mail ja usado e nao chega a gravar")
-  void rejectsDuplicateEmail() {
+  @DisplayName("recusa criacao quando o e-mail ja pertence a outra identidade")
+  void rejectsEmailAlreadyUsedByAnotherIdentity() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-456", "Outra Ana", "ana@exemplo.com");
+    when(userRepository.existsByCognitoId("cognito-sub-456")).thenReturn(false);
     when(userRepository.existsByEmail("ana@exemplo.com")).thenReturn(true);
 
-    assertThatThrownBy(() -> userService.register("Ana Souza", "ana@exemplo.com"))
+    assertThatThrownBy(() -> userService.createFromAuthenticatedIdentity(identity))
         .isInstanceOf(EmailAlreadyRegisteredException.class)
         .hasMessageContaining("ana@exemplo.com");
 
@@ -83,5 +94,41 @@ class UserServiceTest {
 
     assertThatThrownBy(() -> userService.findById(id))
         .isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("atualiza informacoes complementares de um usuario ja criado")
+  void updatesAdditionalInfoForExistingUser() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
+    User existing =
+        User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
+    when(userRepository.findByCognitoId("cognito-sub-123")).thenReturn(Optional.of(existing));
+    when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+    User updated =
+        userService.updateAdditionalInfo(
+            identity, LocalDate.of(1998, 4, 12), new BigDecimal("3500.00"), "MODERADO");
+
+    assertThat(updated.getBirthDate()).isEqualTo(LocalDate.of(1998, 4, 12));
+    assertThat(updated.getMonthlyIncome()).isEqualByComparingTo("3500.00");
+    assertThat(updated.getFinancialProfile()).isEqualTo("MODERADO");
+    assertThat(updated.getUpdatedAt()).isAfterOrEqualTo(existing.getCreatedAt());
+  }
+
+  @Test
+  @DisplayName("recusa atualizar informacoes complementares quando a Etapa 1 nao foi feita")
+  void rejectsAdditionalInfoWhenUserDoesNotExist() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-999", "Ana Souza", "ana@exemplo.com");
+    when(userRepository.findByCognitoId("cognito-sub-999")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                userService.updateAdditionalInfo(
+                    identity, LocalDate.of(1998, 4, 12), new BigDecimal("3500.00"), "MODERADO"))
+        .isInstanceOf(ResourceNotFoundException.class);
+
+    verify(userRepository, never()).save(any());
   }
 }
