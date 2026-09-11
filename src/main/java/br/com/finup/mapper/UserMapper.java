@@ -18,7 +18,15 @@ public final class UserMapper {
   private UserMapper() {}
 
   public static UserResponse toResponse(User user) {
-    return new UserResponse(user.getId(), user.getName(), user.getEmail(), user.getCreatedAt());
+    return new UserResponse(
+        user.getId(),
+        user.getName(),
+        user.getEmail(),
+        user.getBirthDate(),
+        user.getMonthlyIncome(),
+        user.getFinancialProfile(),
+        user.getCreatedAt(),
+        user.getUpdatedAt());
   }
 
   public static List<UserResponse> toResponses(List<User> users) {

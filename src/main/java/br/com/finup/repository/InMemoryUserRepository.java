@@ -12,8 +12,8 @@ import org.springframework.stereotype.Repository;
 /**
  * Implementacao temporaria em memoria.
  *
- * <p>Existe para que o exemplo de cadastro rode de ponta a ponta sem banco — os dados somem quando
- * a aplicacao reinicia.
+ * <p>Existe para que o cadastro rode de ponta a ponta sem banco — os dados somem quando a aplicacao
+ * reinicia.
  *
  * <p><strong>Substituir quando o PostgreSQL entrar:</strong> apague esta classe e faca {@link
  * UserRepository} estender {@code JpaRepository<User, UUID>}. Nem o service nem o controller mudam.
@@ -33,6 +33,18 @@ public class InMemoryUserRepository implements UserRepository {
   @Override
   public Optional<User> findById(UUID id) {
     return Optional.ofNullable(storage.get(id));
+  }
+
+  @Override
+  public Optional<User> findByCognitoId(String cognitoId) {
+    return storage.values().stream()
+        .filter(user -> user.getCognitoId().equals(cognitoId))
+        .findFirst();
+  }
+
+  @Override
+  public boolean existsByCognitoId(String cognitoId) {
+    return findByCognitoId(cognitoId).isPresent();
   }
 
   @Override

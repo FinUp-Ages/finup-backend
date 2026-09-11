@@ -19,6 +19,10 @@ public interface UserRepository {
 
   Optional<User> findById(UUID id);
 
+  Optional<User> findByCognitoId(String cognitoId);
+
+  boolean existsByCognitoId(String cognitoId);
+
   boolean existsByEmail(String email);
 
   List<User> findAll();
