@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -22,6 +23,7 @@ class OpenApiIntegrationTests {
   @Autowired private MockMvc mockMvc;
 
   @Test
+  @DisplayName("contrato OpenAPI expoe os metadados do projeto e o recurso de usuarios")
   void exposesOpenApiContractWithProjectMetadata() throws Exception {
     mockMvc
         .perform(get("/v3/api-docs"))
@@ -35,6 +37,7 @@ class OpenApiIntegrationTests {
   }
 
   @Test
+  @DisplayName("Swagger UI redireciona para a interface")
   void redirectsSwaggerUiToItsInterface() throws Exception {
     mockMvc
         .perform(get("/swagger-ui.html"))
