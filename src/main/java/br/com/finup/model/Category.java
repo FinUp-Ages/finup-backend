@@ -3,34 +3,40 @@ package br.com.finup.model;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import org.hibernate.annotations.UuidGenerator;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 @Entity
-@Table (name = "categories")
+@Table(name = "categories")
 public class Category {
-    @Id 
-    @GeneratedValue (strategy= GenerationType.AUTO)
-    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
+    @Id
+    @UuidGenerator
+    @Column(updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "user_id")
-    private UUID userId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
 
     @Column(nullable = false)
     private String name;
-    
-    @Enumerated (EnumType.STRING)
+
+    @Enumerated(EnumType.STRING)
     private CategoryType type;
 
     @Column(name = "is_default")
-    private boolean isDefault;
+    private Boolean isDefault;
 
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
@@ -38,14 +44,13 @@ public class Category {
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
 
-    // Construtor vazio obrigatório pelo JPA
     public Category() {
     }
 
-    // Construtor completo
-    public Category(UUID id, UUID userId, String name, CategoryType type, Boolean isDefault, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
+    public Category(UUID id, User user, String name, CategoryType type,
+            Boolean isDefault, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
         this.id = id;
-        this.userId = userId;
+        this.user = user;
         this.name = name;
         this.type = type;
         this.isDefault = isDefault;
@@ -53,13 +58,24 @@ public class Category {
         this.updatedAt = updatedAt;
     }
 
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = OffsetDateTime.now();
+        this.updatedAt = OffsetDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = OffsetDateTime.now();
+    }
+
     // Getters
     public UUID getId() {
         return id;
     }
 
-    public UUID getUserId() {
-        return userId;
+    public User getUser() {
+        return user;
     }
 
     public String getName() {
@@ -87,8 +103,8 @@ public class Category {
         this.id = id;
     }
 
-    public void setUserId(UUID userId) {
-        this.userId = userId;
+    public void setUser(User user) {
+        this.user = user;
     }
 
     public void setName(String name) {
