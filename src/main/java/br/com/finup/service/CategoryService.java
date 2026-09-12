@@ -1,10 +1,5 @@
 package br.com.finup.service;
 
-import java.util.List;
-import java.util.UUID;
-
-import org.springframework.stereotype.Service;
-
 import br.com.finup.dto.CategoryRequest;
 import br.com.finup.dto.CategoryResponse;
 import br.com.finup.exception.ForbiddenOperationException;
@@ -14,6 +9,9 @@ import br.com.finup.model.Category;
 import br.com.finup.model.User;
 import br.com.finup.repository.CategoryRepository;
 import br.com.finup.repository.UserRepository;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
 
 @Service
 public class CategoryService {
@@ -43,11 +41,11 @@ public class CategoryService {
             .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId));
 
     if (category.getIsDefault()) {
-      throw new ForbiddenOperationException("Nao e possivel editar uma categoria padrao");
+      throw new ForbiddenOperationException("Não e possivel editar uma categoria padrão");
     }
 
     if (!category.getUser().getId().equals(userId)) {
-      throw new ForbiddenOperationException("Sem permissao para editar esta categoria");
+      throw new ForbiddenOperationException("Sem permissão para editar esta categoria");
     }
 
     category.setName(request.name());
@@ -74,11 +72,11 @@ public class CategoryService {
             .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId));
 
     if (category.getIsDefault()) {
-      throw new RuntimeException("Não é possível deletar uma categoria padrão");
+      throw new ForbiddenOperationException("Não e possivel deletar uma categoria padrão");
     }
 
     if (!category.getUser().getId().equals(userId)) {
-      throw new RuntimeException("Sem permissão para deletar esta categoria");
+      throw new ForbiddenOperationException("Sem permissão para deletar esta categoria");
     }
 
     categoryRepository.deleteById(categoryId);
