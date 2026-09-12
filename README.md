@@ -2,30 +2,42 @@
 
 API REST do projeto **FinUp** — AGES 2026/2.
 
-Java 21 · Spring Boot 3.3 · Maven · Docker
+Java 21 · Spring Boot 3.5 · Maven · PostgreSQL 16 · Docker
 
-> Esqueleto do projeto. As camadas estão criadas e vazias — nenhuma regra de negócio foi implementada ainda.
+> O cadastro de usuário existe como **exemplo de referência** das convenções (veja a seção mais abaixo).
+> O banco já está provisionado e populado, mas a **persistência ainda não está ligada**: o `User` é um POJO de
+> domínio sem `@Entity` e o repositório em uso é o `InMemoryUserRepository`. Fazer essa ponte é o próximo passo.
 
 ---
 
 ## Pré-requisitos
 
 - JDK 21
-- Docker (opcional, para rodar via container)
+- Docker — **obrigatório**: o PostgreSQL sobe via `docker compose`, e a aplicação não inicia sem ele
 
 Maven **não** precisa estar instalado: use o wrapper `./mvnw` (`mvnw.cmd` no Windows), que baixa a
 versão correta na primeira execução. É a mesma versão usada pelo CI e pelo Dockerfile.
 
 ## Como rodar
 
-```bash
-# via Maven Wrapper
-./mvnw spring-boot:run
+São três passos, nesta ordem. Pular o primeiro ou o segundo faz a aplicação falhar no startup.
 
-# ou via Docker
-docker build -t finup-backend .
-docker run -p 8080:8080 finup-backend
+```bash
+# 1. credenciais locais: copie o exemplo e defina DB_PASSWORD
+cp .env.example .env
+
+# 2. banco: PostgreSQL 16, com schema e carga inicial
+docker compose up -d
+
+# 3. aplicacao
+./mvnw spring-boot:run
 ```
+
+O `.env` **não** é opcional: `DB_PASSWORD` não tem valor padrão. Sem ele, ou com o banco fora do ar, a
+aplicação morre com uma stack do Hibernate (`Unable to determine Dialect without JDBC metadata` ou
+`password authentication failed`), nunca com uma mensagem dizendo que falta configuração.
+
+Detalhes do banco — recriar, popular, ver logs — estão em [Banco de Dados com Docker](#banco-de-dados-com-docker).
 
 Depois de subir:
 
@@ -268,9 +280,15 @@ desenvolvimento (veja `.env.example`):
 | `SPRING_PROFILES_ACTIVE` | `dev` | perfil ativo; use `prod` no ambiente implantado |
 | `LOG_LEVEL` | `DEBUG` no perfil `dev`, `INFO` fora dele | nível de log de `br.com.finup` |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | origens do CORS, separadas por vírgula |
+| `DB_NAME` | `finup` | nome do banco |
+| `DB_USER` | `finup_user` | usuário do banco |
+| `DB_PASSWORD` | **sem default** | senha do banco; sem ela a aplicação não sobe |
+| `DB_PORT` | `5432` | porta publicada pelo container do PostgreSQL |
 
-Spring Boot **não lê `.env` nativamente**. O arquivo existe para o `docker-compose` (`env_file`) e
-como referência — rodando via `./mvnw`, exporte no shell ou confie nos defaults do perfil `dev`.
+O `application.yml` importa o `.env` da raiz (`spring.config.import: optional:file:.env[.properties]`),
+então o mesmo arquivo serve para o `docker compose` e para a aplicação rodando via `./mvnw`. O `optional:`
+faz o Boot não reclamar da ausência do arquivo — mas a falta de `DB_PASSWORD` derruba o startup mesmo assim,
+porque essa é a única variável sem valor padrão.
 
 ## O que ainda não está aqui (e por quê)
 
@@ -278,9 +296,16 @@ Estas dependências estão **comentadas no `pom.xml`**, prontas para serem desco
 
 | Item | Quando habilitar |
 |---|---|
-| Banco de dados (JPA + PostgreSQL) | quando a modelagem de dados estiver definida |
 | Spring Security | quando o fluxo de autenticação estiver definido |
-| Migrations (Flyway) | junto com o banco |
+
+Já **entraram**, e por isso saíram desta lista: JPA e o driver do PostgreSQL, com o banco em
+`docker compose`. Duas ressalvas sobre esse estado:
+
+- **A persistência não está ligada.** Não existe nenhuma `@Entity`; o `UserRepository` em uso é o
+  `InMemoryUserRepository`, então o que a API grava se perde no restart e não chega ao PostgreSQL.
+- **Não há ferramenta de migration.** Os scripts de `database/init/` só rodam quando o volume é criado,
+  então hoje mudar o schema exige `docker compose down -v` e perder o banco local. Flyway continua
+  pendente e vai precisar entrar antes de o schema começar a evoluir de verdade.
 
 Os pacotes por funcionalidade (transações, score, trilhas, IA...) serão criados conforme cada feature entrar em sprint — não foram criados antecipadamente porque o escopo ainda está em discussão.
 
@@ -303,6 +328,12 @@ Dockerfile                    build multi-stage, runtime sem root
 
 O `CODEOWNERS` só tem efeito com **"Require review from Code Owners"** ligado na branch
 protection — sem isso o GitHub ignora o arquivo em silêncio.
+
+Sobre o `Dockerfile`: ele monta a imagem da aplicação e é usado pelo CI, mas **rodar essa imagem sozinha
+não funciona para desenvolvimento local**. O `spring.datasource.url` aponta para `localhost`, e dentro do
+container `localhost` é o próprio container, não o host onde o PostgreSQL está publicado. Enquanto a
+aplicação não entrar no `docker-compose.yml` como serviço — com um `DB_HOST` apontando para `db` — o
+caminho local é o da seção [Como rodar](#como-rodar): banco em container, aplicação na sua máquina.
 
 ## Banco de Dados com Docker
 
