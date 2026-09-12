@@ -1,5 +1,6 @@
 package br.com.finup.model;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -16,6 +17,8 @@ import java.util.UUID;
  *
  * <p>Quando o banco entrar, esta classe recebe {@code @Entity} e o {@code id} recebe {@code @Id}.
  * Nada aqui muda por causa disso — a entidade nao conhece HTTP nem persistencia.
+ *
+ * <p>{@code monthlyIncome} e {@code finUpScore} sao opcionais: podem nao existir ainda.
  */
 public class User {
 
@@ -23,12 +26,22 @@ public class User {
   private final String name;
   private final String email;
   private final Instant createdAt;
+  private final BigDecimal monthlyIncome;
+  private final Integer finUpScore;
 
-  private User(UUID id, String name, String email, Instant createdAt) {
+  private User(
+      UUID id,
+      String name,
+      String email,
+      Instant createdAt,
+      BigDecimal monthlyIncome,
+      Integer finUpScore) {
     this.id = id;
     this.name = name;
     this.email = email;
     this.createdAt = createdAt;
+    this.monthlyIncome = monthlyIncome;
+    this.finUpScore = finUpScore;
   }
 
   /**
@@ -36,12 +49,29 @@ public class User {
    * dominio, nunca do cliente da API.
    */
   public static User register(String name, String email) {
-    return new User(UUID.randomUUID(), name.strip(), normalizeEmail(email), Instant.now());
+    return new User(
+        UUID.randomUUID(), name.strip(), normalizeEmail(email), Instant.now(), null, null);
   }
 
   /** Devolve uma copia com o nome trocado. A instancia original continua valida. */
   public User withName(String newName) {
-    return new User(this.id, newName.strip(), this.email, this.createdAt);
+    return new User(
+        this.id, newName.strip(), this.email, this.createdAt, this.monthlyIncome, this.finUpScore);
+  }
+
+  /** Devolve uma copia com a renda mensal atualizada. */
+  public User withMonthlyIncome(BigDecimal newMonthlyIncome) {
+    return new User(
+        this.id, this.name, this.email, this.createdAt, newMonthlyIncome, this.finUpScore);
+  }
+
+  /**
+   * Devolve uma copia com o FinUp Score atualizado. Quem decide o valor e {@code
+   * FinUpScoreCalculator}; esta classe so guarda o resultado.
+   */
+  public User withFinUpScore(Integer newFinUpScore) {
+    return new User(
+        this.id, this.name, this.email, this.createdAt, this.monthlyIncome, newFinUpScore);
   }
 
   /**
@@ -66,6 +96,14 @@ public class User {
 
   public Instant getCreatedAt() {
     return createdAt;
+  }
+
+  public BigDecimal getMonthlyIncome() {
+    return monthlyIncome;
+  }
+
+  public Integer getFinUpScore() {
+    return finUpScore;
   }
 
   /** Identidade de entidade e o id — dois usuarios com o mesmo id sao o mesmo usuario. */
