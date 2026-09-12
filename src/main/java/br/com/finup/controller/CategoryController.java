@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,28 +32,34 @@ public class CategoryController {
 
     @PostMapping
     public ResponseEntity<CategoryResponse> create(
-        // TODO: substituir pelo userId vindo do token JWT via Spring Security
-        @RequestHeader("X-User-Id") UUID userId,
-        @RequestBody @Valid CategoryRequest request
-    ) {
+            // TODO: substituir pelo userId vindo do token JWT via Spring Security
+            @RequestHeader("X-User-Id") UUID userId,
+            @RequestBody @Valid CategoryRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(categoryService.create(userId, request));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<CategoryResponse> update(
-        // TODO: substituir pelo userId vindo do token JWT via Spring Security
-        @RequestHeader("X-User-Id") UUID userId,
-        @PathVariable UUID id,
-        @RequestBody @Valid CategoryRequest request
-    ) {
+            // TODO: substituir pelo userId vindo do token JWT via Spring Security
+            @RequestHeader("X-User-Id") UUID userId,
+            @PathVariable UUID id,
+            @RequestBody @Valid CategoryRequest request) {
         return ResponseEntity.ok(categoryService.update(userId, id, request));
     }
 
     @GetMapping
     public ResponseEntity<List<CategoryResponse>> findAvailable(
-        // TODO: substituir pelo userId vindo do token JWT via Spring Security
-        @RequestHeader("X-User-Id") UUID userId
-    ) {
+            // TODO: substituir pelo userId vindo do token JWT via Spring Security
+            @RequestHeader("X-User-Id") UUID userId) {
         return ResponseEntity.ok(categoryService.findAvailable(userId));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(
+            // TODO: substituir pelo userId vindo do token JWT via Spring Security
+            @RequestHeader("X-User-Id") UUID userId,
+            @PathVariable UUID id) {
+        categoryService.delete(userId, id);
+        return ResponseEntity.noContent().build();
     }
 }
