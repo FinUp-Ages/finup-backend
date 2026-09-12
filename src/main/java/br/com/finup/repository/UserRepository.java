@@ -1,9 +1,11 @@
 package br.com.finup.repository;
 
-import br.com.finup.model.User;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import br.com.finup.model.User;
 
 /**
  * Contrato de acesso a dados de usuario.
@@ -13,13 +15,6 @@ import java.util.UUID;
  *
  * <p>Devolve {@link Optional} em vez de {@code null}: quem chama e obrigado a tratar a ausencia.
  */
-public interface UserRepository {
-
-  User save(User user);
-
-  Optional<User> findById(UUID id);
-
+public interface UserRepository extends JpaRepository<User, UUID> {
   boolean existsByEmail(String email);
-
-  List<User> findAll();
 }

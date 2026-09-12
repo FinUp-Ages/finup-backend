@@ -4,6 +4,13 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
+import org.hibernate.annotations.UuidGenerator;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
 /**
  * Usuario do FinUp.
  *
@@ -17,12 +24,23 @@ import java.util.UUID;
  * <p>Quando o banco entrar, esta classe recebe {@code @Entity} e o {@code id} recebe {@code @Id}.
  * Nada aqui muda por causa disso — a entidade nao conhece HTTP nem persistencia.
  */
+
+@Entity
+@Table(name = "users")
 public class User {
 
-  private final UUID id;
-  private final String name;
-  private final String email;
-  private final Instant createdAt;
+  @Id
+  @UuidGenerator
+  @Column(updatable = false, nullable = false)
+  private UUID id;
+
+  private String name;
+  private String email;
+
+  @Column(name = "created_at", updatable = false)
+  private Instant createdAt;
+
+  protected User() {}
 
   private User(UUID id, String name, String email, Instant createdAt) {
     this.id = id;
