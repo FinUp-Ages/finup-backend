@@ -2,6 +2,7 @@ package br.com.finup.service;
 
 import br.com.finup.dto.CategoryRequest;
 import br.com.finup.dto.CategoryResponse;
+import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.mapper.CategoryMapper;
 import br.com.finup.model.Category;
 import br.com.finup.model.User;
@@ -26,18 +27,17 @@ public class CategoryService {
     User user =
         userRepository
             .findById(userId)
-            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("User", userId));
 
-    Category category = CategoryMapper.toEntity(request, user);
-
-    return CategoryMapper.toResponse(categoryRepository.save(category));
+    return CategoryMapper.toResponse(
+        categoryRepository.save(CategoryMapper.toEntity(request, user)));
   }
 
   public CategoryResponse update(UUID userId, UUID categoryId, CategoryRequest request) {
     Category category =
         categoryRepository
             .findById(categoryId)
-            .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId));
 
     if (category.getIsDefault()) {
       throw new RuntimeException("Não é possível editar uma categoria padrão");
@@ -57,7 +57,7 @@ public class CategoryService {
     User user =
         userRepository
             .findById(userId)
-            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("User", userId));
 
     return categoryRepository.findByUserOrIsDefaultTrue(user).stream()
         .map(CategoryMapper::toResponse)
@@ -68,7 +68,7 @@ public class CategoryService {
     Category category =
         categoryRepository
             .findById(categoryId)
-            .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId));
 
     if (category.getIsDefault()) {
       throw new RuntimeException("Não é possível deletar uma categoria padrão");
