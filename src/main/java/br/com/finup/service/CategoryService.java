@@ -26,7 +26,7 @@ public class CategoryService {
 
     public CategoryResponse create(UUID userId, CategoryRequest request) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 
         Category category = CategoryMapper.toEntity(request, user);
 
@@ -35,7 +35,7 @@ public class CategoryService {
 
     public CategoryResponse update(UUID userId, UUID categoryId, CategoryRequest request) {
         Category category = categoryRepository.findById(categoryId)
-            .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
+                .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
 
         if (category.getIsDefault()) {
             throw new RuntimeException("Não é possível editar uma categoria padrão");
@@ -53,11 +53,26 @@ public class CategoryService {
 
     public List<CategoryResponse> findAvailable(UUID userId) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 
         return categoryRepository.findByUserOrIsDefaultTrue(user)
-            .stream()
-            .map(CategoryMapper::toResponse)
-            .toList();
+                .stream()
+                .map(CategoryMapper::toResponse)
+                .toList();
+    }
+
+    public void delete(UUID userId, UUID categoryId) {
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
+
+        if (category.getIsDefault()) {
+            throw new RuntimeException("Não é possível deletar uma categoria padrão");
+        }
+
+        if (!category.getUser().getId().equals(userId)) {
+            throw new RuntimeException("Sem permissão para deletar esta categoria");
+        }
+
+        categoryRepository.deleteById(categoryId);
     }
 }
