@@ -18,10 +18,9 @@ public class CategoryMapper {
 
     public static CategoryResponse toResponse(Category category) {
         return new CategoryResponse(
-            category.getId(),
-            category.getName(),
-            category.getType(),
-            category.getIsDefault()
-        );
+                category.getId(),
+                category.getName(),
+                category.getType(),
+                category.getIsDefault());
     }
 }
