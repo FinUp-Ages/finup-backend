@@ -385,7 +385,13 @@ A senha deve ser definida localmente através da variável `DB_PASSWORD`.
 
 O Docker Compose utiliza as variáveis definidas no `.env`.
 
-Ao executar o Spring Boot diretamente, as variáveis necessárias devem estar disponíveis no ambiente ou podem ser utilizados os valores padrão definidos pelo profile de desenvolvimento.
+Ao executar o Spring Boot diretamente, o `.env` precisa existir na raiz: o `application.yml` o importa
+via `spring.config.import`. `DB_NAME`, `DB_USER` e `DB_PORT` têm valor padrão no `application.yml`, mas
+**`DB_PASSWORD` não tem** — sem ele a aplicação não sobe. O banco também precisa estar de pé
+(`docker compose up -d`) antes de iniciar o backend, porque o JPA abre conexão durante o startup.
+
+Nos dois casos a falha aparece como uma stack do Hibernate
+(`Unable to determine Dialect without JDBC metadata`), e não como uma mensagem de configuração faltando.
 
 A conexão local com o PostgreSQL utiliza o formato:
 
