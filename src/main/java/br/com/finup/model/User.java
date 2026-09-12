@@ -1,15 +1,13 @@
 package br.com.finup.model;
 
-import java.time.Instant;
-import java.util.Objects;
-import java.util.UUID;
-
-import org.hibernate.annotations.UuidGenerator;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.Objects;
+import java.util.UUID;
+import org.hibernate.annotations.UuidGenerator;
 
 /**
  * Usuario do FinUp.
@@ -24,7 +22,6 @@ import jakarta.persistence.Table;
  * <p>Quando o banco entrar, esta classe recebe {@code @Entity} e o {@code id} recebe {@code @Id}.
  * Nada aqui muda por causa disso — a entidade nao conhece HTTP nem persistencia.
  */
-
 @Entity
 @Table(name = "users")
 public class User {

@@ -1,11 +1,9 @@
 package br.com.finup.repository;
 
+import br.com.finup.model.User;
 import java.util.Optional;
 import java.util.UUID;
-
 import org.springframework.data.jpa.repository.JpaRepository;
-
-import br.com.finup.model.User;
 
 /**
  * Contrato de acesso a dados de usuario.
