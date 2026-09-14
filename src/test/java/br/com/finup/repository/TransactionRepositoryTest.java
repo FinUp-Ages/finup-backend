@@ -37,7 +37,11 @@ class TransactionRepositoryTest {
     UUID userId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     UUID paymentMethodId = UUID.randomUUID();
-    jdbcTemplate.update("INSERT INTO users (id) VALUES (?)", userId);
+    jdbcTemplate.update(
+        "INSERT INTO users (id, cognito_id, email, created_at, updated_at) VALUES (?, ?, ?, now(), now())",
+        userId,
+        "cognito-" + userId,
+        userId + "@example.com");
     jdbcTemplate.update("INSERT INTO categories (id) VALUES (?)", categoryId);
     jdbcTemplate.update("INSERT INTO payment_methods (id) VALUES (?)", paymentMethodId);
 

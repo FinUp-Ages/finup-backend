@@ -2,21 +2,24 @@ package br.com.finup.service;
 
 import br.com.finup.exception.EmailAlreadyRegisteredException;
 import br.com.finup.exception.ResourceNotFoundException;
+import br.com.finup.exception.UserAlreadyRegisteredException;
+import br.com.finup.model.FinancialProfile;
 import br.com.finup.model.User;
 import br.com.finup.repository.UserRepository;
-import java.util.List;
-import java.util.UUID;
+import br.com.finup.security.AuthenticatedIdentity;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Regra de negocio de usuario.
  *
  * <p>Repare no que <strong>nao</strong> tem aqui: nenhum {@code ResponseEntity}, nenhum codigo de
  * status, nenhum {@code HttpServletRequest}. O service sinaliza o problema lancando excecao de
- * negocio; quem traduz para HTTP e o {@code ApiExceptionHandler}. E isso que permite reusar este
- * service em um job agendado ou num consumidor de fila sem arrastar a camada web junto.
+ * negocio; quem traduz para HTTP e o {@code ApiExceptionHandler}.
  *
  * <p>Injecao por construtor, com campo {@code final}: a dependencia fica explicita, a classe nao
  * pode ser construida pela metade e o teste passa um duble sem precisar de contexto Spring.
@@ -33,30 +36,70 @@ public class UserService {
   }
 
   /**
-   * Cadastra um usuario.
+   * Etapa 1 do cadastro: cria o registro local a partir de uma identidade ja autenticada pelo
+   * Cognito. Nao recebe nem valida senha — isso e responsabilidade do Cognito.
    *
+   * @throws UserAlreadyRegisteredException se essa identidade ja tiver um usuario local
    * @throws EmailAlreadyRegisteredException se o e-mail ja pertencer a outro usuario
    */
-  public User register(String name, String email) {
-    if (userRepository.existsByEmail(email)) {
-      throw new EmailAlreadyRegisteredException(email);
+  @Transactional
+  public User createFromAuthenticatedIdentity(AuthenticatedIdentity identity) {
+    String normalizedEmail = identity.email().strip().toLowerCase();
+
+    if (userRepository.existsByCognitoId(identity.cognitoId())) {
+      throw new UserAlreadyRegisteredException();
+    }
+    if (userRepository.existsByEmail(normalizedEmail)) {
+      throw new EmailAlreadyRegisteredException(identity.email());
     }
 
-    User user = userRepository.save(User.register(name, email));
-    log.info("Usuario cadastrado: id={}", user.getId());
+    User user =
+        userRepository.save(
+            User.createFromCognitoIdentity(
+                identity.cognitoId(), identity.name(), identity.email()));
+    log.info(
+        "Usuario criado a partir do Cognito: id={}, cognitoId={}",
+        user.getId(),
+        user.getCognitoId());
     return user;
   }
 
   /**
-   * Busca um usuario pelo identificador.
+   * Etapa 2 do cadastro: grava ou atualiza as informacoes complementares de um usuario que ja
+   * existe. So pode ser chamada depois da Etapa 1 — nao cria usuario, so complementa um que ja foi
+   * criado a partir da identidade do Cognito.
    *
-   * @throws ResourceNotFoundException se nao existir usuario com esse id
+   * @throws ResourceNotFoundException se essa identidade ainda nao tiver usuario local
    */
-  public User findById(UUID id) {
-    return userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User", id));
+  @Transactional
+  public User updateAdditionalInfo(
+      AuthenticatedIdentity identity,
+      LocalDate birthDate,
+      BigDecimal monthlyIncome,
+      FinancialProfile financialProfile) {
+    User user = findByIdentityOrThrow(identity);
+    user.applyAdditionalInfo(birthDate, monthlyIncome, financialProfile);
+    User updated = userRepository.save(user);
+    log.info("Informacoes complementares atualizadas: id={}", updated.getId());
+    return updated;
   }
 
-  public List<User> findAll() {
-    return userRepository.findAll();
+  /**
+   * Busca o usuario correspondente a identidade autenticada — usado no login, para o mobile saber
+   * se a Etapa 1 ja foi feita.
+   *
+   * @throws ResourceNotFoundException se essa identidade ainda nao tiver usuario local
+   */
+  public User findByAuthenticatedIdentity(AuthenticatedIdentity identity) {
+    return findByIdentityOrThrow(identity);
+  }
+
+  private User findByIdentityOrThrow(AuthenticatedIdentity identity) {
+    return userRepository
+        .findByCognitoId(identity.cognitoId())
+        .orElseThrow(
+            () ->
+                new ResourceNotFoundException(
+                    "Usuario nao encontrado para a identidade autenticada."));
   }
 }
