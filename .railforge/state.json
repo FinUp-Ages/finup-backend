@@ -1,0 +1,9 @@
+{
+  "stage": "COMPLETED",
+  "task": null,
+  "objective": "Executar a CI em pushes para qualquer branch.",
+  "files_in_scope": [".github/workflows/ci.yml"],
+  "validation": {"git diff --check": "passed"},
+  "review": "approved",
+  "updated_at": "2026-09-13"
+}

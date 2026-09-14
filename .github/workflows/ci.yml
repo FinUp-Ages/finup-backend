@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main, develop]
+    branches: ["**"]
 
 # Sem isto o GITHUB_TOKEN herda as permissoes padrao da organizacao, que podem ser de escrita.
 # Este workflow so precisa ler o codigo.
