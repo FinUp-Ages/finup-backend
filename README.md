@@ -2,38 +2,88 @@
 
 API REST do projeto **FinUp** — AGES 2026/2.
 
-Java 21 · Spring Boot 3.3 · Maven · Docker
+Java 21 · Spring Boot 3.5 · Maven · PostgreSQL 16 · Docker
 
-> Esqueleto do projeto. As camadas estão criadas e vazias — nenhuma regra de negócio foi implementada ainda.
+> O cadastro de usuário existe como **exemplo de referência** das convenções (veja a seção mais abaixo).
+> O banco já está provisionado e populado, mas a **persistência ainda não está ligada**: o `User` é um POJO de
+> domínio sem `@Entity` e o repositório em uso é o `InMemoryUserRepository`. Fazer essa ponte é o próximo passo.
 
 ---
 
 ## Pré-requisitos
 
 - JDK 21
-- Docker (opcional, para rodar via container)
+- Docker — **obrigatório**: o PostgreSQL sobe via `docker compose`, e a aplicação não inicia sem ele
 
 Maven **não** precisa estar instalado: use o wrapper `./mvnw` (`mvnw.cmd` no Windows), que baixa a
 versão correta na primeira execução. É a mesma versão usada pelo CI e pelo Dockerfile.
 
 ## Como rodar
 
-```bash
-# via Maven Wrapper
-./mvnw spring-boot:run
+São três passos, nesta ordem. Pular o primeiro ou o segundo faz a aplicação falhar no startup.
 
-# ou via Docker
-docker build -t finup-backend .
-docker run -p 8080:8080 finup-backend
+```bash
+# 1. credenciais locais: copie o exemplo e defina DB_PASSWORD
+cp .env.example .env
+
+# 2. banco: PostgreSQL 16, com schema e carga inicial
+docker compose up -d
+
+# 3. aplicacao
+./mvnw spring-boot:run
 ```
+
+O `.env` **não** é opcional: `DB_PASSWORD` não tem valor padrão. Sem ele, ou com o banco fora do ar, a
+aplicação morre com uma stack do Hibernate (`Unable to determine Dialect without JDBC metadata` ou
+`password authentication failed`), nunca com uma mensagem dizendo que falta configuração.
+
+Detalhes do banco — recriar, popular, ver logs — estão em [Banco de Dados com Docker](#banco-de-dados-com-docker).
 
 Depois de subir:
 
 | O quê | URL |
 |---|---|
 | Health check | http://localhost:8080/actuator/health |
+
+## Swagger / OpenAPI
+
+Com a aplicação em execução, a documentação da API fica disponível nestas URLs:
+
+| O quê | URL |
+|---|---|
 | Swagger UI | http://localhost:8080/swagger-ui.html |
 | Contrato OpenAPI | http://localhost:8080/v3/api-docs |
+
+O Swagger UI lê o contrato OpenAPI gerado automaticamente pelo `springdoc` a partir dos
+controllers e DTOs da aplicação. Os metadados gerais da API ficam centralizados em
+`config/OpenApiConfig.java`.
+
+### Como documentar novos endpoints
+
+O `springdoc` descobre automaticamente classes com `@RestController`. Use as anotações do pacote
+`io.swagger.v3.oas.annotations` apenas para complementar o que não puder ser inferido pelos tipos
+Java:
+
+```java
+@Operation(summary = "Lista as transações do usuário")
+@ApiResponse(responseCode = "200", description = "Transações encontradas")
+@GetMapping("/transactions")
+public List<TransactionResponse> list() {
+    // ...
+}
+```
+
+Nos DTOs, `@Schema` pode esclarecer regras e fornecer exemplos de campos:
+
+```java
+public record TransactionResponse(
+        @Schema(example = "42") Long id,
+        @Schema(example = "125.90") BigDecimal amount
+) {}
+```
+
+Evite anotar tudo: nomes claros e DTOs tipados já produzem boa parte do contrato. Depois de criar
+ou alterar um endpoint, confira o resultado no Swagger UI e rode `./mvnw clean verify`.
 
 ## Como validar antes de abrir um PR
 
@@ -230,9 +280,15 @@ desenvolvimento (veja `.env.example`):
 | `SPRING_PROFILES_ACTIVE` | `dev` | perfil ativo; use `prod` no ambiente implantado |
 | `LOG_LEVEL` | `DEBUG` no perfil `dev`, `INFO` fora dele | nível de log de `br.com.finup` |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | origens do CORS, separadas por vírgula |
+| `DB_NAME` | `finup` | nome do banco |
+| `DB_USER` | `finup_user` | usuário do banco |
+| `DB_PASSWORD` | **sem default** | senha do banco; sem ela a aplicação não sobe |
+| `DB_PORT` | `5432` | porta publicada pelo container do PostgreSQL |
 
-Spring Boot **não lê `.env` nativamente**. O arquivo existe para o `docker-compose` (`env_file`) e
-como referência — rodando via `./mvnw`, exporte no shell ou confie nos defaults do perfil `dev`.
+O `application.yml` importa o `.env` da raiz (`spring.config.import: optional:file:.env[.properties]`),
+então o mesmo arquivo serve para o `docker compose` e para a aplicação rodando via `./mvnw`. O `optional:`
+faz o Boot não reclamar da ausência do arquivo — mas a falta de `DB_PASSWORD` derruba o startup mesmo assim,
+porque essa é a única variável sem valor padrão.
 
 ## O que ainda não está aqui (e por quê)
 
@@ -240,9 +296,16 @@ Estas dependências estão **comentadas no `pom.xml`**, prontas para serem desco
 
 | Item | Quando habilitar |
 |---|---|
-| Banco de dados (JPA + PostgreSQL) | quando a modelagem de dados estiver definida |
 | Spring Security | quando o fluxo de autenticação estiver definido |
-| Migrations (Flyway) | junto com o banco |
+
+Já **entraram**, e por isso saíram desta lista: JPA e o driver do PostgreSQL, com o banco em
+`docker compose`. Duas ressalvas sobre esse estado:
+
+- **A persistência não está ligada.** Não existe nenhuma `@Entity`; o `UserRepository` em uso é o
+  `InMemoryUserRepository`, então o que a API grava se perde no restart e não chega ao PostgreSQL.
+- **Não há ferramenta de migration.** Os scripts de `database/init/` só rodam quando o volume é criado,
+  então hoje mudar o schema exige `docker compose down -v` e perder o banco local. Flyway continua
+  pendente e vai precisar entrar antes de o schema começar a evoluir de verdade.
 
 Os pacotes por funcionalidade (transações, score, trilhas, IA...) serão criados conforme cada feature entrar em sprint — não foram criados antecipadamente porque o escopo ainda está em discussão.
 
@@ -265,3 +328,145 @@ Dockerfile                    build multi-stage, runtime sem root
 
 O `CODEOWNERS` só tem efeito com **"Require review from Code Owners"** ligado na branch
 protection — sem isso o GitHub ignora o arquivo em silêncio.
+
+Sobre o `Dockerfile`: ele monta a imagem da aplicação e é usado pelo CI, mas **rodar essa imagem sozinha
+não funciona para desenvolvimento local**. O `spring.datasource.url` aponta para `localhost`, e dentro do
+container `localhost` é o próprio container, não o host onde o PostgreSQL está publicado. Enquanto a
+aplicação não entrar no `docker-compose.yml` como serviço — com um `DB_HOST` apontando para `db` — o
+caminho local é o da seção [Como rodar](#como-rodar): banco em container, aplicação na sua máquina.
+
+## Banco de Dados com Docker
+
+O projeto utiliza PostgreSQL 16 executado via Docker Compose para o ambiente local.
+
+### Configuração
+
+Crie um arquivo `.env` na raiz do projeto com base no `.env.example`.
+
+Exemplo:
+
+```env
+SERVER_PORT=8080
+SPRING_PROFILES_ACTIVE=dev
+LOG_LEVEL=DEBUG
+CORS_ALLOWED_ORIGINS=http://localhost:5173
+
+DB_NAME=finup
+DB_USER=finup_user
+DB_PASSWORD=sua_senha_local
+DB_PORT=5432
+```
+
+O arquivo `.env` não deve ser versionado, pois pode conter informações sensíveis.
+
+### Subir o banco
+
+```bash
+docker compose up -d
+```
+
+### Verificar se o banco está funcionando
+
+```bash
+docker compose ps
+```
+
+O container do PostgreSQL deve aparecer em execução e com status `healthy`.
+
+### Visualizar os logs do PostgreSQL
+
+```bash
+docker compose logs db
+```
+
+### Parar o ambiente
+
+```bash
+docker compose down
+```
+
+Os dados permanecem armazenados no volume Docker.
+
+### Recriar o container
+
+```bash
+docker compose up -d --force-recreate
+```
+
+### Apagar o banco local e começar do zero
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+> Atenção: o comando `docker compose down -v` remove o volume do PostgreSQL e apaga os dados armazenados localmente.
+
+### Configuração padrão do banco
+
+- Banco: PostgreSQL 16
+- Host: localhost
+- Porta: 5432
+- Nome do banco: finup
+- Usuário: finup_user
+
+A senha deve ser definida localmente através da variável `DB_PASSWORD`.
+
+### Conexão com o backend
+
+O Docker Compose utiliza as variáveis definidas no `.env`.
+
+Ao executar o Spring Boot diretamente, o `.env` precisa existir na raiz: o `application.yml` o importa
+via `spring.config.import`. `DB_NAME`, `DB_USER` e `DB_PORT` têm valor padrão no `application.yml`, mas
+**`DB_PASSWORD` não tem** — sem ele a aplicação não sobe. O banco também precisa estar de pé
+(`docker compose up -d`) antes de iniciar o backend, porque o JPA abre conexão durante o startup.
+
+Nos dois casos a falha aparece como uma stack do Hibernate
+(`Unable to determine Dialect without JDBC metadata`), e não como uma mensagem de configuração faltando.
+
+A conexão local com o PostgreSQL utiliza o formato:
+
+```text
+jdbc:postgresql://localhost:5432/finup
+```
+
+## Inicialização e população do banco de dados
+
+Os scripts SQL responsáveis pela criação e população do banco ficam em:
+
+`database/init`
+
+Eles são executados automaticamente pelo PostgreSQL durante a criação inicial do banco.
+
+### Ordem de execução
+
+1. `01-schema.sql` - cria a estrutura, as tabelas e os relacionamentos do banco.
+2. `02-required-data.sql` - insere os dados obrigatórios da aplicação.
+3. `03-test-data.sql` - insere dados fictícios para desenvolvimento e testes.
+
+### Recriar e popular o banco novamente
+
+Os scripts de inicialização são executados quando o PostgreSQL cria um novo volume.
+
+Para remover o banco local e executar novamente todos os scripts:
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+Para acompanhar a execução dos scripts:
+
+```bash
+docker compose logs db
+```
+
+### Fluxo de inicialização
+
+Ao criar o banco pela primeira vez, o processo ocorre na seguinte ordem:
+
+1. O PostgreSQL é inicializado.
+2. O arquivo `01-schema.sql` cria as tabelas e os relacionamentos.
+3. O arquivo `02-required-data.sql` insere os dados obrigatórios.
+4. O arquivo `03-test-data.sql` insere os dados fictícios de desenvolvimento e testes.
+5. O banco fica disponível para utilização pela aplicação.
