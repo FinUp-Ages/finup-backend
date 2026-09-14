@@ -10,9 +10,7 @@ import org.springframework.http.HttpStatus;
  */
 public class UserAlreadyRegisteredException extends BusinessException {
 
-  public UserAlreadyRegisteredException(String cognitoId) {
-    super(
-        "Ja existe um usuario cadastrado para esta identidade (%s)".formatted(cognitoId),
-        HttpStatus.CONFLICT);
+  public UserAlreadyRegisteredException() {
+    super("Ja existe um usuario cadastrado para esta identidade.", HttpStatus.CONFLICT);
   }
 }

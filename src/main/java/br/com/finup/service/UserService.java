@@ -3,16 +3,16 @@ package br.com.finup.service;
 import br.com.finup.exception.EmailAlreadyRegisteredException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.exception.UserAlreadyRegisteredException;
+import br.com.finup.model.FinancialProfile;
 import br.com.finup.model.User;
 import br.com.finup.repository.UserRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Regra de negocio de usuario.
@@ -42,11 +42,14 @@ public class UserService {
    * @throws UserAlreadyRegisteredException se essa identidade ja tiver um usuario local
    * @throws EmailAlreadyRegisteredException se o e-mail ja pertencer a outro usuario
    */
+  @Transactional
   public User createFromAuthenticatedIdentity(AuthenticatedIdentity identity) {
+    String normalizedEmail = identity.email().strip().toLowerCase();
+
     if (userRepository.existsByCognitoId(identity.cognitoId())) {
-      throw new UserAlreadyRegisteredException(identity.cognitoId());
+      throw new UserAlreadyRegisteredException();
     }
-    if (userRepository.existsByEmail(identity.email())) {
+    if (userRepository.existsByEmail(normalizedEmail)) {
       throw new EmailAlreadyRegisteredException(identity.email());
     }
 
@@ -68,32 +71,35 @@ public class UserService {
    *
    * @throws ResourceNotFoundException se essa identidade ainda nao tiver usuario local
    */
+  @Transactional
   public User updateAdditionalInfo(
       AuthenticatedIdentity identity,
       LocalDate birthDate,
       BigDecimal monthlyIncome,
-      String financialProfile) {
-    User user =
-        userRepository
-            .findByCognitoId(identity.cognitoId())
-            .orElseThrow(() -> new ResourceNotFoundException("User", identity.cognitoId()));
-
-    User updated =
-        userRepository.save(user.withAdditionalInfo(birthDate, monthlyIncome, financialProfile));
+      FinancialProfile financialProfile) {
+    User user = findByIdentityOrThrow(identity);
+    user.applyAdditionalInfo(birthDate, monthlyIncome, financialProfile);
+    User updated = userRepository.save(user);
     log.info("Informacoes complementares atualizadas: id={}", updated.getId());
     return updated;
   }
 
   /**
-   * Busca um usuario pelo identificador.
+   * Busca o usuario correspondente a identidade autenticada — usado no login, para o mobile saber
+   * se a Etapa 1 ja foi feita.
    *
-   * @throws ResourceNotFoundException se nao existir usuario com esse id
+   * @throws ResourceNotFoundException se essa identidade ainda nao tiver usuario local
    */
-  public User findById(UUID id) {
-    return userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User", id));
+  public User findByAuthenticatedIdentity(AuthenticatedIdentity identity) {
+    return findByIdentityOrThrow(identity);
   }
 
-  public List<User> findAll() {
-    return userRepository.findAll();
+  private User findByIdentityOrThrow(AuthenticatedIdentity identity) {
+    return userRepository
+        .findByCognitoId(identity.cognitoId())
+        .orElseThrow(
+            () ->
+                new ResourceNotFoundException(
+                    "Usuario nao encontrado para a identidade autenticada."));
   }
 }

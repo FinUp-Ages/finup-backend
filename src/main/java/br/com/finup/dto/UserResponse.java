@@ -1,5 +1,6 @@
 package br.com.finup.dto;
 
+import br.com.finup.model.FinancialProfile;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -26,6 +27,7 @@ public record UserResponse(
     @Schema(description = "E-mail, sempre em minusculas") String email,
     @Schema(description = "Data de nascimento, se ja preenchida na Etapa 2") LocalDate birthDate,
     @Schema(description = "Renda mensal, se ja preenchida na Etapa 2") BigDecimal monthlyIncome,
-    @Schema(description = "Perfil financeiro, se ja preenchido na Etapa 2") String financialProfile,
+    @Schema(description = "Perfil financeiro, se ja preenchido na Etapa 2")
+        FinancialProfile financialProfile,
     @Schema(description = "Instante do cadastro, em UTC") Instant createdAt,
     @Schema(description = "Instante da ultima atualizacao, em UTC") Instant updatedAt) {}

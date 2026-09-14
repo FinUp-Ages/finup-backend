@@ -1,9 +1,9 @@
 package br.com.finup.dto;
 
+import br.com.finup.model.FinancialProfile;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Past;
-import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -12,10 +12,6 @@ import java.time.LocalDate;
  *
  * <p>Todos os campos sao opcionais — cada chamada atualiza so o que veio preenchido, o que permite
  * tanto o primeiro preenchimento quanto atualizacoes parciais depois.
- *
- * <p>{@code financialProfile} e {@code String} de proposito, e nao um enum Java: os valores validos
- * ainda nao foram definidos pelo time, e inventar um conjunto agora seria criar regra de negocio
- * que a task pede explicitamente para nao inventar.
  */
 @Schema(description = "Informacoes complementares do usuario")
 public record UpdateUserAdditionalInfoRequest(
@@ -25,6 +21,4 @@ public record UpdateUserAdditionalInfoRequest(
     @Schema(description = "Renda mensal", example = "3500.00")
         @DecimalMin(value = "0.0", message = "nao pode ser negativa")
         BigDecimal monthlyIncome,
-    @Schema(description = "Perfil financeiro do usuario", example = "MODERADO")
-        @Size(max = 50, message = "deve ter no maximo 50 caracteres")
-        String financialProfile) {}
+    @Schema(description = "Perfil financeiro do usuario") FinancialProfile financialProfile) {}

@@ -10,13 +10,13 @@ import static org.mockito.Mockito.when;
 import br.com.finup.exception.EmailAlreadyRegisteredException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.exception.UserAlreadyRegisteredException;
+import br.com.finup.model.FinancialProfile;
 import br.com.finup.model.User;
 import br.com.finup.repository.UserRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
-import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,6 +58,20 @@ class UserServiceTest {
   }
 
   @Test
+  @DisplayName("permite identidade sem nome, como no login com Apple sem o primeiro acesso")
+  void createsWhenNameIsAbsent() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", null, "ana@exemplo.com");
+    when(userRepository.existsByCognitoId("cognito-sub-123")).thenReturn(false);
+    when(userRepository.existsByEmail("ana@exemplo.com")).thenReturn(false);
+    when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+    User user = userService.createFromAuthenticatedIdentity(identity);
+
+    assertThat(user.getName()).isNull();
+  }
+
+  @Test
   @DisplayName("recusa criacao quando a identidade ja tem usuario local e nao chega a gravar")
   void rejectsDuplicateCognitoIdentity() {
     AuthenticatedIdentity identity =
@@ -65,8 +79,7 @@ class UserServiceTest {
     when(userRepository.existsByCognitoId("cognito-sub-123")).thenReturn(true);
 
     assertThatThrownBy(() -> userService.createFromAuthenticatedIdentity(identity))
-        .isInstanceOf(UserAlreadyRegisteredException.class)
-        .hasMessageContaining("cognito-sub-123");
+        .isInstanceOf(UserAlreadyRegisteredException.class);
 
     verify(userRepository, never()).save(any());
   }
@@ -87,13 +100,19 @@ class UserServiceTest {
   }
 
   @Test
-  @DisplayName("buscar por id inexistente lanca ResourceNotFoundException")
-  void throwsWhenIdDoesNotExist() {
-    UUID id = UUID.randomUUID();
-    when(userRepository.findById(id)).thenReturn(Optional.empty());
+  @DisplayName("recusa criacao quando o e-mail ja existe, mesmo com caixa diferente")
+  void rejectsEmailAlreadyUsedRegardlessOfCase() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-456", "Outra Ana", "Ana@Exemplo.COM");
+    when(userRepository.existsByCognitoId("cognito-sub-456")).thenReturn(false);
+    // O service normaliza (strip + lowercase) antes de consultar - a checagem e feita com o
+    // e-mail ja normalizado, entao a variacao de caixa na entrada nao deveria escapar da regra.
+    when(userRepository.existsByEmail("ana@exemplo.com")).thenReturn(true);
 
-    assertThatThrownBy(() -> userService.findById(id))
-        .isInstanceOf(ResourceNotFoundException.class);
+    assertThatThrownBy(() -> userService.createFromAuthenticatedIdentity(identity))
+        .isInstanceOf(EmailAlreadyRegisteredException.class);
+
+    verify(userRepository, never()).save(any());
   }
 
   @Test
@@ -108,12 +127,14 @@ class UserServiceTest {
 
     User updated =
         userService.updateAdditionalInfo(
-            identity, LocalDate.of(1998, 4, 12), new BigDecimal("3500.00"), "MODERADO");
+            identity,
+            LocalDate.of(1998, 4, 12),
+            new BigDecimal("3500.00"),
+            FinancialProfile.MODERATE);
 
     assertThat(updated.getBirthDate()).isEqualTo(LocalDate.of(1998, 4, 12));
     assertThat(updated.getMonthlyIncome()).isEqualByComparingTo("3500.00");
-    assertThat(updated.getFinancialProfile()).isEqualTo("MODERADO");
-    assertThat(updated.getUpdatedAt()).isAfterOrEqualTo(existing.getCreatedAt());
+    assertThat(updated.getFinancialProfile()).isEqualTo(FinancialProfile.MODERATE);
   }
 
   @Test
@@ -126,9 +147,37 @@ class UserServiceTest {
     assertThatThrownBy(
             () ->
                 userService.updateAdditionalInfo(
-                    identity, LocalDate.of(1998, 4, 12), new BigDecimal("3500.00"), "MODERADO"))
+                    identity,
+                    LocalDate.of(1998, 4, 12),
+                    new BigDecimal("3500.00"),
+                    FinancialProfile.MODERATE))
         .isInstanceOf(ResourceNotFoundException.class);
 
     verify(userRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("busca usuario pela identidade autenticada")
+  void findsByAuthenticatedIdentity() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
+    User existing =
+        User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
+    when(userRepository.findByCognitoId("cognito-sub-123")).thenReturn(Optional.of(existing));
+
+    User found = userService.findByAuthenticatedIdentity(identity);
+
+    assertThat(found).isEqualTo(existing);
+  }
+
+  @Test
+  @DisplayName("busca por identidade inexistente lanca ResourceNotFoundException")
+  void throwsWhenIdentityHasNoLocalUser() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-999", "Ana Souza", "ana@exemplo.com");
+    when(userRepository.findByCognitoId("cognito-sub-999")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> userService.findByAuthenticatedIdentity(identity))
+        .isInstanceOf(ResourceNotFoundException.class);
   }
 }

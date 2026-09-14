@@ -3,9 +3,9 @@
 -- ============================================
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  cognito_id VARCHAR(255) NOT NULL UNIQUE,
   name VARCHAR(255),
   email VARCHAR(255) NOT NULL UNIQUE,
-  password_hash VARCHAR(255) NOT NULL,
   birth_date DATE,
   monthly_income DECIMAL(12, 2),
   fin_up_score INTEGER,

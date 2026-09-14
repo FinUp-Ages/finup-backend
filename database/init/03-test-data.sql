@@ -6,9 +6,9 @@
 -- --------------------------------------------
 INSERT INTO
   users (
+    cognito_id,
     name,
     email,
-    password_hash,
     birth_date,
     monthly_income,
     fin_up_score,
@@ -16,9 +16,9 @@ INSERT INTO
   )
 VALUES
   (
+    'mock-sub-usuario-teste',
     'Usuário Teste',
     'teste@finup.local',
-    'test-only',
     '2000-01-01',
     5000.00,
     650,
