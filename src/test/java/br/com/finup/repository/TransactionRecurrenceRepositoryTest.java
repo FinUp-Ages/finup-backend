@@ -43,7 +43,13 @@ class TransactionRecurrenceRepositoryTest {
         userId,
         "cognito-" + userId,
         userId + "@example.com");
-    jdbcTemplate.update("INSERT INTO categories (id) VALUES (?)", categoryId);
+    jdbcTemplate.update(
+        "INSERT INTO categories (id, name, type, is_default, created_at, updated_at) "
+            + "VALUES (?, ?, ?, ?, now(), now())",
+        categoryId,
+        "Alimentação",
+        "EXPENSE",
+        false);
     jdbcTemplate.update("INSERT INTO payment_methods (id) VALUES (?)", paymentMethodId);
 
     assertThat(transactionRecurrenceRepository.existsUserById(userId)).isTrue();
