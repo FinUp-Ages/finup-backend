@@ -5,19 +5,17 @@ import br.com.finup.dto.CategoryResponse;
 import br.com.finup.model.Category;
 import br.com.finup.model.User;
 
-public class CategoryMapper {
+/** Converte entre a entidade {@link Category} e os DTOs de entrada e saída. */
+public final class CategoryMapper {
+
+  private CategoryMapper() {}
 
   public static Category toEntity(CategoryRequest request, User user) {
-    Category category = new Category();
-    category.setUser(user);
-    category.setName(request.name());
-    category.setType(request.type());
-    category.setIsDefault(false);
-    return category;
+    return Category.createForUser(user, request.name(), request.type());
   }
 
   public static CategoryResponse toResponse(Category category) {
     return new CategoryResponse(
-        category.getId(), category.getName(), category.getType(), category.getIsDefault());
+        category.getId(), category.getName(), category.getType(), category.isDefault());
   }
 }

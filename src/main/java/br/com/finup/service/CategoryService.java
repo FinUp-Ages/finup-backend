@@ -2,83 +2,92 @@ package br.com.finup.service;
 
 import br.com.finup.dto.CategoryRequest;
 import br.com.finup.dto.CategoryResponse;
+import br.com.finup.exception.ConflictException;
 import br.com.finup.exception.ForbiddenOperationException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.mapper.CategoryMapper;
 import br.com.finup.model.Category;
 import br.com.finup.model.User;
 import br.com.finup.repository.CategoryRepository;
-import br.com.finup.repository.UserRepository;
+import br.com.finup.security.AuthenticatedIdentity;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CategoryService {
 
   private final CategoryRepository categoryRepository;
-  private final UserRepository userRepository;
+  private final UserService userService;
 
-  public CategoryService(CategoryRepository categoryRepository, UserRepository userRepository) {
+  public CategoryService(CategoryRepository categoryRepository, UserService userService) {
     this.categoryRepository = categoryRepository;
-    this.userRepository = userRepository;
+    this.userService = userService;
   }
 
-  public CategoryResponse create(UUID userId, CategoryRequest request) {
-    User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("User", userId));
-
-    return CategoryMapper.toResponse(
-        categoryRepository.save(CategoryMapper.toEntity(request, user)));
-  }
-
-  public CategoryResponse update(UUID userId, UUID categoryId, CategoryRequest request) {
-    Category category =
-        categoryRepository
-            .findById(categoryId)
-            .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId));
-
-    if (category.getIsDefault()) {
-      throw new ForbiddenOperationException("Não e possivel editar uma categoria padrão");
-    }
-
-    if (!category.getUser().getId().equals(userId)) {
-      throw new ForbiddenOperationException("Sem permissão para editar esta categoria");
-    }
-
-    category.setName(request.name());
-    category.setType(request.type());
-
+  @Transactional
+  public CategoryResponse create(AuthenticatedIdentity identity, CategoryRequest request) {
+    User user = userService.findByAuthenticatedIdentity(identity);
+    Category category = Category.createForUser(user, request.name(), request.type());
     return CategoryMapper.toResponse(categoryRepository.save(category));
   }
 
-  public List<CategoryResponse> findAvailable(UUID userId) {
-    User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+  @Transactional
+  public CategoryResponse update(
+      AuthenticatedIdentity identity, UUID categoryId, CategoryRequest request) {
+    User user = userService.findByAuthenticatedIdentity(identity);
+    Category category = findByIdOrThrow(categoryId);
 
+    if (category.isDefault()) {
+      throw new ForbiddenOperationException("Não é possível editar uma categoria padrão");
+    }
+    ensureOwnedByUser(user, category);
+
+    category.rename(request.name(), request.type());
+    return CategoryMapper.toResponse(categoryRepository.save(category));
+  }
+
+  public List<CategoryResponse> findAvailable(AuthenticatedIdentity identity) {
+    User user = userService.findByAuthenticatedIdentity(identity);
     return categoryRepository.findByUserOrIsDefaultTrue(user).stream()
         .map(CategoryMapper::toResponse)
         .toList();
   }
 
-  public void delete(UUID userId, UUID categoryId) {
-    Category category =
-        categoryRepository
-            .findById(categoryId)
-            .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId));
+  @Transactional
+  public void delete(AuthenticatedIdentity identity, UUID categoryId) {
+    User user = userService.findByAuthenticatedIdentity(identity);
+    Category category = findByIdOrThrow(categoryId);
 
-    if (category.getIsDefault()) {
-      throw new ForbiddenOperationException("Não e possivel deletar uma categoria padrão");
+    if (category.isDefault()) {
+      throw new ForbiddenOperationException("Não é possível excluir uma categoria padrão");
     }
+    ensureOwnedByUser(user, category);
 
-    if (!category.getUser().getId().equals(userId)) {
-      throw new ForbiddenOperationException("Sem permissão para deletar esta categoria");
+    try {
+      categoryRepository.deleteById(categoryId);
+      categoryRepository.flush();
+    } catch (DataIntegrityViolationException e) {
+      throw new ConflictException(
+          "A categoria não pode ser excluída pois está em uso por uma ou mais transações");
     }
+  }
 
-    categoryRepository.deleteById(categoryId);
+  /**
+   * Busca a categoria pelo id e verifica que pertence ao usuário. Tratar categoria de outro usuário
+   * como inexistente (404) evita confirmar a existência de um id para quem não tem acesso a ele.
+   */
+  private Category findByIdOrThrow(UUID categoryId) {
+    return categoryRepository
+        .findById(categoryId)
+        .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId));
+  }
+
+  private void ensureOwnedByUser(User user, Category category) {
+    if (!user.equals(category.getUser())) {
+      throw new ResourceNotFoundException("Category", category.getId());
+    }
   }
 }

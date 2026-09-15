@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import br.com.finup.dto.CategoryResponse;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.CategoryType;
+import br.com.finup.security.AuthenticatedIdentity;
+import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.CategoryService;
 import java.util.List;
 import java.util.UUID;
@@ -32,7 +34,15 @@ class CategoryControllerTest {
 
   @MockitoBean private CategoryService categoryService;
 
-  private static final UUID USER_ID = UUID.randomUUID();
+  @MockitoBean private AuthenticatedIdentityResolver authenticatedIdentityResolver;
+
+  private static final AuthenticatedIdentity IDENTITY =
+      new AuthenticatedIdentity("mock-sub", "Ana Souza", "ana@exemplo.com");
+
+  @org.junit.jupiter.api.BeforeEach
+  void mockIdentity() {
+    when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(IDENTITY);
+  }
 
   @Test
   @DisplayName("POST valido devolve 201 com a categoria criada")
@@ -40,13 +50,12 @@ class CategoryControllerTest {
     CategoryResponse response =
         new CategoryResponse(UUID.randomUUID(), "Academia", CategoryType.EXPENSE, false);
 
-    when(categoryService.create(eq(USER_ID), any())).thenReturn(response);
+    when(categoryService.create(eq(IDENTITY), any())).thenReturn(response);
 
     mockMvc
         .perform(
-            post("/categories")
+            post("/api/v1/categories")
                 .contentType(MediaType.APPLICATION_JSON)
-                .header("X-User-Id", USER_ID)
                 .content("{\"name\":\"Academia\",\"type\":\"EXPENSE\"}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.name").value("Academia"))
@@ -59,9 +68,8 @@ class CategoryControllerTest {
   void invalidCreateReturns400() throws Exception {
     mockMvc
         .perform(
-            post("/categories")
+            post("/api/v1/categories")
                 .contentType(MediaType.APPLICATION_JSON)
-                .header("X-User-Id", USER_ID)
                 .content("{\"name\":\"\",\"type\":null}"))
         .andExpect(status().isBadRequest());
   }
@@ -73,13 +81,12 @@ class CategoryControllerTest {
     CategoryResponse response =
         new CategoryResponse(categoryId, "Academia e Esportes", CategoryType.EXPENSE, false);
 
-    when(categoryService.update(eq(USER_ID), eq(categoryId), any())).thenReturn(response);
+    when(categoryService.update(eq(IDENTITY), eq(categoryId), any())).thenReturn(response);
 
     mockMvc
         .perform(
-            put("/categories/{id}", categoryId)
+            put("/api/v1/categories/{id}", categoryId)
                 .contentType(MediaType.APPLICATION_JSON)
-                .header("X-User-Id", USER_ID)
                 .content("{\"name\":\"Academia e Esportes\",\"type\":\"EXPENSE\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.name").value("Academia e Esportes"));
@@ -90,14 +97,13 @@ class CategoryControllerTest {
   void updateUnknownCategoryReturns404() throws Exception {
     UUID categoryId = UUID.randomUUID();
 
-    when(categoryService.update(eq(USER_ID), eq(categoryId), any()))
+    when(categoryService.update(eq(IDENTITY), eq(categoryId), any()))
         .thenThrow(new ResourceNotFoundException("Category", categoryId));
 
     mockMvc
         .perform(
-            put("/categories/{id}", categoryId)
+            put("/api/v1/categories/{id}", categoryId)
                 .contentType(MediaType.APPLICATION_JSON)
-                .header("X-User-Id", USER_ID)
                 .content("{\"name\":\"Academia e Esportes\",\"type\":\"EXPENSE\"}"))
         .andExpect(status().isNotFound());
   }
@@ -110,10 +116,10 @@ class CategoryControllerTest {
             new CategoryResponse(UUID.randomUUID(), "Alimentação", CategoryType.EXPENSE, true),
             new CategoryResponse(UUID.randomUUID(), "Academia", CategoryType.EXPENSE, false));
 
-    when(categoryService.findAvailable(USER_ID)).thenReturn(response);
+    when(categoryService.findAvailable(IDENTITY)).thenReturn(response);
 
     mockMvc
-        .perform(get("/categories").header("X-User-Id", USER_ID))
+        .perform(get("/api/v1/categories"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(2));
   }
@@ -124,7 +130,7 @@ class CategoryControllerTest {
     UUID categoryId = UUID.randomUUID();
 
     mockMvc
-        .perform(delete("/categories/{id}", categoryId).header("X-User-Id", USER_ID))
+        .perform(delete("/api/v1/categories/{id}", categoryId))
         .andExpect(status().isNoContent());
   }
 
@@ -135,10 +141,8 @@ class CategoryControllerTest {
 
     doThrow(new ResourceNotFoundException("Category", categoryId))
         .when(categoryService)
-        .delete(eq(USER_ID), eq(categoryId));
+        .delete(eq(IDENTITY), eq(categoryId));
 
-    mockMvc
-        .perform(delete("/categories/{id}", categoryId).header("X-User-Id", USER_ID))
-        .andExpect(status().isNotFound());
+    mockMvc.perform(delete("/api/v1/categories/{id}", categoryId)).andExpect(status().isNotFound());
   }
 }

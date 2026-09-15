@@ -8,16 +8,24 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import java.time.OffsetDateTime;
+import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import org.hibernate.annotations.UuidGenerator;
 
+/**
+ * Categoria de transação pertencente a um usuário ou do sistema (padrão).
+ *
+ * <p>Categorias com {@code isDefault = true} pertencem ao sistema: não têm {@code user} associado e
+ * não podem ser editadas nem removidas. Cada usuário só enxerga as próprias categorias somadas às
+ * categorias padrão.
+ */
 @Entity
 @Table(name = "categories")
 public class Category {
+
   @Id
   @UuidGenerator
   @Column(updatable = false, nullable = false)
@@ -27,52 +35,57 @@ public class Category {
   @JoinColumn(name = "user_id")
   private User user;
 
-  @Column(nullable = false)
+  @Column(nullable = false, length = 255)
   private String name;
 
   @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 50)
   private CategoryType type;
 
-  @Column(name = "is_default")
-  private Boolean isDefault;
+  @Column(name = "is_default", nullable = false)
+  private boolean isDefault;
 
-  @Column(name = "created_at", updatable = false)
-  private OffsetDateTime createdAt;
+  @Column(name = "created_at", updatable = false, nullable = false)
+  private Instant createdAt;
 
-  @Column(name = "updated_at")
-  private OffsetDateTime updatedAt;
+  @Column(name = "updated_at", nullable = false)
+  private Instant updatedAt;
 
-  public Category() {}
+  /** Construtor protegido exclusivo para o JPA. */
+  protected Category() {}
 
-  public Category(
-      UUID id,
-      User user,
-      String name,
-      CategoryType type,
-      Boolean isDefault,
-      OffsetDateTime createdAt,
-      OffsetDateTime updatedAt) {
-    this.id = id;
+  private Category(User user, String name, CategoryType type, boolean isDefault) {
     this.user = user;
-    this.name = name;
-    this.type = type;
+    this.name = Objects.requireNonNull(name, "name é obrigatório").strip();
+    this.type = Objects.requireNonNull(type, "type é obrigatório");
     this.isDefault = isDefault;
-    this.createdAt = createdAt;
-    this.updatedAt = updatedAt;
+    this.createdAt = Instant.now();
+    this.updatedAt = this.createdAt;
   }
 
-  @PrePersist
-  protected void onCreate() {
-    this.createdAt = OffsetDateTime.now();
-    this.updatedAt = OffsetDateTime.now();
+  /**
+   * Cria uma categoria pessoal vinculada a um usuário. Categorias criadas por este método nunca são
+   * padrão do sistema.
+   */
+  public static Category createForUser(User user, String name, CategoryType type) {
+    Objects.requireNonNull(user, "user é obrigatório");
+    return new Category(user, name, type, false);
+  }
+
+  /**
+   * Altera nome e tipo da categoria. Chamar em categorias padrão é proibido pelo service antes de
+   * chegar aqui.
+   */
+  public void rename(String name, CategoryType type) {
+    this.name = Objects.requireNonNull(name, "name é obrigatório").strip();
+    this.type = Objects.requireNonNull(type, "type é obrigatório");
   }
 
   @PreUpdate
-  protected void onUpdate() {
-    this.updatedAt = OffsetDateTime.now();
+  void markAsUpdated() {
+    this.updatedAt = Instant.now();
   }
 
-  // Getters
   public UUID getId() {
     return id;
   }
@@ -89,44 +102,31 @@ public class Category {
     return type;
   }
 
-  public Boolean getIsDefault() {
+  public boolean isDefault() {
     return isDefault;
   }
 
-  public OffsetDateTime getCreatedAt() {
+  public Instant getCreatedAt() {
     return createdAt;
   }
 
-  public OffsetDateTime getUpdatedAt() {
+  public Instant getUpdatedAt() {
     return updatedAt;
   }
 
-  // Setters
-  public void setId(UUID id) {
-    this.id = id;
+  @Override
+  public boolean equals(Object other) {
+    if (this == other) return true;
+    return other instanceof Category c && Objects.equals(id, c.id);
   }
 
-  public void setUser(User user) {
-    this.user = user;
+  @Override
+  public int hashCode() {
+    return Objects.hash(id);
   }
 
-  public void setName(String name) {
-    this.name = name;
-  }
-
-  public void setType(CategoryType type) {
-    this.type = type;
-  }
-
-  public void setIsDefault(Boolean isDefault) {
-    this.isDefault = isDefault;
-  }
-
-  public void setCreatedAt(OffsetDateTime createdAt) {
-    this.createdAt = createdAt;
-  }
-
-  public void setUpdatedAt(OffsetDateTime updatedAt) {
-    this.updatedAt = updatedAt;
+  @Override
+  public String toString() {
+    return "Category[id=%s, name=%s, isDefault=%s]".formatted(id, name, isDefault);
   }
 }
