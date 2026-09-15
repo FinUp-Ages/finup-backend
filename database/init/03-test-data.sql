@@ -27,6 +27,35 @@ VALUES
 ON CONFLICT (email) DO NOTHING;
 
 -- --------------------------------------------
+-- Usuários de demonstração do FinUp Score
+-- (docs/finup-score.md, Exemplos A/C/D — ver InMemoryFinUpScoreDataProvider).
+-- Testar via Swagger com o header X-Mock-Cognito-Sub igual ao cognito_id abaixo,
+-- chamando POST /api/v1/users/me/finup-score/recalculate.
+-- --------------------------------------------
+INSERT INTO
+  users (cognito_id, name, email, monthly_income)
+VALUES
+  (
+    'mock-sub-exemplo-a',
+    'Exemplo A',
+    'exemplo.a.fallback@finup.local',
+    5000.00
+  ),
+  (
+    'mock-sub-exemplo-c',
+    'Exemplo C',
+    'exemplo.c.saudavel@finup.local',
+    8000.00
+  ),
+  (
+    'mock-sub-exemplo-d',
+    'Exemplo D',
+    'exemplo.d.dificuldade@finup.local',
+    3000.00
+  )
+ON CONFLICT (email) DO NOTHING;
+
+-- --------------------------------------------
 -- Perfil financeiro do usuário de teste
 -- --------------------------------------------
 INSERT INTO
