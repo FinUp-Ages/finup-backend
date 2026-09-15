@@ -22,5 +22,29 @@ services:
 
     restart: unless-stopped
 
+  app:
+    build: .
+
+    environment:
+      SERVER_PORT: ${SERVER_PORT}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+      LOG_LEVEL: ${LOG_LEVEL}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: 5432
+      # Dentro da rede do compose o Postgres e o servico "db", nao localhost.
+      DB_HOST: db
+
+    ports:
+      - "${SERVER_PORT}:8080"
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    restart: unless-stopped
+
 volumes:
   finup_postgres_data:
