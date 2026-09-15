@@ -9,21 +9,21 @@ import java.util.Map;
 import org.springframework.stereotype.Repository;
 
 /**
- * Implementacao temporaria em memoria, no mesmo espirito do {@link InMemoryUserRepository}: nao
- * existe ainda entidade/consulta JPA para {@code UserFinancialProfiles}, {@code Transactions},
- * {@code Debts}, {@code Goals} e {@code Investments} (isso e escopo da tarefa de modelagem de
- * dados, ainda nao integrada ao codigo).
+ * Implementacao temporaria em memoria: o restante do projeto (usuario, transacao, recorrencia) ja
+ * roda em JPA/Postgres, mas as entidades de divida, meta e investimento ainda nao existem — por
+ * isso este provider nao tem de onde consultar {@code UserFinancialProfiles}, {@code Transactions},
+ * {@code Debts}, {@code Goals} e {@code Investments} de verdade.
  *
- * <p>Para os 3 e-mails de demonstracao abaixo (ver {@code FinUpScoreDemoSeeder}), devolve os
- * fixtures que reproduzem, numero a numero, os Exemplos A/C/D de {@code docs/finup-score.md} — o
- * {@code InMemoryFinUpScoreDataProviderTest} trava essa correspondencia para o codigo e o documento
- * nunca divergirem. Para qualquer outro usuario (ex.: recem-cadastrado via {@code POST
- * /api/v1/users}), devolve "sem dado nenhum", o que faz o calculo cair no caminho de dado
- * insuficiente quando a renda tambem nao foi informada.
+ * <p>Para os 3 e-mails de demonstracao abaixo (seed em {@code database/init/03-test-data.sql}),
+ * devolve os fixtures que reproduzem, numero a numero, os Exemplos A/C/D de {@code
+ * docs/finup-score.md} — o {@code InMemoryFinUpScoreDataProviderTest} trava essa correspondencia
+ * para o codigo e o documento nunca divergirem. Para qualquer outro usuario (ex.: recem-cadastrado
+ * via {@code POST /api/v1/users}), devolve "sem dado nenhum", o que faz o calculo cair no caminho
+ * de dado insuficiente quando a renda tambem nao foi informada.
  *
- * <p><strong>Substituir quando o PostgreSQL entrar:</strong> apague esta classe e implemente {@link
- * FinUpScoreDataProvider} com as consultas reais as 5 tabelas. Nem o service nem o calculador mudam
- * — e esse o motivo de a interface existir.
+ * <p><strong>Substituir quando as entidades de divida/meta/investimento existirem:</strong> apague
+ * esta classe e implemente {@link FinUpScoreDataProvider} com as consultas reais as 5 tabelas. Nem
+ * o service nem o calculador mudam — e esse o motivo de a interface existir.
  */
 @Repository
 public class InMemoryFinUpScoreDataProvider implements FinUpScoreDataProvider {

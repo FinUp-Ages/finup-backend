@@ -42,7 +42,7 @@ class InMemoryFinUpScoreDataProviderTest {
   @Test
   @DisplayName("usuario sem fixture e sem renda cadastrada resulta em dado insuficiente")
   void unknownUserWithoutIncomeIsInsufficientData() {
-    User user = User.register("Usuario Novo", "novo@exemplo.com");
+    User user = User.createFromCognitoIdentity("mock-sub-novo", "Usuario Novo", "novo@exemplo.com");
 
     FinUpScoreResult result = calculator.calculate(provider.loadInputs(user));
 
@@ -50,8 +50,8 @@ class InMemoryFinUpScoreDataProviderTest {
   }
 
   private int scoreFor(String email, String monthlyIncome) {
-    User user =
-        User.register("Usuario Demo", email).withMonthlyIncome(new BigDecimal(monthlyIncome));
+    User user = User.createFromCognitoIdentity("mock-sub-" + email, "Usuario Demo", email);
+    user.applyAdditionalInfo(null, new BigDecimal(monthlyIncome), null);
     FinUpScoreResult result = calculator.calculate(provider.loadInputs(user));
     assertThat(result).isInstanceOf(FinUpScoreResult.Computed.class);
     return ((FinUpScoreResult.Computed) result).score();

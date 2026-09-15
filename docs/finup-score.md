@@ -1,6 +1,6 @@
 # FinUp Score — regra de cálculo
 
-> Define a fórmula usada por `FinUpScoreCalculator` para preencher `Users.FinUpScore`. Qualquer
+> Define a fórmula usada por `FinUpScoreCalculator` para preencher `users.fin_up_score`. Qualquer
 > mudança de peso/fórmula neste documento precisa ser replicada no código, e vice-versa — o teste
 > `FinUpScoreCalculatorTest` (com os exemplos da seção 6) e o `InMemoryFinUpScoreDataProviderTest`
 > existem justamente para travar essa correspondência.
@@ -9,25 +9,25 @@
 
 Inteiro de **0 a 1000**, quanto maior melhor. Escolhida por analogia com score de crédito (ex.
 Serasa), familiar ao usuário brasileiro, e compatível com o valor fictício (`650`) já usado no
-seed de teste do banco (`feature/docker-database`, `03-test-data.sql`) — aquele valor é só um
-placeholder do fixture, não foi calculado por esta fórmula.
+seed de teste do banco (`database/init/03-test-data.sql`) — aquele valor é só um placeholder do
+fixture, não foi calculado por esta fórmula.
 
 ## 2. Dado obrigatório (gate global)
 
-O cálculo exige `Users.MonthlyIncome > 0`. Quase todo pilar normaliza um valor pela renda mensal;
+O cálculo exige `users.monthly_income > 0`. Quase todo pilar normaliza um valor pela renda mensal;
 sem ela não há base para nenhuma conta. Se a renda estiver ausente, zerada ou negativa, o resultado
-é **dado insuficiente**: `Users.FinUpScore` **não é sobrescrito** (permanece como estava, `null` se
-nunca calculado). Não existe "score parcial" nesse caso.
+é **dado insuficiente**: `users.fin_up_score` **não é sobrescrito** (permanece como estava, `null`
+se nunca calculado). Não existe "score parcial" nesse caso.
 
 ## 3. Pilares e pesos
 
 | # | Pilar | Peso | Tabelas/colunas de origem |
 |---|-------|-----:|-----------------|
-| 1 | Equilíbrio orçamentário (renda × gastos) | 350 | `Users.MonthlyIncome`, `Transactions` (30 dias), `UserFinancialProfiles.MonthlyExpensesEstimate`, `.IncomeExpenseRelation` |
-| 2 | Endividamento | 250 | `Debts.TotalAmount`, `.PaidAmount`, `.Status` |
-| 3 | Reserva / investimentos | 200 | `Investments.CurrentAmount`, `UserFinancialProfiles.HasInvestments`, `.ApproximateInvestedAmount` |
-| 4 | Metas financeiras | 100 | `Goals.TargetAmount`, `.CurrentAmount`, `.Status` |
-| 5 | Hábito financeiro autodeclarado | 100 | `UserFinancialProfiles.SpendingHabit` |
+| 1 | Equilíbrio orçamentário (renda × gastos) | 350 | `users.monthly_income`, `transactions` (30 dias), `user_financial_profiles.monthly_expenses_estimate`, `.income_expense_relation` |
+| 2 | Endividamento | 250 | `debts.total_amount`, `.paid_amount`, `.status` |
+| 3 | Reserva / investimentos | 200 | `investments.current_amount`, `user_financial_profiles.has_investments`, `.approximate_invested_amount` |
+| 4 | Metas financeiras | 100 | `goals.target_amount`, `.current_amount`, `.status` |
+| 5 | Hábito financeiro autodeclarado | 100 | `user_financial_profiles.spending_habit` |
 
 `FinUpScore = pilar1 + pilar2 + pilar3 + pilar4 + pilar5`, arredondado uma única vez no final (cada
 pilar já é limitado ao seu próprio intervalo, então a soma nunca sai de 0–1000).
@@ -41,11 +41,11 @@ score1 = 350 * (clamp(savingsRate, -0.30, 0.30) + 0.30) / 0.60
 
 Fonte de "gastos", nesta ordem de prioridade:
 
-1. Soma de `Transactions` do tipo `EXPENSE` dos últimos 30 dias (dado mais objetivo e atual).
-2. `UserFinancialProfiles.MonthlyExpensesEstimate`, se não houver histórico de transação
+1. Soma de `transactions` do tipo `EXPENSE` dos últimos 30 dias (dado mais objetivo e atual).
+2. `user_financial_profiles.monthly_expenses_estimate`, se não houver histórico de transação
    suficiente.
-3. `UserFinancialProfiles.IncomeExpenseRelation`, convertida numa taxa assumida, se nenhuma das
-   anteriores existir: `SPENDS_LESS` → +0,25, `BALANCED` → 0, `SPENDS_MORE` → -0,25.
+3. `user_financial_profiles.income_expense_relation`, convertida numa taxa assumida, se nenhuma
+   das anteriores existir: `SPENDS_LESS` → +0,25, `BALANCED` → 0, `SPENDS_MORE` → -0,25.
 4. Se nada disso existir, o pilar usa o ponto neutro (175 = metade de 350).
 
 Poupar 30% ou mais da renda satura a nota máxima; gastar 30% a mais que a renda satura a nota
@@ -55,10 +55,10 @@ da escala (175), nem bom nem ruim.
 ### 3.2 Pilar 2 — Endividamento (0–250)
 
 ```
-saldoDevedor = soma(TotalAmount - PaidAmount) das dívidas com Status ativo ou atrasado
+saldoDevedor = soma(total_amount - paid_amount) das dívidas com status ativo ou atrasado
 ratio = clamp(saldoDevedor / (rendaMensal * 12), 0, 1)
 score2 = 250 * (1 - ratio)
-se alguma dívida tiver Status = LATE: score2 = max(0, score2 - 75)
+se alguma dívida tiver status = LATE: score2 = max(0, score2 - 75)
 ```
 
 Sem dívida nenhuma, `ratio = 0` e o pilar atinge a nota máxima — ausência de dívida é um resultado
@@ -68,8 +68,8 @@ valor devido: pesa o comportamento de pagamento, não só o tamanho da dívida.
 ### 3.3 Pilar 3 — Reserva / investimentos (0–200)
 
 ```
-valorInvestido = soma(Investments.CurrentAmount); se não houver linhas em Investments mas
-                 UserFinancialProfiles.HasInvestments = true, usa .ApproximateInvestedAmount
+valorInvestido = soma(investments.current_amount); se não houver linhas em investments mas
+                 user_financial_profiles.has_investments = true, usa .approximate_invested_amount
 mesesCobertos = valorInvestido / rendaMensal
 score3 = 200 * clamp(mesesCobertos / 6, 0, 1)
 ```
@@ -77,17 +77,17 @@ score3 = 200 * clamp(mesesCobertos / 6, 0, 1)
 O teto de 6 meses segue a referência clássica de reserva de emergência. Sem investimento algum,
 `valorInvestido = 0` e o pilar zera — de novo, um resultado real, não uma lacuna de dado.
 
-**Não usados nesta versão:** `UserFinancialProfiles.InvestmentExperienceTime` e
-`UserInvestmentInterests` são coletados mas não entram na fórmula — são indicadores de perfil de
+**Não usados nesta versão:** `user_financial_profiles.investment_experience_time` e
+`user_investment_interests` são coletados mas não entram na fórmula — são indicadores de perfil de
 investidor, não de saúde financeira atual. Candidatos a uma versão futura (ex.: pequeno bônus por
 experiência), registrados aqui para não serem esquecidos.
 
 ### 3.4 Pilar 4 — Metas financeiras (0–100)
 
 ```
-para cada Goal com Status IN_PROGRESS: progresso = min(CurrentAmount / TargetAmount, 1)
-para cada Goal com Status COMPLETED: progresso = 1
-Goals com Status CANCELLED são ignoradas
+para cada goal com status IN_PROGRESS: progresso = min(current_amount / target_amount, 1)
+para cada goal com status COMPLETED: progresso = 1
+goals com status CANCELLED são ignoradas
 score4 = 100 * média(progresso)
 ```
 
@@ -96,28 +96,34 @@ Sem nenhuma meta elegível (nenhuma meta cadastrada, ou só canceladas), o pilar
 
 ### 3.5 Pilar 5 — Hábito financeiro autodeclarado (0–100)
 
-| `SpendingHabit` | Pontos |
+| `spending_habit` | Pontos |
 |---|---:|
 | `CONTROLLED` | 100 |
 | `MODERATE` | 60 |
 | `IMPULSIVE` | 20 |
 | *(não informado)* | 60 (neutro, igual a `MODERATE`) |
 
-**Não usado nesta versão:** `Users.FinancialProfile` (conservador/moderado/arrojado) reflete
+**Não usado nesta versão:** `users.financial_profile` (conservador/moderado/arrojado) reflete
 apetite a risco de investimento, não saúde financeira — um perfil "arrojado" não é pior que um
-"conservador". Por isso não entra na fórmula, e por isso o domínio de código (`model/User.java`)
-nem chegou a modelar essa coluna: nada no v1 do FinUp Score depende dela.
+"conservador". Por isso não entra na fórmula, mesmo `model/User.java` já modelando essa coluna
+(usada em `PATCH /api/v1/users/me/additional-info`, fora do escopo do FinUp Score): nada no v1 do
+FinUp Score depende dela.
 
-Também não usados, pelo mesmo motivo de não terem relação direta com saúde financeira: `Categories`
-e `PaymentMethods` (metadados de classificação/meio de pagamento, não de volume ou comportamento).
+Também não usados, pelo mesmo motivo de não terem relação direta com saúde financeira: `categories`
+e `payment_methods` (metadados de classificação/meio de pagamento, não de volume ou comportamento).
 
 ## 4. Quando recalcular
 
-Disparado sob demanda por `FinUpScoreService.recalculate(userId)`, exposto via:
+Disparado sob demanda por `FinUpScoreService.recalculate(identity)`, exposto via:
 
 ```
-POST /api/v1/users/{userId}/finup-score/recalculate
+POST /api/v1/users/me/finup-score/recalculate
 ```
+
+O usuário é sempre o dono da identidade autenticada (resolvida por
+`AuthenticatedIdentityResolver`, hoje mockada pelos headers `X-Mock-Cognito-Sub`,
+`X-Mock-Cognito-Email` e `X-Mock-Cognito-Name`) — nenhum endpoint recebe um id de usuário do
+cliente.
 
 Gatilhos pretendidos (a implementar quando os respectivos fluxos existirem, hoje fora do escopo
 desta tarefa): atualização de renda/perfil financeiro, e criação/edição/exclusão de transação,
@@ -127,17 +133,19 @@ existirem, devem chamar este mesmo `FinUpScoreService.recalculate`. Não há rec
 
 ## 5. Estado atual da persistência (importante)
 
-O projeto ainda não tem JPA/Postgres ligado (ver `pom.xml`, dependências comentadas) nem entidades
-mapeadas para `UserFinancialProfiles`, `Transactions`, `Debts`, `Goals` ou `Investments` — só o
-schema SQL existe, numa branch separada (`feature/docker-database`), nunca integrada. Todas as
-colunas usadas nesta fórmula **já estão mapeadas no banco**; o que falta é só a camada de acesso a
-dados, que é escopo de outra tarefa (modelagem de dados/JPA).
+JPA e PostgreSQL já estão integrados ao projeto: `User` é `@Entity`, mapeado 1:1 na tabela `users`
+(`cognito_id`, `monthly_income`, `fin_up_score` etc.), e o schema completo — incluindo
+`user_financial_profiles`, `transactions`, `debts`, `goals` e `investments` — já existe em
+`database/init/`. Não há mais `InMemoryUserRepository`: `UserRepository` é um `JpaRepository` de
+verdade.
 
-Para não bloquear esta tarefa nisso, `FinUpScoreDataProvider` é uma porta (interface) com uma
-implementação mock em memória (`InMemoryFinUpScoreDataProvider`), no mesmo padrão já usado por
-`UserRepository`/`InMemoryUserRepository` no boilerplate do projeto. Quando a modelagem de dados
-entrar, basta escrever um novo adapter que implemente `FinUpScoreDataProvider` com consultas reais
-— `FinUpScoreCalculator` e `FinUpScoreService` não mudam.
+O que falta é só a leitura dessas 5 tabelas para o FinUp Score: as entidades JPA de dívida, meta e
+investimento ainda não existem (escopo de tarefa futura), então `FinUpScoreDataProvider` continua
+sendo uma porta (interface) com uma única implementação mock em memória
+(`InMemoryFinUpScoreDataProvider`), que devolve fixtures fixos para os 3 usuários de demonstração
+semeados em `database/init/03-test-data.sql` e "sem dado nenhum" para qualquer outro usuário. Quando
+essas entidades existirem, basta escrever um novo adapter que implemente `FinUpScoreDataProvider`
+com consultas reais — `FinUpScoreCalculator` e `FinUpScoreService` não mudam.
 
 ## 6. Exemplos para validação manual
 
@@ -159,7 +167,7 @@ recalculado por esta fórmula, não copiado do fixture):
 - `score5 = 60` (`MODERATE`)
 - **Total = 350 + 241,67 + 14,33 + 30 + 60 = 696**
 
-**Exemplo B:** `Users.MonthlyIncome` nulo → `FinUpScoreCalculator` devolve
+**Exemplo B:** `users.monthly_income` nulo → `FinUpScoreCalculator` devolve
 `InsufficientData("Renda mensal (Users.MonthlyIncome) nao informada ou invalida.")` antes de
 calcular qualquer pilar.
 
@@ -182,4 +190,6 @@ calcular qualquer pilar.
 
 Estes 4 casos são exatamente os usados em `FinUpScoreCalculatorTest` e nos fixtures de
 `InMemoryFinUpScoreDataProvider` (Exemplos A/C/D, ligados via e-mail aos usuários de demonstração
-criados por `FinUpScoreDemoSeeder` na subida da aplicação).
+semeados em `database/init/03-test-data.sql`). Para testar pelo Swagger, chame
+`POST /api/v1/users/me/finup-score/recalculate` com o header `X-Mock-Cognito-Sub` igual ao
+`cognito_id` do usuário desejado (ex.: `mock-sub-exemplo-a`).

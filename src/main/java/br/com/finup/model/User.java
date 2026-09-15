@@ -97,6 +97,15 @@ public class User {
     }
   }
 
+  /**
+   * Grava o resultado do recalculo do FinUp Score, mutando a propria instancia gerenciada pelo JPA.
+   * Quem decide quando chamar isso e o FinUpScoreService; este metodo so persiste o valor ja
+   * calculado.
+   */
+  public void updateFinUpScore(int newFinUpScore) {
+    this.finUpScore = newFinUpScore;
+  }
+
   @PreUpdate
   void markAsUpdated() {
     updatedAt = Instant.now();

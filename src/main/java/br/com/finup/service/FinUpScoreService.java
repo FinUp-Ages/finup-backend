@@ -6,10 +6,11 @@ import br.com.finup.model.FinUpScoreResult;
 import br.com.finup.model.User;
 import br.com.finup.repository.FinUpScoreDataProvider;
 import br.com.finup.repository.UserRepository;
-import java.util.UUID;
+import br.com.finup.security.AuthenticatedIdentity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Orquestra o recalculo do FinUp Score. So persiste quando o resultado e {@link
@@ -35,26 +36,30 @@ public class FinUpScoreService {
   }
 
   /**
-   * Recalcula o FinUp Score de um usuario.
+   * Recalcula o FinUp Score do usuario correspondente a identidade autenticada.
    *
-   * @throws ResourceNotFoundException se nao existir usuario com esse id
+   * @throws ResourceNotFoundException se essa identidade ainda nao tiver usuario local
    */
-  public FinUpScoreResult recalculate(UUID userId) {
+  @Transactional
+  public FinUpScoreResult recalculate(AuthenticatedIdentity identity) {
     User user =
         userRepository
-            .findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+            .findByCognitoId(identity.cognitoId())
+            .orElseThrow(
+                () ->
+                    new ResourceNotFoundException(
+                        "Usuario nao encontrado para a identidade autenticada."));
 
     FinUpScoreInputs inputs = dataProvider.loadInputs(user);
     FinUpScoreResult result = calculator.calculate(inputs);
 
     if (result instanceof FinUpScoreResult.Computed computed) {
-      userRepository.save(user.withFinUpScore(computed.score()));
-      log.info("FinUp Score recalculado: userId={}, score={}", userId, computed.score());
+      user.updateFinUpScore(computed.score());
+      log.info("FinUp Score recalculado: userId={}, score={}", user.getId(), computed.score());
     } else if (result instanceof FinUpScoreResult.InsufficientData insufficient) {
       log.info(
           "FinUp Score nao recalculado por dado insuficiente: userId={}, motivo={}",
-          userId,
+          user.getId(),
           insufficient.reason());
     }
 
