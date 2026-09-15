@@ -85,8 +85,16 @@ public class CategoryService {
         .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId));
   }
 
+  /**
+   * Compara pelo id, e não por {@code equals}, de propósito: {@code category.getUser()} é uma
+   * associação LAZY, então pode chegar aqui como proxy do Hibernate. O {@code User.equals} lê o
+   * campo {@code id} direto, que num proxy ainda não inicializado vem nulo — a comparação passaria
+   * a depender de a instância já estar no persistence context. Com {@code getId()} o proxy
+   * inicializa e a resposta é a mesma em qualquer cenário.
+   */
   private void ensureOwnedByUser(User user, Category category) {
-    if (!user.equals(category.getUser())) {
+    User owner = category.getUser();
+    if (owner == null || !owner.getId().equals(user.getId())) {
       throw new ResourceNotFoundException("Category", category.getId());
     }
   }

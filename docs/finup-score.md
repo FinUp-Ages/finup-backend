@@ -167,9 +167,9 @@ recalculado por esta fórmula, não copiado do fixture):
 - `score5 = 60` (`MODERATE`)
 - **Total = 350 + 241,67 + 14,33 + 30 + 60 = 696**
 
-**Exemplo B:** `users.monthly_income` nulo → `FinUpScoreCalculator` devolve
-`InsufficientData("Renda mensal (Users.MonthlyIncome) nao informada ou invalida.")` antes de
-calcular qualquer pilar.
+**Exemplo B:** `users.monthly_income` nulo ou não positivo → `FinUpScoreCalculator` devolve
+`InsufficientData`, apontando o `PATCH /api/v1/users/me/additional-info`, antes de calcular qualquer
+pilar. A mensagem é voltada para quem chama a API, então não cita nome de coluna.
 
 **Exemplo C:**
 - `savingsRate = (8000-5000)/8000 = 0,375` → clamp em `0,30` → `score1 = 350`

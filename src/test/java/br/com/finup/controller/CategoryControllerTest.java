@@ -12,6 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.finup.dto.CategoryResponse;
+import br.com.finup.exception.ConflictException;
+import br.com.finup.exception.ForbiddenOperationException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.CategoryType;
 import br.com.finup.security.AuthenticatedIdentity;
@@ -144,5 +146,53 @@ class CategoryControllerTest {
         .delete(eq(IDENTITY), eq(categoryId));
 
     mockMvc.perform(delete("/api/v1/categories/{id}", categoryId)).andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("PUT de categoria padrao devolve 403")
+  void updateDefaultCategoryReturns403() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+
+    when(categoryService.update(eq(IDENTITY), eq(categoryId), any()))
+        .thenThrow(new ForbiddenOperationException("Não é possível editar uma categoria padrão"));
+
+    mockMvc
+        .perform(
+            put("/api/v1/categories/{id}", categoryId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Outro nome\",\"type\":\"EXPENSE\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.detail").value("Não é possível editar uma categoria padrão"));
+  }
+
+  @Test
+  @DisplayName("DELETE de categoria padrao devolve 403")
+  void deleteDefaultCategoryReturns403() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+
+    doThrow(new ForbiddenOperationException("Não é possível excluir uma categoria padrão"))
+        .when(categoryService)
+        .delete(eq(IDENTITY), eq(categoryId));
+
+    mockMvc
+        .perform(delete("/api/v1/categories/{id}", categoryId))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.detail").value("Não é possível excluir uma categoria padrão"));
+  }
+
+  @Test
+  @DisplayName("DELETE de categoria em uso devolve 409")
+  void deleteCategoryInUseReturns409() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+
+    doThrow(new ConflictException("A categoria não pode ser excluída pois está em uso"))
+        .when(categoryService)
+        .delete(eq(IDENTITY), eq(categoryId));
+
+    mockMvc
+        .perform(delete("/api/v1/categories/{id}", categoryId))
+        .andExpect(status().isConflict())
+        .andExpect(
+            jsonPath("$.detail").value("A categoria não pode ser excluída pois está em uso"));
   }
 }
