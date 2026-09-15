@@ -33,9 +33,7 @@ class CategoryRepositoryTest {
         userRepository.saveAndFlush(
             User.createFromCognitoIdentity("other-category-sub", "Carlos", "carlos@example.com"));
 
-    Category userCategory =
-        categoryRepository.saveAndFlush(
-            Category.createForUser(user, "Academia", CategoryType.EXPENSE));
+    categoryRepository.saveAndFlush(Category.createForUser(user, "Academia", CategoryType.EXPENSE));
     categoryRepository.saveAndFlush(
         Category.createForUser(otherUser, "Outro usuario", CategoryType.EXPENSE));
 

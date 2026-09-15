@@ -24,7 +24,7 @@ VALUES
     650,
     'MODERATE'
   )
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- --------------------------------------------
 -- Usuários de demonstração do FinUp Score
@@ -53,7 +53,9 @@ VALUES
     'exemplo.d.dificuldade@finup.local',
     3000.00
   )
-ON CONFLICT (email) DO NOTHING;
+-- Sem alvo de propósito: users tem UNIQUE em email E em cognito_id, e
+-- ON CONFLICT (email) ignoraria só o primeiro, deixando o segundo abortar a carga.
+ON CONFLICT DO NOTHING;
 
 -- --------------------------------------------
 -- Perfil financeiro do usuário de teste

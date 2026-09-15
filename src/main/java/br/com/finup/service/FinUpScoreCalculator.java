@@ -35,7 +35,8 @@ public class FinUpScoreCalculator {
     BigDecimal income = inputs.monthlyIncome();
     if (income == null || income.signum() <= 0) {
       return new FinUpScoreResult.InsufficientData(
-          "Renda mensal (Users.MonthlyIncome) nao informada ou invalida.");
+          "Renda mensal nao informada. Preencha-a em PATCH /api/v1/users/me/additional-info"
+              + " para calcular o FinUp Score.");
     }
     double monthlyIncome = income.doubleValue();
 
