@@ -3,8 +3,8 @@ package br.com.finup.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.finup.model.RecurrenceFrequency;
-import br.com.finup.model.RecurrenceType;
 import br.com.finup.model.TransactionRecurrence;
+import br.com.finup.model.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -29,33 +29,96 @@ class TransactionRecurrenceRepositoryTest {
   void createReferenceTables() {
     jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS users (id UUID PRIMARY KEY)");
     jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS categories (id UUID PRIMARY KEY)");
-    jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS payment_methods (id UUID PRIMARY KEY)");
+    jdbcTemplate.execute(
+        "CREATE TABLE IF NOT EXISTS payment_methods (id UUID PRIMARY KEY, user_id UUID NOT NULL)");
   }
 
-  @Test
-  @DisplayName("encontra usuario, categoria e meio de pagamento existentes")
-  void findsExistingReferences() {
+  private UUID insertUser() {
     UUID userId = UUID.randomUUID();
-    UUID categoryId = UUID.randomUUID();
-    UUID paymentMethodId = UUID.randomUUID();
     jdbcTemplate.update(
-        "INSERT INTO users (id, cognito_id, email, created_at, updated_at) VALUES (?, ?, ?, now(), now())",
+        "INSERT INTO users (id, cognito_id, email, created_at, updated_at)"
+            + " VALUES (?, ?, ?, now(), now())",
         userId,
         "cognito-" + userId,
         userId + "@example.com");
+    return userId;
+  }
+
+  private UUID insertCategory(UUID ownerId, boolean isDefault) {
+    UUID categoryId = UUID.randomUUID();
     jdbcTemplate.update(
-        "INSERT INTO categories (id, name, type, is_default, created_at, updated_at) "
-            + "VALUES (?, ?, ?, ?, now(), now())",
+        "INSERT INTO categories (id, user_id, name, type, is_default, created_at, updated_at)"
+            + " VALUES (?, ?, ?, ?, ?, now(), now())",
         categoryId,
+        ownerId,
         "Alimentação",
         "EXPENSE",
-        false);
-    jdbcTemplate.update("INSERT INTO payment_methods (id) VALUES (?)", paymentMethodId);
+        isDefault);
+    return categoryId;
+  }
 
-    assertThat(transactionRecurrenceRepository.existsUserById(userId)).isTrue();
-    assertThat(transactionRecurrenceRepository.existsCategoryById(categoryId)).isTrue();
-    assertThat(transactionRecurrenceRepository.existsPaymentMethodById(paymentMethodId)).isTrue();
-    assertThat(transactionRecurrenceRepository.existsCategoryById(UUID.randomUUID())).isFalse();
+  private UUID insertPaymentMethod(UUID ownerId) {
+    UUID paymentMethodId = UUID.randomUUID();
+    jdbcTemplate.update(
+        "INSERT INTO payment_methods (id, user_id) VALUES (?, ?)", paymentMethodId, ownerId);
+    return paymentMethodId;
+  }
+
+  @Test
+  @DisplayName("aceita a categoria do proprio usuario e a categoria padrao do sistema")
+  void findsCategoriesAvailableForUser() {
+    UUID userId = insertUser();
+    UUID ownCategoryId = insertCategory(userId, false);
+    UUID defaultCategoryId = insertCategory(null, true);
+
+    assertThat(
+            transactionRecurrenceRepository.existsCategoryAvailableForUser(ownCategoryId, userId))
+        .isTrue();
+    assertThat(
+            transactionRecurrenceRepository.existsCategoryAvailableForUser(
+                defaultCategoryId, userId))
+        .isTrue();
+    assertThat(
+            transactionRecurrenceRepository.existsCategoryAvailableForUser(
+                UUID.randomUUID(), userId))
+        .isFalse();
+  }
+
+  @Test
+  @DisplayName("trata a categoria privada de outro usuario como inexistente")
+  void ignoresCategoryOwnedByAnotherUser() {
+    UUID userId = insertUser();
+    UUID otherUserId = insertUser();
+    UUID otherUsersCategoryId = insertCategory(otherUserId, false);
+
+    assertThat(
+            transactionRecurrenceRepository.existsCategoryAvailableForUser(
+                otherUsersCategoryId, otherUserId))
+        .isTrue();
+    assertThat(
+            transactionRecurrenceRepository.existsCategoryAvailableForUser(
+                otherUsersCategoryId, userId))
+        .isFalse();
+  }
+
+  @Test
+  @DisplayName("aceita so o meio de pagamento do proprio usuario")
+  void findsOnlyOwnPaymentMethod() {
+    UUID userId = insertUser();
+    UUID otherUserId = insertUser();
+    UUID ownPaymentMethodId = insertPaymentMethod(userId);
+    UUID otherUsersPaymentMethodId = insertPaymentMethod(otherUserId);
+
+    assertThat(
+            transactionRecurrenceRepository.existsPaymentMethodForUser(ownPaymentMethodId, userId))
+        .isTrue();
+    assertThat(
+            transactionRecurrenceRepository.existsPaymentMethodForUser(
+                otherUsersPaymentMethodId, userId))
+        .isFalse();
+    assertThat(
+            transactionRecurrenceRepository.existsPaymentMethodForUser(UUID.randomUUID(), userId))
+        .isFalse();
   }
 
   @Test
@@ -66,7 +129,7 @@ class TransactionRecurrenceRepositoryTest {
             UUID.randomUUID(),
             UUID.randomUUID(),
             null,
-            RecurrenceType.EXPENSE,
+            TransactionType.EXPENSE,
             "Conta de luz",
             new BigDecimal("250.00"),
             RecurrenceFrequency.MONTHLY,
@@ -101,7 +164,7 @@ class TransactionRecurrenceRepositoryTest {
             userId,
             UUID.randomUUID(),
             null,
-            RecurrenceType.EXPENSE,
+            TransactionType.EXPENSE,
             "Conta de luz",
             new BigDecimal("250.00"),
             RecurrenceFrequency.MONTHLY,
@@ -113,7 +176,7 @@ class TransactionRecurrenceRepositoryTest {
             otherUserId,
             UUID.randomUUID(),
             null,
-            RecurrenceType.INCOME,
+            TransactionType.INCOME,
             "Salario",
             new BigDecimal("5000.00"),
             RecurrenceFrequency.MONTHLY,

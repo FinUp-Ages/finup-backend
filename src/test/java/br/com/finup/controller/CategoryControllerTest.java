@@ -15,7 +15,7 @@ import br.com.finup.dto.CategoryResponse;
 import br.com.finup.exception.ConflictException;
 import br.com.finup.exception.ForbiddenOperationException;
 import br.com.finup.exception.ResourceNotFoundException;
-import br.com.finup.model.CategoryType;
+import br.com.finup.model.TransactionType;
 import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.CategoryService;
@@ -50,7 +50,7 @@ class CategoryControllerTest {
   @DisplayName("POST valido devolve 201 com a categoria criada")
   void validCreateReturns201() throws Exception {
     CategoryResponse response =
-        new CategoryResponse(UUID.randomUUID(), "Academia", CategoryType.EXPENSE, false);
+        new CategoryResponse(UUID.randomUUID(), "Academia", TransactionType.EXPENSE, false);
 
     when(categoryService.create(eq(IDENTITY), any())).thenReturn(response);
 
@@ -81,7 +81,7 @@ class CategoryControllerTest {
   void validUpdateReturns200() throws Exception {
     UUID categoryId = UUID.randomUUID();
     CategoryResponse response =
-        new CategoryResponse(categoryId, "Academia e Esportes", CategoryType.EXPENSE, false);
+        new CategoryResponse(categoryId, "Academia e Esportes", TransactionType.EXPENSE, false);
 
     when(categoryService.update(eq(IDENTITY), eq(categoryId), any())).thenReturn(response);
 
@@ -115,8 +115,8 @@ class CategoryControllerTest {
   void findAvailableReturns200() throws Exception {
     List<CategoryResponse> response =
         List.of(
-            new CategoryResponse(UUID.randomUUID(), "Alimentação", CategoryType.EXPENSE, true),
-            new CategoryResponse(UUID.randomUUID(), "Academia", CategoryType.EXPENSE, false));
+            new CategoryResponse(UUID.randomUUID(), "Alimentação", TransactionType.EXPENSE, true),
+            new CategoryResponse(UUID.randomUUID(), "Academia", TransactionType.EXPENSE, false));
 
     when(categoryService.findAvailable(IDENTITY)).thenReturn(response);
 

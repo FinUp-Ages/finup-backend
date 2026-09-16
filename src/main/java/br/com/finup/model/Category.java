@@ -40,7 +40,7 @@ public class Category {
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 50)
-  private CategoryType type;
+  private TransactionType type;
 
   @Column(name = "is_default", nullable = false)
   private boolean isDefault;
@@ -54,7 +54,7 @@ public class Category {
   /** Construtor protegido exclusivo para o JPA. */
   protected Category() {}
 
-  private Category(User user, String name, CategoryType type, boolean isDefault) {
+  private Category(User user, String name, TransactionType type, boolean isDefault) {
     this.user = user;
     this.name = Objects.requireNonNull(name, "name é obrigatório").strip();
     this.type = Objects.requireNonNull(type, "type é obrigatório");
@@ -67,7 +67,7 @@ public class Category {
    * Cria uma categoria pessoal vinculada a um usuário. Categorias criadas por este método nunca são
    * padrão do sistema.
    */
-  public static Category createForUser(User user, String name, CategoryType type) {
+  public static Category createForUser(User user, String name, TransactionType type) {
     Objects.requireNonNull(user, "user é obrigatório");
     return new Category(user, name, type, false);
   }
@@ -76,7 +76,7 @@ public class Category {
    * Altera nome e tipo da categoria. Chamar em categorias padrão é proibido pelo service antes de
    * chegar aqui.
    */
-  public void rename(String name, CategoryType type) {
+  public void rename(String name, TransactionType type) {
     this.name = Objects.requireNonNull(name, "name é obrigatório").strip();
     this.type = Objects.requireNonNull(type, "type é obrigatório");
   }
@@ -98,7 +98,7 @@ public class Category {
     return name;
   }
 
-  public CategoryType getType() {
+  public TransactionType getType() {
     return type;
   }
 
