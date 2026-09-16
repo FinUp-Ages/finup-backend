@@ -33,16 +33,10 @@ class TransactionRecurrenceRepositoryTest {
   }
 
   @Test
-  @DisplayName("encontra usuario, categoria e meio de pagamento existentes")
+  @DisplayName("encontra categoria e meio de pagamento existentes")
   void findsExistingReferences() {
-    UUID userId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     UUID paymentMethodId = UUID.randomUUID();
-    jdbcTemplate.update(
-        "INSERT INTO users (id, cognito_id, email, created_at, updated_at) VALUES (?, ?, ?, now(), now())",
-        userId,
-        "cognito-" + userId,
-        userId + "@example.com");
     jdbcTemplate.update(
         "INSERT INTO categories (id, name, type, is_default, created_at, updated_at) "
             + "VALUES (?, ?, ?, ?, now(), now())",
@@ -52,7 +46,6 @@ class TransactionRecurrenceRepositoryTest {
         false);
     jdbcTemplate.update("INSERT INTO payment_methods (id) VALUES (?)", paymentMethodId);
 
-    assertThat(transactionRecurrenceRepository.existsUserById(userId)).isTrue();
     assertThat(transactionRecurrenceRepository.existsCategoryById(categoryId)).isTrue();
     assertThat(transactionRecurrenceRepository.existsPaymentMethodById(paymentMethodId)).isTrue();
     assertThat(transactionRecurrenceRepository.existsCategoryById(UUID.randomUUID())).isFalse();

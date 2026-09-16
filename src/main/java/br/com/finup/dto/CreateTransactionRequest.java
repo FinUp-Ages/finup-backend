@@ -12,9 +12,6 @@ import java.util.UUID;
 /** Corpo do cadastro de uma transacao financeira. */
 @Schema(description = "Dados para registrar uma transacao financeira")
 public record CreateTransactionRequest(
-    @Schema(description = "Identificador do usuario responsavel")
-        @NotNull(message = "e obrigatorio")
-        UUID userId,
     @Schema(description = "Identificador de uma categoria existente")
         @NotNull(message = "e obrigatorio")
         UUID categoryId,

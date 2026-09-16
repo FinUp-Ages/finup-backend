@@ -9,9 +9,6 @@ import org.springframework.data.repository.query.Param;
 /** Acesso a transacoes e verificacao das referencias exigidas para cadastra-las. */
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
 
-  @Query(value = "SELECT EXISTS (SELECT 1 FROM users WHERE id = :id)", nativeQuery = true)
-  boolean existsUserById(@Param("id") UUID id);
-
   @Query(value = "SELECT EXISTS (SELECT 1 FROM categories WHERE id = :id)", nativeQuery = true)
   boolean existsCategoryById(@Param("id") UUID id);
 

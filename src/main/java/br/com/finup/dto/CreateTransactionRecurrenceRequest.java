@@ -16,9 +16,6 @@ import java.util.UUID;
 /** Corpo do cadastro de uma recorrencia de transacao. */
 @Schema(description = "Dados para cadastrar uma recorrencia de transacao")
 public record CreateTransactionRecurrenceRequest(
-    @Schema(description = "Identificador do usuario responsavel")
-        @NotNull(message = "e obrigatorio")
-        UUID userId,
     @Schema(description = "Identificador de uma categoria existente")
         @NotNull(message = "e obrigatorio")
         UUID categoryId,

@@ -3,7 +3,9 @@ package br.com.finup.service;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
+import br.com.finup.model.User;
 import br.com.finup.repository.TransactionRepository;
+import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -12,26 +14,35 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Regras do fluxo de cadastro de uma transacao financeira. */
+/**
+ * Regras do fluxo de cadastro de uma transacao financeira.
+ *
+ * <p>O dono da transacao vem sempre da identidade autenticada, nunca do corpo da requisicao — mesmo
+ * contrato que o {@link CategoryService} segue.
+ */
 @Service
 public class TransactionService {
 
   private static final Logger log = LoggerFactory.getLogger(TransactionService.class);
 
   private final TransactionRepository transactionRepository;
+  private final UserService userService;
 
-  public TransactionService(TransactionRepository transactionRepository) {
+  public TransactionService(TransactionRepository transactionRepository, UserService userService) {
     this.transactionRepository = transactionRepository;
+    this.userService = userService;
   }
 
   /**
-   * Registra uma transacao depois de confirmar que suas referencias existem.
+   * Registra uma transacao no nome do usuario autenticado, depois de confirmar que as referencias
+   * informadas existem e estao disponiveis para ele.
    *
-   * @throws ResourceNotFoundException se usuario, categoria ou meio de pagamento nao existir
+   * @throws ResourceNotFoundException se a identidade nao tiver usuario local, ou se a categoria ou
+   *     o meio de pagamento nao existir
    */
   @Transactional
   public Transaction register(
-      UUID userId,
+      AuthenticatedIdentity identity,
       UUID categoryId,
       UUID paymentMethodId,
       TransactionType type,
@@ -39,12 +50,13 @@ public class TransactionService {
       BigDecimal amount,
       LocalDate transactionDate,
       boolean recurring) {
-    requireExistingReferences(userId, categoryId, paymentMethodId);
+    User user = userService.findByAuthenticatedIdentity(identity);
+    requireExistingReferences(categoryId, paymentMethodId);
 
     Transaction transaction =
         transactionRepository.save(
             Transaction.register(
-                userId,
+                user.getId(),
                 categoryId,
                 paymentMethodId,
                 type,
@@ -52,14 +64,11 @@ public class TransactionService {
                 amount,
                 transactionDate,
                 recurring));
-    log.info("Transacao cadastrada: id={}, userId={}", transaction.getId(), userId);
+    log.info("Transacao cadastrada: id={}, userId={}", transaction.getId(), user.getId());
     return transaction;
   }
 
-  private void requireExistingReferences(UUID userId, UUID categoryId, UUID paymentMethodId) {
-    if (!transactionRepository.existsUserById(userId)) {
-      throw new ResourceNotFoundException("Usuario", userId);
-    }
+  private void requireExistingReferences(UUID categoryId, UUID paymentMethodId) {
     if (!transactionRepository.existsCategoryById(categoryId)) {
       throw new ResourceNotFoundException("Categoria", categoryId);
     }

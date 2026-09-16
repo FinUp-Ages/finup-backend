@@ -10,14 +10,16 @@ import static org.mockito.Mockito.when;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
+import br.com.finup.model.User;
 import br.com.finup.repository.TransactionRepository;
+import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -26,27 +28,32 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class TransactionServiceTest {
 
   @Mock private TransactionRepository transactionRepository;
+  @Mock private UserService userService;
 
-  private TransactionService transactionService;
+  @InjectMocks private TransactionService transactionService;
 
-  @BeforeEach
-  void setUp() {
-    transactionService = new TransactionService(transactionRepository);
+  private User mockUser() {
+    return User.createFromCognitoIdentity("cognito-sub-ana", "Ana Souza", "ana@exemplo.com");
+  }
+
+  private AuthenticatedIdentity identity(User user) {
+    return new AuthenticatedIdentity(user.getCognitoId(), user.getName(), user.getEmail());
   }
 
   @Test
   @DisplayName("cadastra transacao sem consultar meio de pagamento quando ele nao e informado")
   void registersWithoutPaymentMethod() {
-    UUID userId = UUID.randomUUID();
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
-    when(transactionRepository.existsUserById(userId)).thenReturn(true);
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
     when(transactionRepository.existsCategoryById(categoryId)).thenReturn(true);
     when(transactionRepository.save(any(Transaction.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     Transaction transaction =
         transactionService.register(
-            userId,
+            identity,
             categoryId,
             null,
             TransactionType.INCOME,
@@ -56,7 +63,7 @@ class TransactionServiceTest {
             true);
 
     assertThat(transaction.getId()).isNotNull();
-    assertThat(transaction.getUserId()).isEqualTo(userId);
+    assertThat(transaction.getUserId()).isEqualTo(user.getId());
     assertThat(transaction.getCategoryId()).isEqualTo(categoryId);
     assertThat(transaction.getPaymentMethodId()).isNull();
     assertThat(transaction.getType()).isEqualTo(TransactionType.INCOME);
@@ -66,10 +73,11 @@ class TransactionServiceTest {
   @Test
   @DisplayName("associa o meio de pagamento quando ele e informado e existe")
   void registersWithExistingPaymentMethod() {
-    UUID userId = UUID.randomUUID();
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
     UUID paymentMethodId = UUID.randomUUID();
-    when(transactionRepository.existsUserById(userId)).thenReturn(true);
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
     when(transactionRepository.existsCategoryById(categoryId)).thenReturn(true);
     when(transactionRepository.existsPaymentMethodById(paymentMethodId)).thenReturn(true);
     when(transactionRepository.save(any(Transaction.class)))
@@ -77,7 +85,7 @@ class TransactionServiceTest {
 
     Transaction transaction =
         transactionService.register(
-            userId,
+            identity,
             categoryId,
             paymentMethodId,
             TransactionType.EXPENSE,
@@ -90,12 +98,13 @@ class TransactionServiceTest {
   }
 
   @Test
-  @DisplayName("recusa transacao quando o usuario nao existe")
-  void rejectsUnknownUser() {
-    UUID userId = UUID.randomUUID();
-    when(transactionRepository.existsUserById(userId)).thenReturn(false);
+  @DisplayName("propaga o 404 quando a identidade autenticada ainda nao tem usuario local")
+  void rejectsIdentityWithoutLocalUser() {
+    AuthenticatedIdentity identity = new AuthenticatedIdentity("sub-sem-usuario", null, "x@y.com");
+    when(userService.findByAuthenticatedIdentity(identity))
+        .thenThrow(new ResourceNotFoundException("Usuario nao encontrado"));
 
-    assertThatThrownBy(() -> register(userId, UUID.randomUUID(), null))
+    assertThatThrownBy(() -> register(identity, UUID.randomUUID(), null))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("Usuario");
     verify(transactionRepository, never()).save(any());
@@ -104,12 +113,13 @@ class TransactionServiceTest {
   @Test
   @DisplayName("recusa transacao quando a categoria nao existe")
   void rejectsUnknownCategory() {
-    UUID userId = UUID.randomUUID();
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
-    when(transactionRepository.existsUserById(userId)).thenReturn(true);
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
     when(transactionRepository.existsCategoryById(categoryId)).thenReturn(false);
 
-    assertThatThrownBy(() -> register(userId, categoryId, null))
+    assertThatThrownBy(() -> register(identity, categoryId, null))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("Categoria");
     verify(transactionRepository, never()).save(any());
@@ -118,22 +128,24 @@ class TransactionServiceTest {
   @Test
   @DisplayName("recusa transacao quando o meio de pagamento informado nao existe")
   void rejectsUnknownPaymentMethod() {
-    UUID userId = UUID.randomUUID();
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
     UUID paymentMethodId = UUID.randomUUID();
-    when(transactionRepository.existsUserById(userId)).thenReturn(true);
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
     when(transactionRepository.existsCategoryById(categoryId)).thenReturn(true);
     when(transactionRepository.existsPaymentMethodById(paymentMethodId)).thenReturn(false);
 
-    assertThatThrownBy(() -> register(userId, categoryId, paymentMethodId))
+    assertThatThrownBy(() -> register(identity, categoryId, paymentMethodId))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("Meio de pagamento");
     verify(transactionRepository, never()).save(any());
   }
 
-  private Transaction register(UUID userId, UUID categoryId, UUID paymentMethodId) {
+  private Transaction register(
+      AuthenticatedIdentity identity, UUID categoryId, UUID paymentMethodId) {
     return transactionService.register(
-        userId,
+        identity,
         categoryId,
         paymentMethodId,
         TransactionType.EXPENSE,

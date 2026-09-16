@@ -13,9 +13,6 @@ public interface TransactionRecurrenceRepository
 
   List<TransactionRecurrence> findByUserId(UUID userId);
 
-  @Query(value = "SELECT EXISTS (SELECT 1 FROM users WHERE id = :id)", nativeQuery = true)
-  boolean existsUserById(@Param("id") UUID id);
-
   @Query(value = "SELECT EXISTS (SELECT 1 FROM categories WHERE id = :id)", nativeQuery = true)
   boolean existsCategoryById(@Param("id") UUID id);
 

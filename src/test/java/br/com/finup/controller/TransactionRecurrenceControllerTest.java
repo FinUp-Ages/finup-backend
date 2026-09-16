@@ -15,11 +15,14 @@ import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.RecurrenceFrequency;
 import br.com.finup.model.TransactionRecurrence;
 import br.com.finup.model.TransactionType;
+import br.com.finup.security.AuthenticatedIdentity;
+import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.TransactionRecurrenceService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,9 +35,19 @@ import org.springframework.test.web.servlet.MockMvc;
 @WebMvcTest(TransactionRecurrenceController.class)
 class TransactionRecurrenceControllerTest {
 
+  private static final AuthenticatedIdentity IDENTITY =
+      new AuthenticatedIdentity("mock-sub", "Ana Souza", "ana@exemplo.com");
+
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private TransactionRecurrenceService transactionRecurrenceService;
+
+  @MockitoBean private AuthenticatedIdentityResolver authenticatedIdentityResolver;
+
+  @BeforeEach
+  void mockIdentity() {
+    when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(IDENTITY);
+  }
 
   @Test
   @DisplayName("POST valido devolve 201 com Location e o corpo da recorrencia")
@@ -54,7 +67,7 @@ class TransactionRecurrenceControllerTest {
             LocalDate.of(2026, 1, 1),
             null);
     when(transactionRecurrenceService.register(
-            eq(userId),
+            eq(IDENTITY),
             eq(categoryId),
             eq(null),
             eq(TransactionType.EXPENSE),
@@ -73,7 +86,6 @@ class TransactionRecurrenceControllerTest {
                 .content(
                     """
                     {
-                      "userId": "%s",
                       "categoryId": "%s",
                       "type": "EXPENSE",
                       "description": "Conta de luz",
@@ -83,7 +95,7 @@ class TransactionRecurrenceControllerTest {
                       "startDate": "2026-01-01"
                     }
                     """
-                        .formatted(userId, categoryId)))
+                        .formatted(categoryId)))
         .andExpect(status().isCreated())
         .andExpect(
             header().string("Location", "/api/v1/transaction-recurrences/" + recurrence.getId()))
@@ -114,7 +126,6 @@ class TransactionRecurrenceControllerTest {
   @Test
   @DisplayName("categoria inexistente vira 404, e nao 500")
   void unknownCategoryReturns404() throws Exception {
-    UUID userId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     when(transactionRecurrenceService.register(
             any(), any(), any(), any(), any(), any(), any(), anyInt(), any(), any()))
@@ -127,7 +138,6 @@ class TransactionRecurrenceControllerTest {
                 .content(
                     """
                     {
-                      "userId": "%s",
                       "categoryId": "%s",
                       "type": "EXPENSE",
                       "amount": 250.00,
@@ -136,7 +146,7 @@ class TransactionRecurrenceControllerTest {
                       "startDate": "2026-01-01"
                     }
                     """
-                        .formatted(userId, categoryId)))
+                        .formatted(categoryId)))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.status").value(404));
   }
@@ -144,7 +154,6 @@ class TransactionRecurrenceControllerTest {
   @Test
   @DisplayName("periodo invalido vira 422")
   void invalidPeriodReturns422() throws Exception {
-    UUID userId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     when(transactionRecurrenceService.register(
             any(), any(), any(), any(), any(), any(), any(), anyInt(), any(), any()))
@@ -157,7 +166,6 @@ class TransactionRecurrenceControllerTest {
                 .content(
                     """
                     {
-                      "userId": "%s",
                       "categoryId": "%s",
                       "type": "EXPENSE",
                       "amount": 250.00,
@@ -167,12 +175,12 @@ class TransactionRecurrenceControllerTest {
                       "endDate": "2026-01-01"
                     }
                     """
-                        .formatted(userId, categoryId)))
+                        .formatted(categoryId)))
         .andExpect(status().isUnprocessableEntity());
   }
 
   @Test
-  @DisplayName("GET /due lista as recorrencias do usuario que caem na data informada")
+  @DisplayName("GET /due lista as recorrencias do usuario autenticado que caem na data informada")
   void findDueReturnsMatchingRecurrences() throws Exception {
     UUID userId = UUID.randomUUID();
     TransactionRecurrence recurrence =
@@ -187,14 +195,11 @@ class TransactionRecurrenceControllerTest {
             5,
             LocalDate.of(2026, 1, 1),
             null);
-    when(transactionRecurrenceService.findDueOn(userId, LocalDate.of(2026, 9, 5)))
+    when(transactionRecurrenceService.findDueOn(IDENTITY, LocalDate.of(2026, 9, 5)))
         .thenReturn(List.of(recurrence));
 
     mockMvc
-        .perform(
-            get("/api/v1/transaction-recurrences/due")
-                .param("userId", userId.toString())
-                .param("date", "2026-09-05"))
+        .perform(get("/api/v1/transaction-recurrences/due").param("date", "2026-09-05"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(1))
         .andExpect(jsonPath("$[0].id").value(recurrence.getId().toString()));
