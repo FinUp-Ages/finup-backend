@@ -12,7 +12,7 @@ import br.com.finup.dto.CategoryResponse;
 import br.com.finup.exception.ConflictException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.Category;
-import br.com.finup.model.CategoryType;
+import br.com.finup.model.TransactionType;
 import br.com.finup.model.User;
 import br.com.finup.repository.CategoryRepository;
 import br.com.finup.security.AuthenticatedIdentity;
@@ -44,7 +44,7 @@ class CategoryServiceTest {
   }
 
   private Category mockCategory(User user) {
-    return Category.createForUser(user, "Alimentação", CategoryType.EXPENSE);
+    return Category.createForUser(user, "Alimentação", TransactionType.EXPENSE);
   }
 
   private Category mockDefaultCategory() {
@@ -58,7 +58,7 @@ class CategoryServiceTest {
   void createsCategoryForUser() {
     User user = mockUser();
     AuthenticatedIdentity identity = identity(user);
-    CategoryRequest request = new CategoryRequest("Academia", CategoryType.EXPENSE);
+    CategoryRequest request = new CategoryRequest("Academia", TransactionType.EXPENSE);
 
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
     when(categoryRepository.save(any(Category.class))).thenAnswer(i -> i.getArgument(0));
@@ -66,7 +66,7 @@ class CategoryServiceTest {
     CategoryResponse response = categoryService.create(identity, request);
 
     assertThat(response.name()).isEqualTo("Academia");
-    assertThat(response.type()).isEqualTo(CategoryType.EXPENSE);
+    assertThat(response.type()).isEqualTo(TransactionType.EXPENSE);
     assertThat(response.isDefault()).isFalse();
   }
 
@@ -75,7 +75,7 @@ class CategoryServiceTest {
   void createThrowsWhenUserNotFound() {
     AuthenticatedIdentity identity =
         new AuthenticatedIdentity("missing-sub", "Ana Souza", "ana@exemplo.com");
-    CategoryRequest request = new CategoryRequest("Academia", CategoryType.EXPENSE);
+    CategoryRequest request = new CategoryRequest("Academia", TransactionType.EXPENSE);
 
     when(userService.findByAuthenticatedIdentity(identity))
         .thenThrow(new ResourceNotFoundException("Usuario nao encontrado"));
@@ -92,7 +92,7 @@ class CategoryServiceTest {
     User user = mockUser();
     AuthenticatedIdentity identity = identity(user);
     Category category = mockCategory(user);
-    CategoryRequest request = new CategoryRequest("Academia e Esportes", CategoryType.EXPENSE);
+    CategoryRequest request = new CategoryRequest("Academia e Esportes", TransactionType.EXPENSE);
 
     when(categoryRepository.findById(any())).thenReturn(Optional.of(category));
     when(categoryRepository.save(any(Category.class))).thenAnswer(i -> i.getArgument(0));
@@ -109,7 +109,7 @@ class CategoryServiceTest {
     User user = mockUser();
     AuthenticatedIdentity identity = identity(user);
     Category category = mockDefaultCategory();
-    CategoryRequest request = new CategoryRequest("Outro nome", CategoryType.EXPENSE);
+    CategoryRequest request = new CategoryRequest("Outro nome", TransactionType.EXPENSE);
 
     when(categoryRepository.findById(any())).thenReturn(Optional.of(category));
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
@@ -129,7 +129,7 @@ class CategoryServiceTest {
         User.createFromCognitoIdentity("cognito-sub-carlos", "Carlos", "carlos@exemplo.com");
     AuthenticatedIdentity identity = identity(other);
     Category category = mockCategory(owner);
-    CategoryRequest request = new CategoryRequest("Outro nome", CategoryType.EXPENSE);
+    CategoryRequest request = new CategoryRequest("Outro nome", TransactionType.EXPENSE);
 
     when(categoryRepository.findById(any())).thenReturn(Optional.of(category));
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(other);

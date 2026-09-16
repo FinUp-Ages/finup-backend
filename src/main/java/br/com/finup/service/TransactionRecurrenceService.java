@@ -3,8 +3,8 @@ package br.com.finup.service;
 import br.com.finup.exception.InvalidRecurrencePeriodException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.RecurrenceFrequency;
-import br.com.finup.model.RecurrenceType;
 import br.com.finup.model.TransactionRecurrence;
+import br.com.finup.model.TransactionType;
 import br.com.finup.repository.TransactionRecurrenceRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -39,7 +39,7 @@ public class TransactionRecurrenceService {
       UUID userId,
       UUID categoryId,
       UUID paymentMethodId,
-      RecurrenceType type,
+      TransactionType type,
       String description,
       BigDecimal amount,
       RecurrenceFrequency frequency,

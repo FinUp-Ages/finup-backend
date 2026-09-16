@@ -10,8 +10,8 @@ import static org.mockito.Mockito.when;
 import br.com.finup.exception.InvalidRecurrencePeriodException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.RecurrenceFrequency;
-import br.com.finup.model.RecurrenceType;
 import br.com.finup.model.TransactionRecurrence;
+import br.com.finup.model.TransactionType;
 import br.com.finup.repository.TransactionRecurrenceRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -143,7 +143,7 @@ class TransactionRecurrenceServiceTest {
             userId,
             UUID.randomUUID(),
             null,
-            RecurrenceType.EXPENSE,
+            TransactionType.EXPENSE,
             "Conta de luz",
             new BigDecimal("250.00"),
             RecurrenceFrequency.MONTHLY,
@@ -155,7 +155,7 @@ class TransactionRecurrenceServiceTest {
             userId,
             UUID.randomUUID(),
             null,
-            RecurrenceType.EXPENSE,
+            TransactionType.EXPENSE,
             "Internet",
             new BigDecimal("120.00"),
             RecurrenceFrequency.MONTHLY,
@@ -177,7 +177,7 @@ class TransactionRecurrenceServiceTest {
         userId,
         categoryId,
         paymentMethodId,
-        RecurrenceType.EXPENSE,
+        TransactionType.EXPENSE,
         "Conta de luz",
         new BigDecimal("250.00"),
         RecurrenceFrequency.MONTHLY,

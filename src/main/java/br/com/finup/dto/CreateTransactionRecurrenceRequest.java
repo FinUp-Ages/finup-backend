@@ -1,7 +1,7 @@
 package br.com.finup.dto;
 
 import br.com.finup.model.RecurrenceFrequency;
-import br.com.finup.model.RecurrenceType;
+import br.com.finup.model.TransactionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
@@ -26,7 +26,7 @@ public record CreateTransactionRecurrenceRequest(
         UUID paymentMethodId,
     @Schema(description = "Tipo da transacao gerada", example = "EXPENSE")
         @NotNull(message = "e obrigatorio")
-        RecurrenceType type,
+        TransactionType type,
     @Schema(description = "Descricao opcional", example = "Conta de luz")
         @Size(max = 255, message = "deve ter no maximo 255 caracteres")
         String description,

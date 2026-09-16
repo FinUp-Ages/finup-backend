@@ -3,7 +3,7 @@ package br.com.finup.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.finup.model.Category;
-import br.com.finup.model.CategoryType;
+import br.com.finup.model.TransactionType;
 import br.com.finup.model.User;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -33,9 +33,10 @@ class CategoryRepositoryTest {
         userRepository.saveAndFlush(
             User.createFromCognitoIdentity("other-category-sub", "Carlos", "carlos@example.com"));
 
-    categoryRepository.saveAndFlush(Category.createForUser(user, "Academia", CategoryType.EXPENSE));
     categoryRepository.saveAndFlush(
-        Category.createForUser(otherUser, "Outro usuario", CategoryType.EXPENSE));
+        Category.createForUser(user, "Academia", TransactionType.EXPENSE));
+    categoryRepository.saveAndFlush(
+        Category.createForUser(otherUser, "Outro usuario", TransactionType.EXPENSE));
 
     jdbcTemplate.update(
         "INSERT INTO categories (id, user_id, name, type, is_default, created_at, updated_at) "

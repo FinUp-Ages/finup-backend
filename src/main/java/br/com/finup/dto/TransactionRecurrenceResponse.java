@@ -1,7 +1,7 @@
 package br.com.finup.dto;
 
 import br.com.finup.model.RecurrenceFrequency;
-import br.com.finup.model.RecurrenceType;
+import br.com.finup.model.TransactionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -15,7 +15,7 @@ public record TransactionRecurrenceResponse(
     UUID userId,
     UUID categoryId,
     UUID paymentMethodId,
-    RecurrenceType type,
+    TransactionType type,
     String description,
     BigDecimal amount,
     RecurrenceFrequency frequency,

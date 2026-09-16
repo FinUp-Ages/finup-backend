@@ -13,8 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import br.com.finup.exception.InvalidRecurrencePeriodException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.RecurrenceFrequency;
-import br.com.finup.model.RecurrenceType;
 import br.com.finup.model.TransactionRecurrence;
+import br.com.finup.model.TransactionType;
 import br.com.finup.service.TransactionRecurrenceService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -46,7 +46,7 @@ class TransactionRecurrenceControllerTest {
             userId,
             categoryId,
             null,
-            RecurrenceType.EXPENSE,
+            TransactionType.EXPENSE,
             "Conta de luz",
             new BigDecimal("250.00"),
             RecurrenceFrequency.MONTHLY,
@@ -57,7 +57,7 @@ class TransactionRecurrenceControllerTest {
             eq(userId),
             eq(categoryId),
             eq(null),
-            eq(RecurrenceType.EXPENSE),
+            eq(TransactionType.EXPENSE),
             eq("Conta de luz"),
             eq(new BigDecimal("250.00")),
             eq(RecurrenceFrequency.MONTHLY),
@@ -180,7 +180,7 @@ class TransactionRecurrenceControllerTest {
             userId,
             UUID.randomUUID(),
             null,
-            RecurrenceType.EXPENSE,
+            TransactionType.EXPENSE,
             "Conta de luz",
             new BigDecimal("250.00"),
             RecurrenceFrequency.MONTHLY,

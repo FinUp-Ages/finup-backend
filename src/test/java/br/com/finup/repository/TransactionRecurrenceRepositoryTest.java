@@ -3,8 +3,8 @@ package br.com.finup.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.finup.model.RecurrenceFrequency;
-import br.com.finup.model.RecurrenceType;
 import br.com.finup.model.TransactionRecurrence;
+import br.com.finup.model.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -66,7 +66,7 @@ class TransactionRecurrenceRepositoryTest {
             UUID.randomUUID(),
             UUID.randomUUID(),
             null,
-            RecurrenceType.EXPENSE,
+            TransactionType.EXPENSE,
             "Conta de luz",
             new BigDecimal("250.00"),
             RecurrenceFrequency.MONTHLY,
@@ -101,7 +101,7 @@ class TransactionRecurrenceRepositoryTest {
             userId,
             UUID.randomUUID(),
             null,
-            RecurrenceType.EXPENSE,
+            TransactionType.EXPENSE,
             "Conta de luz",
             new BigDecimal("250.00"),
             RecurrenceFrequency.MONTHLY,
@@ -113,7 +113,7 @@ class TransactionRecurrenceRepositoryTest {
             otherUserId,
             UUID.randomUUID(),
             null,
-            RecurrenceType.INCOME,
+            TransactionType.INCOME,
             "Salario",
             new BigDecimal("5000.00"),
             RecurrenceFrequency.MONTHLY,
