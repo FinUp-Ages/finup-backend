@@ -39,10 +39,10 @@ public class TransactionRecurrenceService {
 
   /**
    * Cadastra uma recorrencia no nome do usuario autenticado, depois de confirmar que as referencias
-   * informadas existem.
+   * informadas existem e estao disponiveis para ele.
    *
    * @throws ResourceNotFoundException se a identidade nao tiver usuario local, ou se a categoria ou
-   *     o meio de pagamento nao existir
+   *     o meio de pagamento nao existir ou pertencer a outro usuario
    * @throws InvalidRecurrencePeriodException se a data de termino for anterior a de inicio
    */
   @Transactional
@@ -58,7 +58,7 @@ public class TransactionRecurrenceService {
       LocalDate startDate,
       LocalDate endDate) {
     User user = userService.findByAuthenticatedIdentity(identity);
-    requireExistingReferences(categoryId, paymentMethodId);
+    requireAvailableReferences(user.getId(), categoryId, paymentMethodId);
     if (endDate != null && endDate.isBefore(startDate)) {
       throw new InvalidRecurrencePeriodException();
     }
@@ -94,12 +94,16 @@ public class TransactionRecurrenceService {
         .toList();
   }
 
-  private void requireExistingReferences(UUID categoryId, UUID paymentMethodId) {
-    if (!transactionRecurrenceRepository.existsCategoryById(categoryId)) {
+  /**
+   * Referencia de outro usuario responde 404, e nao 403: um 403 confirmaria a existencia do id para
+   * quem nao deveria saber dela. Mesma decisao tomada no CRUD de categorias.
+   */
+  private void requireAvailableReferences(UUID userId, UUID categoryId, UUID paymentMethodId) {
+    if (!transactionRecurrenceRepository.existsCategoryAvailableForUser(categoryId, userId)) {
       throw new ResourceNotFoundException("Categoria", categoryId);
     }
     if (paymentMethodId != null
-        && !transactionRecurrenceRepository.existsPaymentMethodById(paymentMethodId)) {
+        && !transactionRecurrenceRepository.existsPaymentMethodForUser(paymentMethodId, userId)) {
       throw new ResourceNotFoundException("Meio de pagamento", paymentMethodId);
     }
   }

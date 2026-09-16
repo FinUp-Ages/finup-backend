@@ -50,7 +50,8 @@ class TransactionRecurrenceServiceTest {
     AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
-    when(transactionRecurrenceRepository.existsCategoryById(categoryId)).thenReturn(true);
+    when(transactionRecurrenceRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
+        .thenReturn(true);
     when(transactionRecurrenceRepository.save(any(TransactionRecurrence.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -60,7 +61,7 @@ class TransactionRecurrenceServiceTest {
     assertThat(recurrence.getId()).isNotNull();
     assertThat(recurrence.getUserId()).isEqualTo(user.getId());
     assertThat(recurrence.getCategoryId()).isEqualTo(categoryId);
-    verify(transactionRecurrenceRepository, never()).existsPaymentMethodById(any());
+    verify(transactionRecurrenceRepository, never()).existsPaymentMethodForUser(any(), any());
   }
 
   @Test
@@ -71,8 +72,10 @@ class TransactionRecurrenceServiceTest {
     UUID categoryId = UUID.randomUUID();
     UUID paymentMethodId = UUID.randomUUID();
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
-    when(transactionRecurrenceRepository.existsCategoryById(categoryId)).thenReturn(true);
-    when(transactionRecurrenceRepository.existsPaymentMethodById(paymentMethodId)).thenReturn(true);
+    when(transactionRecurrenceRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
+        .thenReturn(true);
+    when(transactionRecurrenceRepository.existsPaymentMethodForUser(paymentMethodId, user.getId()))
+        .thenReturn(true);
     when(transactionRecurrenceRepository.save(any(TransactionRecurrence.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -96,13 +99,14 @@ class TransactionRecurrenceServiceTest {
   }
 
   @Test
-  @DisplayName("recusa quando a categoria nao existe")
+  @DisplayName("recusa quando a categoria nao existe ou e de outro usuario")
   void rejectsUnknownCategory() {
     User user = mockUser();
     AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
-    when(transactionRecurrenceRepository.existsCategoryById(categoryId)).thenReturn(false);
+    when(transactionRecurrenceRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
+        .thenReturn(false);
 
     assertThatThrownBy(() -> register(identity, categoryId, null, LocalDate.now(), null))
         .isInstanceOf(ResourceNotFoundException.class)
@@ -111,15 +115,16 @@ class TransactionRecurrenceServiceTest {
   }
 
   @Test
-  @DisplayName("recusa quando o meio de pagamento informado nao existe")
+  @DisplayName("recusa quando o meio de pagamento nao existe ou e de outro usuario")
   void rejectsUnknownPaymentMethod() {
     User user = mockUser();
     AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
     UUID paymentMethodId = UUID.randomUUID();
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
-    when(transactionRecurrenceRepository.existsCategoryById(categoryId)).thenReturn(true);
-    when(transactionRecurrenceRepository.existsPaymentMethodById(paymentMethodId))
+    when(transactionRecurrenceRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
+        .thenReturn(true);
+    when(transactionRecurrenceRepository.existsPaymentMethodForUser(paymentMethodId, user.getId()))
         .thenReturn(false);
 
     assertThatThrownBy(() -> register(identity, categoryId, paymentMethodId, LocalDate.now(), null))
@@ -135,7 +140,8 @@ class TransactionRecurrenceServiceTest {
     AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
-    when(transactionRecurrenceRepository.existsCategoryById(categoryId)).thenReturn(true);
+    when(transactionRecurrenceRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
+        .thenReturn(true);
 
     assertThatThrownBy(
             () ->

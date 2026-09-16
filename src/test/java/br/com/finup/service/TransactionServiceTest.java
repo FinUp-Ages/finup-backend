@@ -47,7 +47,8 @@ class TransactionServiceTest {
     AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
-    when(transactionRepository.existsCategoryById(categoryId)).thenReturn(true);
+    when(transactionRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
+        .thenReturn(true);
     when(transactionRepository.save(any(Transaction.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -67,7 +68,7 @@ class TransactionServiceTest {
     assertThat(transaction.getCategoryId()).isEqualTo(categoryId);
     assertThat(transaction.getPaymentMethodId()).isNull();
     assertThat(transaction.getType()).isEqualTo(TransactionType.INCOME);
-    verify(transactionRepository, never()).existsPaymentMethodById(any());
+    verify(transactionRepository, never()).existsPaymentMethodForUser(any(), any());
   }
 
   @Test
@@ -78,8 +79,10 @@ class TransactionServiceTest {
     UUID categoryId = UUID.randomUUID();
     UUID paymentMethodId = UUID.randomUUID();
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
-    when(transactionRepository.existsCategoryById(categoryId)).thenReturn(true);
-    when(transactionRepository.existsPaymentMethodById(paymentMethodId)).thenReturn(true);
+    when(transactionRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
+        .thenReturn(true);
+    when(transactionRepository.existsPaymentMethodForUser(paymentMethodId, user.getId()))
+        .thenReturn(true);
     when(transactionRepository.save(any(Transaction.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -111,13 +114,14 @@ class TransactionServiceTest {
   }
 
   @Test
-  @DisplayName("recusa transacao quando a categoria nao existe")
+  @DisplayName("recusa transacao quando a categoria nao existe ou e de outro usuario")
   void rejectsUnknownCategory() {
     User user = mockUser();
     AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
-    when(transactionRepository.existsCategoryById(categoryId)).thenReturn(false);
+    when(transactionRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
+        .thenReturn(false);
 
     assertThatThrownBy(() -> register(identity, categoryId, null))
         .isInstanceOf(ResourceNotFoundException.class)
@@ -126,15 +130,17 @@ class TransactionServiceTest {
   }
 
   @Test
-  @DisplayName("recusa transacao quando o meio de pagamento informado nao existe")
+  @DisplayName("recusa transacao quando o meio de pagamento nao existe ou e de outro usuario")
   void rejectsUnknownPaymentMethod() {
     User user = mockUser();
     AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
     UUID paymentMethodId = UUID.randomUUID();
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
-    when(transactionRepository.existsCategoryById(categoryId)).thenReturn(true);
-    when(transactionRepository.existsPaymentMethodById(paymentMethodId)).thenReturn(false);
+    when(transactionRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
+        .thenReturn(true);
+    when(transactionRepository.existsPaymentMethodForUser(paymentMethodId, user.getId()))
+        .thenReturn(false);
 
     assertThatThrownBy(() -> register(identity, categoryId, paymentMethodId))
         .isInstanceOf(ResourceNotFoundException.class)

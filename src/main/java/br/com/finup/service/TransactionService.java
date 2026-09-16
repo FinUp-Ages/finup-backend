@@ -38,7 +38,7 @@ public class TransactionService {
    * informadas existem e estao disponiveis para ele.
    *
    * @throws ResourceNotFoundException se a identidade nao tiver usuario local, ou se a categoria ou
-   *     o meio de pagamento nao existir
+   *     o meio de pagamento nao existir ou pertencer a outro usuario
    */
   @Transactional
   public Transaction register(
@@ -51,7 +51,7 @@ public class TransactionService {
       LocalDate transactionDate,
       boolean recurring) {
     User user = userService.findByAuthenticatedIdentity(identity);
-    requireExistingReferences(categoryId, paymentMethodId);
+    requireAvailableReferences(user.getId(), categoryId, paymentMethodId);
 
     Transaction transaction =
         transactionRepository.save(
@@ -68,12 +68,16 @@ public class TransactionService {
     return transaction;
   }
 
-  private void requireExistingReferences(UUID categoryId, UUID paymentMethodId) {
-    if (!transactionRepository.existsCategoryById(categoryId)) {
+  /**
+   * Referencia de outro usuario responde 404, e nao 403: um 403 confirmaria a existencia do id para
+   * quem nao deveria saber dela. Mesma decisao tomada no CRUD de categorias.
+   */
+  private void requireAvailableReferences(UUID userId, UUID categoryId, UUID paymentMethodId) {
+    if (!transactionRepository.existsCategoryAvailableForUser(categoryId, userId)) {
       throw new ResourceNotFoundException("Categoria", categoryId);
     }
     if (paymentMethodId != null
-        && !transactionRepository.existsPaymentMethodById(paymentMethodId)) {
+        && !transactionRepository.existsPaymentMethodForUser(paymentMethodId, userId)) {
       throw new ResourceNotFoundException("Meio de pagamento", paymentMethodId);
     }
   }
