@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.finup.exception.ConflictException;
 import br.com.finup.exception.EmailAlreadyRegisteredException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.exception.UserAlreadyRegisteredException;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 /**
  * Testes unitarios de service, sem contexto Spring e sem banco: o repositorio e um duble. Roda em
@@ -45,7 +47,8 @@ class UserServiceTest {
         new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
     when(userRepository.existsByCognitoId("cognito-sub-123")).thenReturn(false);
     when(userRepository.existsByEmail("ana@exemplo.com")).thenReturn(false);
-    when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(userRepository.saveAndFlush(any(User.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
 
     User user = userService.createFromAuthenticatedIdentity(identity);
 
@@ -64,11 +67,26 @@ class UserServiceTest {
         new AuthenticatedIdentity("cognito-sub-123", null, "ana@exemplo.com");
     when(userRepository.existsByCognitoId("cognito-sub-123")).thenReturn(false);
     when(userRepository.existsByEmail("ana@exemplo.com")).thenReturn(false);
-    when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(userRepository.saveAndFlush(any(User.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
 
     User user = userService.createFromAuthenticatedIdentity(identity);
 
     assertThat(user.getName()).isNull();
+  }
+
+  @Test
+  @DisplayName("cadastro simultaneo da mesma identidade vira 409, e nao 500")
+  void translatesConcurrentInsertIntoConflict() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
+    when(userRepository.existsByCognitoId("cognito-sub-123")).thenReturn(false);
+    when(userRepository.existsByEmail("ana@exemplo.com")).thenReturn(false);
+    when(userRepository.saveAndFlush(any(User.class)))
+        .thenThrow(new DataIntegrityViolationException("uk_users_cognito_id"));
+
+    assertThatThrownBy(() -> userService.createFromAuthenticatedIdentity(identity))
+        .isInstanceOf(ConflictException.class);
   }
 
   @Test
@@ -81,7 +99,7 @@ class UserServiceTest {
     assertThatThrownBy(() -> userService.createFromAuthenticatedIdentity(identity))
         .isInstanceOf(UserAlreadyRegisteredException.class);
 
-    verify(userRepository, never()).save(any());
+    verify(userRepository, never()).saveAndFlush(any());
   }
 
   @Test
@@ -96,7 +114,7 @@ class UserServiceTest {
         .isInstanceOf(EmailAlreadyRegisteredException.class)
         .hasMessageContaining("ana@exemplo.com");
 
-    verify(userRepository, never()).save(any());
+    verify(userRepository, never()).saveAndFlush(any());
   }
 
   @Test
@@ -112,7 +130,7 @@ class UserServiceTest {
     assertThatThrownBy(() -> userService.createFromAuthenticatedIdentity(identity))
         .isInstanceOf(EmailAlreadyRegisteredException.class);
 
-    verify(userRepository, never()).save(any());
+    verify(userRepository, never()).saveAndFlush(any());
   }
 
   @Test

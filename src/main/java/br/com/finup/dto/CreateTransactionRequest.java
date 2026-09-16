@@ -4,6 +4,7 @@ import br.com.finup.model.TransactionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -25,6 +26,7 @@ public record CreateTransactionRequest(
         String description,
     @Schema(description = "Valor da transacao", example = "320.00")
         @NotNull(message = "e obrigatorio")
+        @Positive(message = "deve ser maior que zero")
         @Digits(
             integer = 10,
             fraction = 2,

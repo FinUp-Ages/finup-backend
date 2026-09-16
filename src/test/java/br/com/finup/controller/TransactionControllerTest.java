@@ -124,6 +124,30 @@ class TransactionControllerTest {
   }
 
   @Test
+  @DisplayName("POST com valor negativo devolve 400, sem chegar ao service")
+  void negativeAmountReturns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/transactions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "categoryId": "%s",
+                      "type": "EXPENSE",
+                      "amount": -10.00,
+                      "transactionDate": "2026-09-12",
+                      "isRecurring": false
+                    }
+                    """
+                        .formatted(UUID.randomUUID())))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.fields[0].field").value("amount"))
+        .andExpect(jsonPath("$.fields[0].message").value("deve ser maior que zero"));
+    verifyNoInteractions(transactionService);
+  }
+
+  @Test
   @DisplayName("POST com tipo fora dos valores definidos devolve 400")
   void invalidTypeReturns400() throws Exception {
     mockMvc
