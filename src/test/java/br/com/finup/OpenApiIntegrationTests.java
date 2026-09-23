@@ -19,7 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * Garante que o contrato OpenAPI publicado continua identificando o projeto e expondo o recurso de
- * usuarios.
+ * usuarios e transacoes.
  *
  * <p>E deste contrato que finup-web e finup-mobile geram cliente: se alguem apagar o {@code
  * OpenApiConfig} ou mudar o path do controller, o CI reprova aqui em vez de a quebra aparecer no
@@ -33,7 +33,7 @@ class OpenApiIntegrationTests {
   @Autowired private MockMvc mockMvc;
 
   @Test
-  @DisplayName("contrato OpenAPI expoe os metadados do projeto e o recurso de usuarios")
+  @DisplayName("contrato OpenAPI expoe os metadados e os recursos de usuarios e transacoes")
   void exposesOpenApiContractWithProjectMetadata() throws Exception {
     mockMvc
         .perform(get("/v3/api-docs"))
@@ -43,7 +43,8 @@ class OpenApiIntegrationTests {
         .andExpect(jsonPath("$.info.title").value("FinUp API"))
         .andExpect(jsonPath("$.info.version").value("v0.0.1"))
         .andExpect(jsonPath("$.info.contact.name").value("AGES 2026/2 - FinUp"))
-        .andExpect(jsonPath("$.paths['/api/v1/users']").exists());
+        .andExpect(jsonPath("$.paths['/api/v1/users']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/transactions'].post").exists());
   }
 
   @Test
