@@ -70,7 +70,7 @@ class TransactionRecurrenceTest {
         UUID.randomUUID(),
         UUID.randomUUID(),
         null,
-        RecurrenceType.EXPENSE,
+        TransactionType.EXPENSE,
         "Conta de luz",
         new BigDecimal("250.00"),
         RecurrenceFrequency.MONTHLY,

@@ -1,6 +1,6 @@
 package br.com.finup.dto;
 
-import br.com.finup.model.CategoryType;
+import br.com.finup.model.TransactionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -13,4 +13,4 @@ public record CategoryRequest(
         @Size(max = 255, message = "nao pode ter mais de 255 caracteres")
         String name,
     @Schema(description = "Tipo da categoria") @NotNull(message = "nao pode ser nulo")
-        CategoryType type) {}
+        TransactionType type) {}
