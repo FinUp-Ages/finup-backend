@@ -1,9 +1,18 @@
 {
-  "stage": "COMPLETED",
-  "task": null,
-  "objective": "Executar a CI em pushes para qualquer branch.",
-  "files_in_scope": [".github/workflows/ci.yml"],
-  "validation": {"git diff --check": "passed"},
-  "review": "approved",
-  "updated_at": "2026-09-13"
+  "stage": "REVIEWING",
+  "task": "PR #18 — fechar o contrato de identidade de transacoes e recorrencias",
+  "objective": "Tirar o userId do contrato de transacoes e recorrencias, aceitar so referencias do proprio usuario e fechar as brechas de validacao herdadas do #9 e do #4.",
+  "files_in_scope": [
+    "src/main/java/br/com/finup/controller/",
+    "src/main/java/br/com/finup/dto/",
+    "src/main/java/br/com/finup/model/",
+    "src/main/java/br/com/finup/repository/",
+    "src/main/java/br/com/finup/security/MockAuthenticatedIdentityResolver.java",
+    "src/main/java/br/com/finup/service/",
+    "src/test/java/br/com/finup/",
+    "README.md"
+  ],
+  "validation": {"mvn clean verify": "passed (121 testes, 0 falhas)"},
+  "review": "pending",
+  "updated_at": "2026-09-25"
 }
