@@ -1,6 +1,8 @@
 package br.com.finup.service;
 
+import br.com.finup.exception.InvalidTransactionRecurrenceException;
 import br.com.finup.exception.ResourceNotFoundException;
+import br.com.finup.model.RecurrenceFrequency;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
 import br.com.finup.model.User;
@@ -8,6 +10,7 @@ import br.com.finup.repository.TransactionRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +52,12 @@ public class TransactionService {
       String description,
       BigDecimal amount,
       LocalDate transactionDate,
-      boolean recurring) {
+      boolean recurring,
+      RecurrenceFrequency recurrenceFrequency,
+      LocalDateTime lastOccurrenceDateTime) {
+
+    validateRecurrence(recurring, recurrenceFrequency, lastOccurrenceDateTime);
+
     User user = userService.findByAuthenticatedIdentity(identity);
     requireAvailableReferences(user.getId(), categoryId, paymentMethodId);
 
@@ -63,7 +71,10 @@ public class TransactionService {
                 description,
                 amount,
                 transactionDate,
-                recurring));
+                recurring,
+                recurrenceFrequency,
+                lastOccurrenceDateTime));
+
     log.info("Transacao cadastrada: id={}, userId={}", transaction.getId(), user.getId());
     return transaction;
   }
@@ -76,9 +87,24 @@ public class TransactionService {
     if (!transactionRepository.existsCategoryAvailableForUser(categoryId, userId)) {
       throw new ResourceNotFoundException("Categoria", categoryId);
     }
+
     if (paymentMethodId != null
         && !transactionRepository.existsPaymentMethodForUser(paymentMethodId, userId)) {
       throw new ResourceNotFoundException("Meio de pagamento", paymentMethodId);
+    }
+  }
+
+  private void validateRecurrence(
+      boolean recurring,
+      RecurrenceFrequency recurrenceFrequency,
+      LocalDateTime lastOccurrenceDateTime) {
+
+    if (recurring && (recurrenceFrequency == null || lastOccurrenceDateTime == null)) {
+      throw new InvalidTransactionRecurrenceException();
+    }
+
+    if (!recurring && (recurrenceFrequency != null || lastOccurrenceDateTime != null)) {
+      throw new InvalidTransactionRecurrenceException();
     }
   }
 }

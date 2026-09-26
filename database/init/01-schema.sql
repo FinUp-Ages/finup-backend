@@ -101,12 +101,25 @@ CREATE TABLE IF NOT EXISTS transactions (
   description VARCHAR(255),
   amount DECIMAL(12, 2) NOT NULL,
   transaction_date DATE NOT NULL,
-  is_recurring BOOLEAN DEFAULT FALSE,
+  is_recurring BOOLEAN NOT NULL DEFAULT FALSE,
+  recurrence_frequency VARCHAR(50),
+  last_occurrence_date_time TIMESTAMP,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_transactions_user FOREIGN KEY (user_id) REFERENCES users (id),
   CONSTRAINT fk_transactions_category FOREIGN KEY (category_id) REFERENCES categories (id),
-  CONSTRAINT fk_transactions_payment_method FOREIGN KEY (payment_method_id) REFERENCES payment_methods (id)
+  CONSTRAINT fk_transactions_payment_method FOREIGN KEY (payment_method_id) REFERENCES payment_methods (id),
+  CONSTRAINT chk_transactions_recurrence CHECK (
+  (
+    is_recurring = TRUE
+    AND recurrence_frequency IS NOT NULL
+    AND last_occurrence_date_time IS NOT NULL
+  )
+  OR (
+    is_recurring = FALSE
+    AND recurrence_frequency IS NULL
+    AND last_occurrence_date_time IS NULL
+  )
 );
 
 CREATE TABLE IF NOT EXISTS debts (

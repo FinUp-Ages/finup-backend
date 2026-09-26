@@ -10,6 +10,7 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -45,6 +46,13 @@ public class Transaction {
   @Column(name = "is_recurring", nullable = false)
   private boolean recurring;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "recurrence_frequency", length = 50)
+  private RecurrenceFrequency recurrenceFrequency;
+
+  @Column(name = "last_occurrence_date_time")
+  private LocalDateTime lastOccurrenceDateTime;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -61,7 +69,9 @@ public class Transaction {
       String description,
       BigDecimal amount,
       LocalDate transactionDate,
-      boolean recurring) {
+      boolean recurring,
+      RecurrenceFrequency recurrenceFrequency,
+      LocalDateTime lastOccurrenceDateTime) {
     this.id = UUID.randomUUID();
     this.userId = Objects.requireNonNull(userId);
     this.categoryId = Objects.requireNonNull(categoryId);
@@ -71,6 +81,8 @@ public class Transaction {
     this.amount = Objects.requireNonNull(amount);
     this.transactionDate = Objects.requireNonNull(transactionDate);
     this.recurring = recurring;
+    this.recurrenceFrequency = recurrenceFrequency;
+    this.lastOccurrenceDateTime = lastOccurrenceDateTime;
     this.createdAt = Instant.now();
     this.updatedAt = createdAt;
   }
@@ -83,9 +95,20 @@ public class Transaction {
       String description,
       BigDecimal amount,
       LocalDate transactionDate,
-      boolean recurring) {
+      boolean recurring,
+      RecurrenceFrequency recurrenceFrequency,
+      LocalDateTime lastOccurrenceDateTime) {
     return new Transaction(
-        userId, categoryId, paymentMethodId, type, description, amount, transactionDate, recurring);
+        userId,
+        categoryId,
+        paymentMethodId,
+        type,
+        description,
+        amount,
+        transactionDate,
+        recurring,
+        recurrenceFrequency,
+        lastOccurrenceDateTime);
   }
 
   @PreUpdate
@@ -127,6 +150,14 @@ public class Transaction {
 
   public boolean isRecurring() {
     return recurring;
+  }
+
+  public RecurrenceFrequency getRecurrenceFrequency() {
+    return recurrenceFrequency;
+  }
+
+  public LocalDateTime getLastOccurrenceDateTime() {
+    return lastOccurrenceDateTime;
   }
 
   public Instant getCreatedAt() {

@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.finup.exception.ResourceNotFoundException;
+import br.com.finup.model.RecurrenceFrequency;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
 import br.com.finup.security.AuthenticatedIdentity;
@@ -17,6 +18,7 @@ import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.TransactionService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,6 +53,7 @@ class TransactionControllerTest {
     UUID userId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     LocalDate date = LocalDate.of(2026, 9, 12);
+    LocalDateTime lastOccurrenceDateTime = LocalDateTime.of(2026, 9, 12, 8, 0);
     Transaction transaction =
         Transaction.register(
             userId,
@@ -60,7 +63,9 @@ class TransactionControllerTest {
             "Salario",
             new BigDecimal("5000.00"),
             date,
-            true);
+            true,
+            RecurrenceFrequency.MONTHLY,
+            lastOccurrenceDateTime);
     when(transactionService.register(
             eq(IDENTITY),
             eq(categoryId),
@@ -69,7 +74,9 @@ class TransactionControllerTest {
             eq("Salario"),
             eq(new BigDecimal("5000.00")),
             eq(date),
-            eq(true)))
+            eq(true),
+            eq(RecurrenceFrequency.MONTHLY),
+            eq(lastOccurrenceDateTime)))
         .thenReturn(transaction);
 
     mockMvc
@@ -84,7 +91,9 @@ class TransactionControllerTest {
                       "description": "Salario",
                       "amount": 5000.00,
                       "transactionDate": "2026-09-12",
-                      "isRecurring": true
+                      "isRecurring": true,
+                      "recurrenceFrequency": "MONTHLY",
+                      "lastOccurrenceDateTime": "2026-09-12T08:00:00"
                     }
                     """
                         .formatted(categoryId)))
@@ -182,7 +191,9 @@ class TransactionControllerTest {
             isNull(),
             eq(new BigDecimal("10.00")),
             eq(date),
-            eq(false)))
+            eq(false),
+            isNull(),
+            isNull()))
         .thenThrow(new ResourceNotFoundException("Categoria", categoryId));
 
     mockMvc
