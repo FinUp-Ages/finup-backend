@@ -121,8 +121,8 @@ POST /api/v1/users/me/finup-score/recalculate
 ```
 
 O usuário é sempre o dono da identidade autenticada (resolvida por
-`AuthenticatedIdentityResolver`, hoje mockada pelos headers `X-Mock-Cognito-Sub`,
-`X-Mock-Cognito-Email` e `X-Mock-Cognito-Name`) — nenhum endpoint recebe um id de usuário do
+`AuthenticatedIdentityResolver` a partir do access token do Cognito, ou dos headers
+`X-Mock-Cognito-*` no profile `mock-auth`) — nenhum endpoint recebe um id de usuário do
 cliente.
 
 Gatilhos pretendidos (a implementar quando os respectivos fluxos existirem, hoje fora do escopo
@@ -190,6 +190,6 @@ pilar. A mensagem é voltada para quem chama a API, então não cita nome de col
 
 Estes 4 casos são exatamente os usados em `FinUpScoreCalculatorTest` e nos fixtures de
 `InMemoryFinUpScoreDataProvider` (Exemplos A/C/D, ligados via e-mail aos usuários de demonstração
-semeados em `database/init/03-test-data.sql`). Para testar pelo Swagger, chame
-`POST /api/v1/users/me/finup-score/recalculate` com o header `X-Mock-Cognito-Sub` igual ao
+semeados em `database/init/03-test-data.sql`). Para testar pelo Swagger, suba com o profile
+`mock-auth` e chame `POST /api/v1/users/me/finup-score/recalculate` com o header `X-Mock-Cognito-Sub` igual ao
 `cognito_id` do usuário desejado (ex.: `mock-sub-exemplo-a`).
