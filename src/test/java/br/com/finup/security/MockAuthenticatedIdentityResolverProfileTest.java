@@ -9,11 +9,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 /**
- * Confirma o mecanismo por tras da exigencia "em producao, sem Cognito, a aplicacao nao deve
- * subir": o {@link MockAuthenticatedIdentityResolver} so existe como bean fora do profile "prod".
- * Como {@code UserController} depende de {@link AuthenticatedIdentityResolver} no construtor, a
- * ausencia desse bean em producao e o que derruba o contexto na inicializacao — este teste isola
- * exatamente essa condicao, sem precisar subir a aplicacao inteira (e sem depender de banco).
+ * O {@link MockAuthenticatedIdentityResolver} so existe com o profile "mock-auth", e nunca em
+ * "prod". Como os controllers dependem de {@link AuthenticatedIdentityResolver} no construtor, e o
+ * resolver do Cognito e {@code !mock-auth}, ativar o mock em producao deixa a aplicacao sem nenhum
+ * resolver e derruba o contexto na inicializacao — este teste isola essa condicao, sem subir a
+ * aplicacao inteira (e sem depender de banco).
  */
 class MockAuthenticatedIdentityResolverProfileTest {
 
@@ -23,18 +23,26 @@ class MockAuthenticatedIdentityResolverProfileTest {
           .withUserConfiguration(MockAuthenticatedIdentityResolver.class);
 
   @Test
-  @DisplayName("mock de identidade existe fora do profile prod")
-  void isRegisteredWhenProfileIsNotProd() {
+  @DisplayName("mock de identidade existe com o profile mock-auth")
+  void isRegisteredWithMockAuthProfile() {
     contextRunner
-        .withPropertyValues("spring.profiles.active=dev")
+        .withPropertyValues("spring.profiles.active=dev,mock-auth")
         .run(context -> assertThat(context).hasSingleBean(AuthenticatedIdentityResolver.class));
   }
 
   @Test
-  @DisplayName("mock de identidade nao existe no profile prod")
-  void isAbsentWhenProfileIsProd() {
+  @DisplayName("mock de identidade nao existe sem o profile mock-auth")
+  void isAbsentWithoutMockAuthProfile() {
     contextRunner
-        .withPropertyValues("spring.profiles.active=prod")
+        .withPropertyValues("spring.profiles.active=dev")
+        .run(context -> assertThat(context).doesNotHaveBean(AuthenticatedIdentityResolver.class));
+  }
+
+  @Test
+  @DisplayName("mock de identidade nao existe em prod, nem com o profile mock-auth")
+  void isAbsentInProdEvenWithMockAuthProfile() {
+    contextRunner
+        .withPropertyValues("spring.profiles.active=prod,mock-auth")
         .run(context -> assertThat(context).doesNotHaveBean(AuthenticatedIdentityResolver.class));
   }
 }

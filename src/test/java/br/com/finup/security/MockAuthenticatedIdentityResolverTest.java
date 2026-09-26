@@ -110,4 +110,17 @@ class MockAuthenticatedIdentityResolverTest {
     assertThatThrownBy(resolver::resolveCurrent)
         .isInstanceOf(MissingAuthenticatedIdentityException.class);
   }
+
+  @Test
+  @DisplayName("resolveCurrentWithAttributes le os mesmos headers")
+  void resolveWithAttributesReadsSameHeaders() {
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getHeader("X-Mock-Cognito-Sub")).thenReturn("cognito-sub-123");
+    when(request.getHeader("X-Mock-Cognito-Name")).thenReturn("Ana Souza");
+    when(request.getHeader("X-Mock-Cognito-Email")).thenReturn("ana@exemplo.com");
+    MockAuthenticatedIdentityResolver resolver = new MockAuthenticatedIdentityResolver(request);
+
+    assertThat(resolver.resolveCurrentWithAttributes())
+        .isEqualTo(new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com"));
+  }
 }
