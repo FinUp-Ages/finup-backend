@@ -6,7 +6,8 @@ Java 21 · Spring Boot 3.5 · Maven · PostgreSQL 16 · Docker
 
 > O cadastro de usuário existe como **exemplo de referência** das convenções (veja a seção mais abaixo).
 > A persistência está ligada: as entidades são `@Entity` e gravam no PostgreSQL do `docker compose`.
-> A autenticação ainda não — a identidade vem de headers `X-Mock-Cognito-*` até o Cognito entrar.
+> A autenticação é o **AWS Cognito**: toda rota de `/api/v1` exige o access token do Cognito. Para
+> desenvolver sem usuário no Cognito, existe o profile `mock-auth` (veja [Autenticação](#autenticação)).
 
 ---
 
@@ -32,6 +33,10 @@ docker compose up -d
 # 3. aplicacao
 ./mvnw spring-boot:run
 ```
+
+Antes do passo 3, preencha no `.env` `COGNITO_USER_POOL_ID` e `COGNITO_CLIENT_ID` — ou, sem
+Cognito, use `SPRING_PROFILES_ACTIVE=dev,mock-auth`. Sem um dos dois a aplicação não sobe, com uma
+mensagem dizendo que falta `finup.cognito.user-pool-id`. Detalhes em [Autenticação](#autenticação).
 
 O `.env` **não** é opcional: `DB_PASSWORD` não tem valor padrão. Sem ele, ou com o banco fora do ar, a
 aplicação morre com uma stack do Hibernate (`Unable to determine Dialect without JDBC metadata` ou
@@ -61,9 +66,9 @@ controllers e DTOs da aplicação. Os metadados gerais da API ficam centralizado
 ### Endpoints disponíveis hoje
 
 Nenhum deles recebe identificador de usuário do cliente: quem está chamando vem sempre da
-identidade autenticada. Enquanto o Cognito não entra, isso são os headers `X-Mock-Cognito-Sub`
-(obrigatório), `X-Mock-Cognito-Email` (obrigatório) e `X-Mock-Cognito-Name` (opcional). Sem os dois
-primeiros, a resposta é `401`.
+identidade autenticada — o header `Authorization: Bearer <access token do Cognito>`, ou os headers
+`X-Mock-Cognito-*` no profile `mock-auth`. Sem identidade, a resposta é `401`. No Swagger, use o
+botão **Authorize**.
 
 | Método e caminho | O que faz |
 |---|---|
@@ -225,7 +230,8 @@ estrutura dele. Cada arquivo mostra a responsabilidade de uma camada:
 | `repository/UserRepository.java` | interface `JpaRepository` — é dela que o service depende |
 | `model/User.java` | `@Entity`, com as invariantes do domínio |
 | `security/AuthenticatedIdentityResolver.java` | de onde vem a identidade de quem chamou |
-| `security/MockAuthenticatedIdentityResolver.java` | implementação temporária por header, **sai quando o Cognito entrar** |
+| `security/CognitoAuthenticatedIdentityResolver.java` | implementação real: `sub` do access token, e-mail e nome via `GetUser` |
+| `security/MockAuthenticatedIdentityResolver.java` | implementação por header, só com o profile `mock-auth` |
 | `dto/UpdateUserAdditionalInfoRequest.java` | entrada + validação + `@Schema` do OpenAPI |
 | `dto/UserResponse.java` | saída. A entidade nunca é exposta |
 | `mapper/UserMapper.java` | conversão entidade ↔ DTO |
@@ -237,11 +243,12 @@ Testes correspondentes, também de referência:
 - `controller/UserControllerTest.java` — `@WebMvcTest`, só a camada web.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/users   -H 'X-Mock-Cognito-Sub: mock-sub-ana'   -H 'X-Mock-Cognito-Email: ana@exemplo.com'   -H 'X-Mock-Cognito-Name: Ana Souza'
+curl -X POST http://localhost:8080/api/v1/users -H "Authorization: Bearer $TOKEN"
 ```
 
 O corpo é vazio: nome e e-mail vêm da identidade autenticada, não do cliente. Devolve `201` com
-`Location`. Repetir a mesma chamada devolve `409`; sem os headers `Sub` e `Email` devolve `401`.
+`Location`. Repetir a mesma chamada devolve `409`; sem token devolve `401`. Como obter o `$TOKEN`
+está em [Autenticação](#autenticação).
 
 ### Idioma
 
@@ -273,6 +280,123 @@ contrato acompanha o código.
 
 > O exemplo é deletável. Quando o cadastro real de usuário for implementado, ele substitui este —
 > mas a estrutura permanece.
+
+## Autenticação
+
+A API valida o **access token** do AWS Cognito (Spring Security OAuth2 Resource Server). O token
+precisa ser assinado pelo User Pool configurado, estar dentro da validade, ter `token_use=access` e
+`client_id` igual ao App Client configurado. O ID token é recusado, mesmo sendo do mesmo pool.
+
+O access token só traz o `sub`. E-mail e nome, necessários só no cadastro (`POST /api/v1/users`),
+o backend busca na API `GetUser` do Cognito usando o próprio token do usuário — sem credencial da
+AWS. As demais rotas usam só o `sub`, sem chamada de rede.
+
+| Classe | Papel |
+|---|---|
+| `config/SecurityConfig.java` | o que exige token e o que é público (Swagger, `/actuator/health`) |
+| `config/CognitoConfig.java` | valida assinatura, issuer, `token_use` e `client_id` |
+| `security/CognitoAuthenticatedIdentityResolver.java` | monta a identidade a partir do token |
+| `security/CognitoUserAttributesClient.java` | chama o `GetUser` do Cognito |
+| `security/ProblemDetailAuthenticationEntryPoint.java` | 401 em RFC 7807, no mesmo formato do resto da API |
+
+### O que pegar no console da AWS
+
+Em **Cognito → Grupos de usuários → (o pool do FinUp)**:
+
+| Informação | Onde | Vai para o `.env` |
+|---|---|---|
+| ID do grupo de usuários (`us-east-2_AbCdEf123`) | página *Visão geral* do pool | `COGNITO_USER_POOL_ID` |
+| ID do cliente | *Clientes da aplicação → FinUp* (página de detalhes, não a de edição) | `COGNITO_CLIENT_ID` |
+
+A região vem do prefixo do ID do pool — não há variável para ela. No cliente da aplicação, confira:
+
+- **Segredo do cliente vazio.** É o cliente do app mobile, que não guarda segredo. Com segredo, o
+  login pelo terminal abaixo falha.
+- **Fluxos de autenticação:** `ALLOW_USER_AUTH`, `ALLOW_USER_SRP_AUTH` e `ALLOW_REFRESH_TOKEN_AUTH`.
+  **Não** é preciso habilitar `ALLOW_USER_PASSWORD_AUTH`: o teste abaixo usa o `ALLOW_USER_AUTH`.
+
+Como o pool do FinUp foi criado (e nada disso muda depois de criado):
+
+- o login é por **nome de usuário, com o e-mail como alias** — o `Username` do cadastro **não pode
+  ter formato de e-mail** (`Username cannot be of email format`). O login pelo e-mail só funciona
+  depois que o e-mail for confirmado pelo código;
+- **`birthdate` é atributo obrigatório** no cadastro do Cognito, no formato `AAAA-MM-DD`.
+
+### Rodar a API contra o Cognito
+
+A API busca as chaves públicas do pool e chama o `GetUser` da AWS. Numa máquina com TLS
+interceptado (o mesmo caso do `PKIX path building failed` acima), o Java da **aplicação** também
+precisa do truststore do Windows — o `MAVEN_OPTS` vale só para o Maven, não para a aplicação que ele
+inicia:
+
+```bash
+./mvnw spring-boot:run "-Dspring-boot.run.jvmArguments=-Djavax.net.ssl.trustStoreType=Windows-ROOT"
+```
+
+Sem isso, token válido volta `401` e o cadastro volta `503`, com `PKIX` no log.
+
+### Testar o cadastro de ponta a ponta
+
+Use um e-mail que você consiga abrir (o código de confirmação chega nele) e uma senha descartável.
+No Gmail, `seu.email+finup1@gmail.com` cai na sua caixa e conta como outro usuário para o Cognito.
+Nos comandos abaixo, `<regiao>` é o prefixo do ID do pool (ex.: `us-east-2`).
+
+1. Crie o usuário no pool (a API de cadastro do Cognito não exige credencial da AWS):
+
+   ```bash
+   curl -s -X POST "https://cognito-idp.<regiao>.amazonaws.com/" \
+     -H "Content-Type: application/x-amz-json-1.1" \
+     -H "X-Amz-Target: AWSCognitoIdentityProviderService.SignUp" \
+     -d '{"ClientId":"<client id>","Username":"ana-teste","Password":"<senha>",
+          "UserAttributes":[{"Name":"email","Value":"ana@exemplo.com"},
+                            {"Name":"name","Value":"Ana Souza"},
+                            {"Name":"birthdate","Value":"2000-05-20"}]}'
+   ```
+
+2. Confirme a conta com o código que chegou por e-mail (ou no console: *Usuários → o usuário →
+   Ações → Confirmar conta*):
+
+   ```bash
+   curl -s -X POST "https://cognito-idp.<regiao>.amazonaws.com/" \
+     -H "Content-Type: application/x-amz-json-1.1" \
+     -H "X-Amz-Target: AWSCognitoIdentityProviderService.ConfirmSignUp" \
+     -d '{"ClientId":"<client id>","Username":"ana-teste","ConfirmationCode":"<codigo>"}'
+   ```
+
+3. Faça login e copie o `AuthenticationResult.AccessToken` da resposta (não o `IdToken`):
+
+   ```bash
+   curl -s -X POST "https://cognito-idp.<regiao>.amazonaws.com/" \
+     -H "Content-Type: application/x-amz-json-1.1" \
+     -H "X-Amz-Target: AWSCognitoIdentityProviderService.InitiateAuth" \
+     -d '{"AuthFlow":"USER_AUTH","ClientId":"<client id>",
+          "AuthParameters":{"USERNAME":"ana-teste","PREFERRED_CHALLENGE":"PASSWORD","PASSWORD":"<senha>"}}'
+   ```
+
+4. Chame a API com o token (ou cole no **Authorize** do Swagger):
+
+   ```bash
+   curl -X POST http://localhost:8080/api/v1/users -H "Authorization: Bearer $TOKEN"   # 201
+   curl http://localhost:8080/api/v1/users/me -H "Authorization: Bearer $TOKEN"        # 200
+   ```
+
+   Repetir o `POST` devolve `409`. O access token vale 1 hora; depois disso a API devolve `401` e é
+   preciso repetir o passo 3.
+
+No Windows, se o `curl` falhar com `CRYPT_E_NO_REVOCATION_CHECK`, acrescente `--ssl-no-revoke`.
+
+### Sem Cognito: profile `mock-auth`
+
+Com `SPRING_PROFILES_ACTIVE=dev,mock-auth`, a API não exige token e a identidade vem dos headers
+`X-Mock-Cognito-Sub` (obrigatório), `X-Mock-Cognito-Email` (obrigatório) e `X-Mock-Cognito-Name`
+(opcional). As variáveis do Cognito deixam de ser necessárias.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/users -H 'X-Mock-Cognito-Sub: mock-sub-ana' -H 'X-Mock-Cognito-Email: ana@exemplo.com' -H 'X-Mock-Cognito-Name: Ana Souza'
+```
+
+O mock nunca vale em produção: com `prod` ativo, `mock-auth` é ignorado e a aplicação não sobe
+sem um resolver de identidade.
 
 ## Contrato de erro
 
@@ -312,6 +436,8 @@ desenvolvimento (veja `.env.example`):
 | `DB_USER` | `finup_user` | usuário do banco |
 | `DB_PASSWORD` | **sem default** | senha do banco; sem ela a aplicação não sobe |
 | `DB_PORT` | `5432` | porta publicada pelo container do PostgreSQL |
+| `COGNITO_USER_POOL_ID` | **sem default** | ID do grupo de usuários (`us-east-2_AbCdEf123`); a região sai do prefixo. Dispensado com `mock-auth` |
+| `COGNITO_CLIENT_ID` | **sem default** | ID do App Client (sem client secret). Dispensado com `mock-auth` |
 
 O `application.yml` importa o `.env` da raiz (`spring.config.import: optional:file:.env[.properties]`),
 então o mesmo arquivo serve para o `docker compose` e para a aplicação rodando via `./mvnw`. O `optional:`
@@ -320,17 +446,9 @@ porque essa é a única variável sem valor padrão.
 
 ## O que ainda não está aqui (e por quê)
 
-Estas dependências estão **comentadas no `pom.xml`**, prontas para serem descomentadas quando o escopo avançar:
+Não há mais dependência comentada no `pom.xml`. Já **entraram**: JPA e o driver do PostgreSQL,
+com o banco em `docker compose`, e o Spring Security, com o Cognito. Uma ressalva sobre esse estado:
 
-| Item | Quando habilitar |
-|---|---|
-| Spring Security | quando o fluxo de autenticação estiver definido |
-
-Já **entraram**, e por isso saíram desta lista: JPA e o driver do PostgreSQL, com o banco em
-`docker compose`. Duas ressalvas sobre esse estado:
-
-- **A autenticação ainda é mockada.** O `MockAuthenticatedIdentityResolver` lê a identidade dos
-  headers `X-Mock-Cognito-*` em vez de validar um JWT, e não sobe no profile `prod`.
 - **Não há ferramenta de migration.** Os scripts de `database/init/` só rodam quando o volume é criado,
   então hoje mudar o schema exige `docker compose down -v` e perder o banco local. Flyway continua
   pendente e vai precisar entrar antes de o schema começar a evoluir de verdade.

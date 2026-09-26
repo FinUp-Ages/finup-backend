@@ -13,6 +13,7 @@ import br.com.finup.service.FinUpScoreService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -22,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * AuthenticatedIdentityResolver} tambem e mockado — o controller depende da interface, nao da
  * implementacao que le os headers mock.
  */
+@AutoConfigureMockMvc(addFilters = false)
 @WebMvcTest(FinUpScoreController.class)
 class FinUpScoreControllerTest {
 

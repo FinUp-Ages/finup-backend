@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.finup.exception.EmailAlreadyRegisteredException;
+import br.com.finup.exception.IdentityProviderUnavailableException;
 import br.com.finup.exception.MissingAuthenticatedIdentityException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.exception.UserAlreadyRegisteredException;
@@ -24,6 +25,7 @@ import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -37,7 +39,11 @@ import org.springframework.test.web.servlet.MockMvc;
  * <p>{@link AuthenticatedIdentityResolver} tambem e mockado aqui: o controller depende da
  * interface, nao da implementacao mockada real (que le headers de request) — entao o teste nao
  * precisa saber nada sobre esses headers.
+ *
+ * <p>{@code addFilters = false} desliga o Spring Security nesta fatia: aqui se testa o controller.
+ * Token ausente, invalido e aceito ficam no {@code SecurityConfigTest}.
  */
+@AutoConfigureMockMvc(addFilters = false)
 @WebMvcTest(UserController.class)
 class UserControllerTest {
 
@@ -54,7 +60,7 @@ class UserControllerTest {
         new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
     User user =
         User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
-    when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
+    when(authenticatedIdentityResolver.resolveCurrentWithAttributes()).thenReturn(identity);
     when(userService.createFromAuthenticatedIdentity(identity)).thenReturn(user);
 
     mockMvc
@@ -69,10 +75,22 @@ class UserControllerTest {
   @Test
   @DisplayName("POST sem identidade autenticada devolve 401 em RFC 7807")
   void missingIdentityReturns401() throws Exception {
-    when(authenticatedIdentityResolver.resolveCurrent())
+    when(authenticatedIdentityResolver.resolveCurrentWithAttributes())
         .thenThrow(new MissingAuthenticatedIdentityException());
 
     mockMvc.perform(post("/api/v1/users")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("Cognito indisponivel ao buscar os atributos vira 503")
+  void identityProviderUnavailableReturns503() throws Exception {
+    when(authenticatedIdentityResolver.resolveCurrentWithAttributes())
+        .thenThrow(new IdentityProviderUnavailableException());
+
+    mockMvc
+        .perform(post("/api/v1/users"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.status").value(503));
   }
 
   @Test
@@ -80,7 +98,7 @@ class UserControllerTest {
   void duplicateIdentityReturns409() throws Exception {
     AuthenticatedIdentity identity =
         new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
-    when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
+    when(authenticatedIdentityResolver.resolveCurrentWithAttributes()).thenReturn(identity);
     when(userService.createFromAuthenticatedIdentity(any()))
         .thenThrow(new UserAlreadyRegisteredException());
 
@@ -95,7 +113,7 @@ class UserControllerTest {
   void duplicateEmailReturns409() throws Exception {
     AuthenticatedIdentity identity =
         new AuthenticatedIdentity("cognito-sub-456", "Outra Ana", "ana@exemplo.com");
-    when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
+    when(authenticatedIdentityResolver.resolveCurrentWithAttributes()).thenReturn(identity);
     when(userService.createFromAuthenticatedIdentity(any()))
         .thenThrow(new EmailAlreadyRegisteredException("ana@exemplo.com"));
 

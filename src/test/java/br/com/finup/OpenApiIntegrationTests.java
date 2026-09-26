@@ -25,7 +25,11 @@ import org.springframework.test.web.servlet.MockMvc;
  * OpenApiConfig} ou mudar o path do controller, o CI reprova aqui em vez de a quebra aparecer no
  * consumidor.
  */
-@SpringBootTest
+@SpringBootTest(
+    properties = {
+      "finup.cognito.user-pool-id=us-east-1_TestPool",
+      "finup.cognito.client-id=test-client"
+    })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY)
 @AutoConfigureMockMvc
 class OpenApiIntegrationTests {
@@ -33,7 +37,9 @@ class OpenApiIntegrationTests {
   @Autowired private MockMvc mockMvc;
 
   @Test
-  @DisplayName("contrato OpenAPI expoe os metadados e os recursos de usuarios e transacoes")
+  @DisplayName(
+      "contrato OpenAPI expoe os metadados, o esquema Bearer e os recursos de usuarios e"
+          + " transacoes")
   void exposesOpenApiContractWithProjectMetadata() throws Exception {
     mockMvc
         .perform(get("/v3/api-docs"))
@@ -43,6 +49,8 @@ class OpenApiIntegrationTests {
         .andExpect(jsonPath("$.info.title").value("FinUp API"))
         .andExpect(jsonPath("$.info.version").value("v0.0.1"))
         .andExpect(jsonPath("$.info.contact.name").value("AGES 2026/2 - FinUp"))
+        .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"))
+        .andExpect(jsonPath("$.security[0].bearerAuth").exists())
         .andExpect(jsonPath("$.paths['/api/v1/users']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/transactions'].post").exists());
   }

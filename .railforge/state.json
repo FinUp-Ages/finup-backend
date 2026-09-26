@@ -1,18 +1,30 @@
 {
   "stage": "REVIEWING",
-  "task": "PR #18 — fechar o contrato de identidade de transacoes e recorrencias",
-  "objective": "Tirar o userId do contrato de transacoes e recorrencias, aceitar so referencias do proprio usuario e fechar as brechas de validacao herdadas do #9 e do #4.",
-  "files_in_scope": [
-    "src/main/java/br/com/finup/controller/",
-    "src/main/java/br/com/finup/dto/",
-    "src/main/java/br/com/finup/model/",
-    "src/main/java/br/com/finup/repository/",
-    "src/main/java/br/com/finup/security/MockAuthenticatedIdentityResolver.java",
-    "src/main/java/br/com/finup/service/",
-    "src/test/java/br/com/finup/",
-    "README.md"
+  "task": "Autenticacao real com AWS Cognito (JWT) no lugar da identidade mockada por header",
+  "objective": "Validar o access token do Cognito via Spring Security OAuth2 Resource Server e resolver a identidade autenticada a partir dele, sem mudar service nem regra de negocio.",
+  "decisions": [
+    "E-mail e nome do cadastro vem do GetUser do Cognito, com o proprio access token do usuario",
+    "Mock por header mantido atras do profile mock-auth, nunca ativo junto de prod"
   ],
-  "validation": {"mvn clean verify": "passed (121 testes, 0 falhas)"},
+  "files_in_scope": [
+    "pom.xml",
+    "src/main/resources/application.yml",
+    ".env.example",
+    "src/main/java/br/com/finup/config/",
+    "src/main/java/br/com/finup/security/",
+    "src/main/java/br/com/finup/exception/IdentityProviderUnavailableException.java",
+    "src/main/java/br/com/finup/controller/",
+    "src/test/java/br/com/finup/",
+    "README.md",
+    "docs/finup-score.md"
+  ],
+  "validation": {
+    "mvn clean verify": "passed (153 testes, 0 falhas, spotless ok)",
+    "teste manual com User Pool real": "passed (us-east-2: SignUp + USER_AUTH, POST /users 201, GET /users/me 200, POST repetido 409, token adulterado 401; cognito_id = sub no banco)"
+  },
   "review": "pending",
-  "updated_at": "2026-09-25"
+  "updated_at": "2026-09-25",
+  "open_questions": [
+    "Pool usa username + e-mail alias (mobile precisa gerar username) e exige birthdate no Cognito, duplicando o birth_date da Etapa 2"
+  ]
 }
