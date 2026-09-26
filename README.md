@@ -498,3 +498,29 @@ Ao criar o banco pela primeira vez, o processo ocorre na seguinte ordem:
 3. O arquivo `02-required-data.sql` insere os dados obrigatórios.
 4. O arquivo `03-test-data.sql` insere os dados fictícios de desenvolvimento e testes.
 5. O banco fica disponível para utilização pela aplicação.
+
+### Recorrência de transações
+
+A recorrência de transações é representada diretamente na tabela `transactions`.
+
+Os campos utilizados são:
+
+- `is_recurring`: indica se a transação é recorrente.
+- `recurrence_frequency`: define a periodicidade da recorrência. Atualmente, o valor suportado é `MONTHLY`.
+- `last_occurrence_date_time`: armazena a data e hora da última ocorrência da transação.
+
+Quando `is_recurring` for `true`, os campos `recurrence_frequency` e `last_occurrence_date_time` devem estar preenchidos.
+
+Quando `is_recurring` for `false`, os campos `recurrence_frequency` e `last_occurrence_date_time` devem permanecer nulos.
+
+A próxima ocorrência é calculada pelo backend a partir da periodicidade definida em `recurrence_frequency` e da data e hora armazenadas em `last_occurrence_date_time`.
+
+Exemplo:
+
+```text
+is_recurring = true
+recurrence_frequency = MONTHLY
+last_occurrence_date_time = 2026-09-05T08:00:00
+```
+
+Nesse cenário, a próxima ocorrência será calculada pelo backend para `2026-10-05T08:00:00`.

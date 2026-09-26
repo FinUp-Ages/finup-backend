@@ -120,7 +120,9 @@ class TransactionRepositoryTest {
             "Supermercado",
             new BigDecimal("320.00"),
             LocalDate.of(2026, 9, 12),
-            false);
+            false,
+            null,
+            null);
 
     Transaction saved = transactionRepository.saveAndFlush(transaction);
 

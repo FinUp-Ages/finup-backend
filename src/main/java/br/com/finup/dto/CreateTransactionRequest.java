@@ -1,5 +1,6 @@
 package br.com.finup.dto;
 
+import br.com.finup.model.RecurrenceFrequency;
 import br.com.finup.model.TransactionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Digits;
@@ -8,6 +9,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /** Corpo do cadastro de uma transacao financeira. */
@@ -37,4 +39,10 @@ public record CreateTransactionRequest(
         LocalDate transactionDate,
     @Schema(description = "Indica se a transacao e recorrente", example = "false")
         @NotNull(message = "e obrigatorio")
-        Boolean isRecurring) {}
+        Boolean isRecurring,
+    @Schema(description = "Periodicidade da recorrencia", example = "MONTHLY")
+        RecurrenceFrequency recurrenceFrequency,
+    @Schema(
+            description = "Data e hora da ultima ocorrencia da transacao recorrente",
+            example = "2026-09-05T08:00:00")
+        LocalDateTime lastOccurrenceDateTime) {}

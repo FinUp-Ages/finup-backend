@@ -92,7 +92,9 @@ public class TransactionController {
             request.description(),
             request.amount(),
             request.transactionDate(),
-            request.isRecurring());
+            request.isRecurring(),
+            request.recurrenceFrequency(),
+            request.lastOccurrenceDateTime());
     TransactionResponse response = TransactionMapper.toResponse(transaction);
     URI location = URI.create("/api/v1/transactions/%s".formatted(response.id()));
     return ResponseEntity.created(location).body(response);
