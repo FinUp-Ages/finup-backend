@@ -45,6 +45,34 @@ Depois de subir:
 |---|---|
 | Health check | http://localhost:8080/actuator/health |
 
+### Alternativa: subir banco + API pelo Docker (para testar com o mobile)
+
+Desde a integração com o app mobile, o `docker-compose.yml` também tem um serviço `app` — não é mais
+só o banco. Para quem vai testar o cadastro pelo app (em vez de só chamar a API local com `curl`/Postman),
+é mais simples subir tudo de uma vez:
+
+```bash
+cp .env.example .env      # se ainda não tiver feito
+docker compose up -d --build
+```
+
+Isso builda a imagem da aplicação (a partir do `Dockerfile`) e sobe os dois containers juntos, com a
+API já esperando o banco ficar `healthy` antes de iniciar. Não precisa mais rodar `./mvnw spring-boot:run`
+à parte nesse fluxo.
+
+**Ponto de atenção ao testar com o app mobile na mesma rede:** o `CORS_ALLOWED_ORIGINS` do `.env`
+só libera as origens já cadastradas (por padrão, `localhost` em algumas portas). Se o app mobile
+estiver rodando em outra máquina/emulador acessando esta API pelo IP da rede local, adicione esse IP
+à lista (ex.: `http://192.168.0.10:8081`) e recrie o container da aplicação para aplicar:
+
+```bash
+docker compose up -d app
+```
+
+Isso normalmente não é necessário para o app mobile nativo (Android/iOS) — CORS só se aplica a
+requisições feitas por um navegador. É relevante apenas testando pela versão web do Expo
+(`npm run web`, no repositório `finup-mobile`), que roda dentro de um navegador.
+
 ## Swagger / OpenAPI
 
 Com a aplicação em execução, a documentação da API fica disponível nestas URLs:
@@ -307,11 +335,12 @@ desenvolvimento (veja `.env.example`):
 | `SERVER_PORT` | `8080` | porta HTTP |
 | `SPRING_PROFILES_ACTIVE` | `dev` | perfil ativo; use `prod` no ambiente implantado |
 | `LOG_LEVEL` | `DEBUG` no perfil `dev`, `INFO` fora dele | nível de log de `br.com.finup` |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | origens do CORS, separadas por vírgula |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://localhost:8081` | origens do CORS, separadas por vírgula (a porta `8081` é o Expo Web do `finup-mobile`, usado como fallback de teste do cadastro no navegador — ver seção acima) |
 | `DB_NAME` | `finup` | nome do banco |
 | `DB_USER` | `finup_user` | usuário do banco |
 | `DB_PASSWORD` | **sem default** | senha do banco; sem ela a aplicação não sobe |
 | `DB_PORT` | `5432` | porta publicada pelo container do PostgreSQL |
+| `DB_HOST` | `localhost` | host do banco; rodando `./mvnw spring-boot:run` mantenha `localhost` — no `docker compose up -d --build` o serviço `app` já sobrescreve para `db` (nome do serviço do Postgres na mesma rede do compose) |
 
 O `application.yml` importa o `.env` da raiz (`spring.config.import: optional:file:.env[.properties]`),
 então o mesmo arquivo serve para o `docker compose` e para a aplicação rodando via `./mvnw`. O `optional:`
@@ -362,6 +391,12 @@ não funciona para desenvolvimento local**. O `spring.datasource.url` aponta par
 container `localhost` é o próprio container, não o host onde o PostgreSQL está publicado. Enquanto a
 aplicação não entrar no `docker-compose.yml` como serviço — com um `DB_HOST` apontando para `db` — o
 caminho local é o da seção [Como rodar](#como-rodar): banco em container, aplicação na sua máquina.
+
+> **Atualização:** isso já mudou. O `docker-compose.yml` agora tem um serviço `app` (ver
+> [Alternativa: subir banco + API pelo Docker](#alternativa-subir-banco--api-pelo-docker-para-testar-com-o-mobile)),
+> com `DB_HOST` apontando para `db` dentro do compose. O caminho descrito no parágrafo acima —
+> aplicação rodando na máquina via `./mvnw spring-boot:run`, com `DB_HOST=localhost` — continua
+> funcionando normalmente; é só mais uma opção agora, não a única.
 
 ## Banco de Dados com Docker
 

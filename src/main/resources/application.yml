@@ -12,7 +12,7 @@ spring:
     import: optional:file:.env[.properties]
 
   datasource:
-    url: jdbc:postgresql://localhost:${DB_PORT:5432}/${DB_NAME:finup}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:finup}
     username: ${DB_USER:finup_user}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
