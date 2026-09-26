@@ -5,8 +5,8 @@ API REST do projeto **FinUp** — AGES 2026/2.
 Java 21 · Spring Boot 3.5 · Maven · PostgreSQL 16 · Docker
 
 > O cadastro de usuário existe como **exemplo de referência** das convenções (veja a seção mais abaixo).
-> O banco já está provisionado e populado, mas a **persistência ainda não está ligada**: o `User` é um POJO de
-> domínio sem `@Entity` e o repositório em uso é o `InMemoryUserRepository`. Fazer essa ponte é o próximo passo.
+> A persistência está ligada: as entidades são `@Entity` e gravam no PostgreSQL do `docker compose`.
+> A autenticação ainda não — a identidade vem de headers `X-Mock-Cognito-*` até o Cognito entrar.
 
 ---
 
@@ -85,6 +85,33 @@ Com a aplicação em execução, a documentação da API fica disponível nestas
 O Swagger UI lê o contrato OpenAPI gerado automaticamente pelo `springdoc` a partir dos
 controllers e DTOs da aplicação. Os metadados gerais da API ficam centralizados em
 `config/OpenApiConfig.java`.
+
+### Endpoints disponíveis hoje
+
+Nenhum deles recebe identificador de usuário do cliente: quem está chamando vem sempre da
+identidade autenticada. Enquanto o Cognito não entra, isso são os headers `X-Mock-Cognito-Sub`
+(obrigatório), `X-Mock-Cognito-Email` (obrigatório) e `X-Mock-Cognito-Name` (opcional). Sem os dois
+primeiros, a resposta é `401`.
+
+| Método e caminho | O que faz |
+|---|---|
+| `POST /api/v1/users` | cria o registro local da identidade autenticada. Corpo vazio |
+| `GET /api/v1/users/me` | devolve o usuário da identidade autenticada |
+| `PATCH /api/v1/users/me/additional-info` | grava as informações complementares (Etapa 2 do cadastro) |
+| `POST /api/v1/users/me/finup-score/recalculate` | recalcula e persiste o FinUp Score |
+| `GET /api/v1/categories` | categorias do usuário **e** as padrão do sistema |
+| `POST /api/v1/categories` | cria categoria do usuário |
+| `PUT /api/v1/categories/{id}` | edita categoria do usuário. Padrão do sistema devolve `403` |
+| `DELETE /api/v1/categories/{id}` | remove categoria do usuário. Em uso devolve `409` |
+| `POST /api/v1/transactions` | registra uma transação |
+| `POST /api/v1/transaction-recurrences` | cadastra uma recorrência |
+| `GET /api/v1/transaction-recurrences/due?date=…` | recorrências que caem na data (hoje, se omitida) |
+
+Categoria e meio de pagamento referenciados por uma transação ou recorrência precisam ser do
+próprio usuário — categoria padrão do sistema também vale. Referência de outro usuário responde
+`404`, e não `403`: um `403` confirmaria a existência do id para quem não deveria saber dela.
+
+O detalhe de cada campo está no Swagger — a tabela acima é só o mapa.
 
 ### Como documentar novos endpoints
 
@@ -223,10 +250,11 @@ estrutura dele. Cada arquivo mostra a responsabilidade de uma camada:
 |---|---|
 | `controller/UserController.java` | recebe, `@Valid`, delega, escolhe o status. Sem `try/catch` |
 | `service/UserService.java` | a regra (e-mail duplicado). Não conhece HTTP |
-| `repository/UserRepository.java` | interface — é dela que o service depende |
-| `repository/InMemoryUserRepository.java` | implementação temporária, **sai quando o JPA entrar** |
-| `model/User.java` | entidade imutável, com as invariantes do domínio |
-| `dto/RegisterUserRequest.java` | entrada + validação + `@Schema` do OpenAPI |
+| `repository/UserRepository.java` | interface `JpaRepository` — é dela que o service depende |
+| `model/User.java` | `@Entity`, com as invariantes do domínio |
+| `security/AuthenticatedIdentityResolver.java` | de onde vem a identidade de quem chamou |
+| `security/MockAuthenticatedIdentityResolver.java` | implementação temporária por header, **sai quando o Cognito entrar** |
+| `dto/UpdateUserAdditionalInfoRequest.java` | entrada + validação + `@Schema` do OpenAPI |
 | `dto/UserResponse.java` | saída. A entidade nunca é exposta |
 | `mapper/UserMapper.java` | conversão entidade ↔ DTO |
 | `exception/EmailAlreadyRegisteredException.java` | erro de negócio com o status que lhe cabe (409) |
@@ -237,11 +265,11 @@ Testes correspondentes, também de referência:
 - `controller/UserControllerTest.java` — `@WebMvcTest`, só a camada web.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/users   -H 'Content-Type: application/json'   -d '{"name":"Ana Souza","email":"ana@exemplo.com"}'
+curl -X POST http://localhost:8080/api/v1/users   -H 'X-Mock-Cognito-Sub: mock-sub-ana'   -H 'X-Mock-Cognito-Email: ana@exemplo.com'   -H 'X-Mock-Cognito-Name: Ana Souza'
 ```
 
-Devolve `201` com `Location`. Repetir a mesma chamada devolve `409`; mandar `email` inválido
-devolve `400` listando os campos.
+O corpo é vazio: nome e e-mail vêm da identidade autenticada, não do cliente. Devolve `201` com
+`Location`. Repetir a mesma chamada devolve `409`; sem os headers `Sub` e `Email` devolve `401`.
 
 ### Idioma
 
@@ -330,8 +358,8 @@ Estas dependências estão **comentadas no `pom.xml`**, prontas para serem desco
 Já **entraram**, e por isso saíram desta lista: JPA e o driver do PostgreSQL, com o banco em
 `docker compose`. Duas ressalvas sobre esse estado:
 
-- **A persistência não está ligada.** Não existe nenhuma `@Entity`; o `UserRepository` em uso é o
-  `InMemoryUserRepository`, então o que a API grava se perde no restart e não chega ao PostgreSQL.
+- **A autenticação ainda é mockada.** O `MockAuthenticatedIdentityResolver` lê a identidade dos
+  headers `X-Mock-Cognito-*` em vez de validar um JWT, e não sobe no profile `prod`.
 - **Não há ferramenta de migration.** Os scripts de `database/init/` só rodam quando o volume é criado,
   então hoje mudar o schema exige `docker compose down -v` e perder o banco local. Flyway continua
   pendente e vai precisar entrar antes de o schema começar a evoluir de verdade.

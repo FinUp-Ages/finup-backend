@@ -39,7 +39,7 @@ public class TransactionRecurrence {
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 50)
-  private RecurrenceType type;
+  private TransactionType type;
 
   @Column(length = 255)
   private String description;
@@ -72,7 +72,7 @@ public class TransactionRecurrence {
       UUID userId,
       UUID categoryId,
       UUID paymentMethodId,
-      RecurrenceType type,
+      TransactionType type,
       String description,
       BigDecimal amount,
       RecurrenceFrequency frequency,
@@ -98,7 +98,7 @@ public class TransactionRecurrence {
       UUID userId,
       UUID categoryId,
       UUID paymentMethodId,
-      RecurrenceType type,
+      TransactionType type,
       String description,
       BigDecimal amount,
       RecurrenceFrequency frequency,
@@ -164,7 +164,7 @@ public class TransactionRecurrence {
     return paymentMethodId;
   }
 
-  public RecurrenceType getType() {
+  public TransactionType getType() {
     return type;
   }
 

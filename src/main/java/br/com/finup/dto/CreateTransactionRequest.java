@@ -4,6 +4,7 @@ import br.com.finup.model.TransactionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -12,9 +13,6 @@ import java.util.UUID;
 /** Corpo do cadastro de uma transacao financeira. */
 @Schema(description = "Dados para registrar uma transacao financeira")
 public record CreateTransactionRequest(
-    @Schema(description = "Identificador do usuario responsavel")
-        @NotNull(message = "e obrigatorio")
-        UUID userId,
     @Schema(description = "Identificador de uma categoria existente")
         @NotNull(message = "e obrigatorio")
         UUID categoryId,
@@ -28,6 +26,7 @@ public record CreateTransactionRequest(
         String description,
     @Schema(description = "Valor da transacao", example = "320.00")
         @NotNull(message = "e obrigatorio")
+        @Positive(message = "deve ser maior que zero")
         @Digits(
             integer = 10,
             fraction = 2,
