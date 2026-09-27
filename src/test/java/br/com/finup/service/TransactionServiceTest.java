@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import br.com.finup.exception.InvalidTransactionRecurrenceException;
@@ -17,7 +18,6 @@ import br.com.finup.repository.TransactionRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,8 +44,8 @@ class TransactionServiceTest {
   }
 
   @Test
-  @DisplayName("cadastra transacao sem consultar meio de pagamento quando ele nao e informado")
-  void registersWithoutPaymentMethod() {
+  @DisplayName("cadastra transacao recorrente sem consultar meio de pagamento nao informado")
+  void registersRecurringWithoutPaymentMethod() {
     User user = mockUser();
     AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
@@ -54,7 +54,7 @@ class TransactionServiceTest {
         .thenReturn(true);
     when(transactionRepository.save(any(Transaction.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
-    LocalDateTime lastOccurrenceDateTime = LocalDateTime.of(2026, 9, 12, 8, 0);
+
     Transaction transaction =
         transactionService.register(
             identity,
@@ -65,14 +65,16 @@ class TransactionServiceTest {
             new BigDecimal("5000.00"),
             LocalDate.of(2026, 9, 12),
             true,
-            RecurrenceFrequency.MONTHLY,
-            lastOccurrenceDateTime);
+            RecurrenceFrequency.MONTHLY);
 
     assertThat(transaction.getId()).isNotNull();
     assertThat(transaction.getUserId()).isEqualTo(user.getId());
     assertThat(transaction.getCategoryId()).isEqualTo(categoryId);
     assertThat(transaction.getPaymentMethodId()).isNull();
     assertThat(transaction.getType()).isEqualTo(TransactionType.INCOME);
+    assertThat(transaction.isRecurring()).isTrue();
+    assertThat(transaction.getRecurrenceFrequency()).isEqualTo(RecurrenceFrequency.MONTHLY);
+    assertThat(transaction.getLastOccurrenceDate()).isEqualTo(LocalDate.of(2026, 9, 12));
     verify(transactionRepository, never()).existsPaymentMethodForUser(any(), any());
   }
 
@@ -101,7 +103,6 @@ class TransactionServiceTest {
             new BigDecimal("320.00"),
             LocalDate.of(2026, 9, 12),
             false,
-            null,
             null);
 
     assertThat(transaction.getPaymentMethodId()).isEqualTo(paymentMethodId);
@@ -166,79 +167,39 @@ class TransactionServiceTest {
         new BigDecimal("10.00"),
         LocalDate.of(2026, 9, 12),
         false,
-        null,
         null);
   }
 
   @Test
   @DisplayName("recusa transacao recorrente sem periodicidade")
   void rejectsRecurringTransactionWithoutFrequency() {
-    User user = mockUser();
-    AuthenticatedIdentity identity = identity(user);
-
-    assertThatThrownBy(
-            () ->
-                transactionService.register(
-                    identity,
-                    UUID.randomUUID(),
-                    null,
-                    TransactionType.EXPENSE,
-                    "Compra",
-                    new BigDecimal("10.00"),
-                    LocalDate.of(2026, 9, 12),
-                    true,
-                    null,
-                    LocalDateTime.of(2026, 9, 12, 8, 0)))
-        .isInstanceOf(InvalidTransactionRecurrenceException.class);
-
-    verify(transactionRepository, never()).save(any());
+    assertThatThrownBy(() -> registerWithRecurrence(true, null))
+        .isInstanceOf(InvalidTransactionRecurrenceException.class)
+        .hasMessageContaining("precisa informar recurrenceFrequency");
+    verifyNoInteractions(userService, transactionRepository);
   }
 
   @Test
-  @DisplayName("recusa transacao recorrente sem data da ultima ocorrencia")
-  void rejectsRecurringTransactionWithoutLastOccurrence() {
-    User user = mockUser();
-    AuthenticatedIdentity identity = identity(user);
-
-    assertThatThrownBy(
-            () ->
-                transactionService.register(
-                    identity,
-                    UUID.randomUUID(),
-                    null,
-                    TransactionType.EXPENSE,
-                    "Compra",
-                    new BigDecimal("10.00"),
-                    LocalDate.of(2026, 9, 12),
-                    true,
-                    RecurrenceFrequency.MONTHLY,
-                    null))
-        .isInstanceOf(InvalidTransactionRecurrenceException.class);
-
-    verify(transactionRepository, never()).save(any());
+  @DisplayName("recusa transacao nao recorrente com periodicidade")
+  void rejectsNonRecurringTransactionWithFrequency() {
+    assertThatThrownBy(() -> registerWithRecurrence(false, RecurrenceFrequency.MONTHLY))
+        .isInstanceOf(InvalidTransactionRecurrenceException.class)
+        .hasMessageContaining("nao pode informar recurrenceFrequency");
+    verifyNoInteractions(userService, transactionRepository);
   }
 
-  @Test
-  @DisplayName("recusa transacao nao recorrente com dados de recorrencia")
-  void rejectsNonRecurringTransactionWithRecurrenceData() {
+  private Transaction registerWithRecurrence(
+      boolean recurring, RecurrenceFrequency recurrenceFrequency) {
     User user = mockUser();
-    AuthenticatedIdentity identity = identity(user);
-
-    assertThatThrownBy(
-            () ->
-                transactionService.register(
-                    identity,
-                    UUID.randomUUID(),
-                    null,
-                    TransactionType.EXPENSE,
-                    "Compra",
-                    new BigDecimal("10.00"),
-                    LocalDate.of(2026, 9, 12),
-                    false,
-                    RecurrenceFrequency.MONTHLY,
-                    LocalDateTime.of(2026, 9, 12, 8, 0)))
-        .isInstanceOf(InvalidTransactionRecurrenceException.class);
-
-    verify(transactionRepository, never()).save(any());
+    return transactionService.register(
+        identity(user),
+        UUID.randomUUID(),
+        null,
+        TransactionType.EXPENSE,
+        "Conta de luz",
+        new BigDecimal("250.00"),
+        LocalDate.of(2026, 9, 5),
+        recurring,
+        recurrenceFrequency);
   }
 }

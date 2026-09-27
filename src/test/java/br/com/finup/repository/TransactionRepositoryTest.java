@@ -1,7 +1,9 @@
 package br.com.finup.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import br.com.finup.model.RecurrenceFrequency;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
 import java.math.BigDecimal;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Valida o mapeamento JPA de transacoes e as consultas das referencias no banco. */
@@ -120,8 +123,6 @@ class TransactionRepositoryTest {
             "Supermercado",
             new BigDecimal("320.00"),
             LocalDate.of(2026, 9, 12),
-            false,
-            null,
             null);
 
     Transaction saved = transactionRepository.saveAndFlush(transaction);
@@ -134,8 +135,68 @@ class TransactionRepositoryTest {
               assertThat(found.getAmount()).isEqualByComparingTo("320.00");
               assertThat(found.getTransactionDate()).isEqualTo(LocalDate.of(2026, 9, 12));
               assertThat(found.isRecurring()).isFalse();
+              assertThat(found.getRecurrenceFrequency()).isNull();
+              assertThat(found.getLastOccurrenceDate()).isNull();
+              assertThat(found.getRecurrenceOriginId()).isNull();
               assertThat(found.getCreatedAt()).isNotNull();
               assertThat(found.getUpdatedAt()).isNotNull();
             });
+  }
+
+  @Test
+  @DisplayName("persiste a serie recorrente com periodicidade e data da ultima ocorrencia")
+  void persistsRecurringSeries() {
+    Transaction saved = transactionRepository.saveAndFlush(monthlySeries(LocalDate.of(2026, 9, 5)));
+
+    assertThat(transactionRepository.findById(saved.getId()))
+        .get()
+        .satisfies(
+            found -> {
+              assertThat(found.isRecurring()).isTrue();
+              assertThat(found.getRecurrenceFrequency()).isEqualTo(RecurrenceFrequency.MONTHLY);
+              assertThat(found.getLastOccurrenceDate()).isEqualTo(LocalDate.of(2026, 9, 5));
+              assertThat(found.getRecurrenceOriginId()).isNull();
+            });
+  }
+
+  @Test
+  @DisplayName("aceita uma ocorrencia gerada por data e recusa a segunda na mesma data")
+  void rejectsDuplicatedOccurrenceOfSameSeries() {
+    Transaction origin =
+        transactionRepository.saveAndFlush(monthlySeries(LocalDate.of(2026, 9, 5)));
+
+    insertGeneratedOccurrence(origin, LocalDate.of(2026, 10, 5));
+    insertGeneratedOccurrence(origin, LocalDate.of(2026, 11, 5));
+
+    assertThatThrownBy(() -> insertGeneratedOccurrence(origin, LocalDate.of(2026, 10, 5)))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  private Transaction monthlySeries(LocalDate transactionDate) {
+    return Transaction.register(
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        null,
+        TransactionType.EXPENSE,
+        "Conta de luz",
+        new BigDecimal("250.00"),
+        transactionDate,
+        RecurrenceFrequency.MONTHLY);
+  }
+
+  /** A geracao das ocorrencias ainda nao existe no codigo; aqui ela e simulada direto no banco. */
+  private void insertGeneratedOccurrence(Transaction origin, LocalDate transactionDate) {
+    jdbcTemplate.update(
+        "INSERT INTO transactions (id, user_id, category_id, type, description, amount,"
+            + " transaction_date, is_recurring, recurrence_origin_id, created_at, updated_at)"
+            + " VALUES (?, ?, ?, ?, ?, ?, ?, FALSE, ?, now(), now())",
+        UUID.randomUUID(),
+        origin.getUserId(),
+        origin.getCategoryId(),
+        origin.getType().name(),
+        origin.getDescription(),
+        origin.getAmount(),
+        transactionDate,
+        origin.getId());
   }
 }

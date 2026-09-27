@@ -10,7 +10,6 @@ import br.com.finup.repository.TransactionRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +39,8 @@ public class TransactionService {
    * Registra uma transacao no nome do usuario autenticado, depois de confirmar que as referencias
    * informadas existem e estao disponiveis para ele.
    *
+   * @throws InvalidTransactionRecurrenceException se {@code recurring} e {@code
+   *     recurrenceFrequency} se contradizem
    * @throws ResourceNotFoundException se a identidade nao tiver usuario local, ou se a categoria ou
    *     o meio de pagamento nao existir ou pertencer a outro usuario
    */
@@ -53,10 +54,9 @@ public class TransactionService {
       BigDecimal amount,
       LocalDate transactionDate,
       boolean recurring,
-      RecurrenceFrequency recurrenceFrequency,
-      LocalDateTime lastOccurrenceDateTime) {
+      RecurrenceFrequency recurrenceFrequency) {
 
-    validateRecurrence(recurring, recurrenceFrequency, lastOccurrenceDateTime);
+    validateRecurrence(recurring, recurrenceFrequency);
 
     User user = userService.findByAuthenticatedIdentity(identity);
     requireAvailableReferences(user.getId(), categoryId, paymentMethodId);
@@ -71,9 +71,7 @@ public class TransactionService {
                 description,
                 amount,
                 transactionDate,
-                recurring,
-                recurrenceFrequency,
-                lastOccurrenceDateTime));
+                recurrenceFrequency));
 
     log.info("Transacao cadastrada: id={}, userId={}", transaction.getId(), user.getId());
     return transaction;
@@ -94,17 +92,14 @@ public class TransactionService {
     }
   }
 
-  private void validateRecurrence(
-      boolean recurring,
-      RecurrenceFrequency recurrenceFrequency,
-      LocalDateTime lastOccurrenceDateTime) {
-
-    if (recurring && (recurrenceFrequency == null || lastOccurrenceDateTime == null)) {
-      throw new InvalidTransactionRecurrenceException();
+  private void validateRecurrence(boolean recurring, RecurrenceFrequency recurrenceFrequency) {
+    if (recurring && recurrenceFrequency == null) {
+      throw new InvalidTransactionRecurrenceException(
+          "Transacao recorrente precisa informar recurrenceFrequency");
     }
-
-    if (!recurring && (recurrenceFrequency != null || lastOccurrenceDateTime != null)) {
-      throw new InvalidTransactionRecurrenceException();
+    if (!recurring && recurrenceFrequency != null) {
+      throw new InvalidTransactionRecurrenceException(
+          "Transacao nao recorrente nao pode informar recurrenceFrequency");
     }
   }
 }

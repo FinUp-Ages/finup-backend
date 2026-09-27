@@ -58,6 +58,10 @@ public class TransactionController {
     @ApiResponse(
         responseCode = "404",
         description = "Usuario, categoria ou meio de pagamento inexistente",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
+        responseCode = "422",
+        description = "isRecurring e recurrenceFrequency se contradizem",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   })
   public ResponseEntity<TransactionResponse> register(
@@ -73,8 +77,7 @@ public class TransactionController {
             request.amount(),
             request.transactionDate(),
             request.isRecurring(),
-            request.recurrenceFrequency(),
-            request.lastOccurrenceDateTime());
+            request.recurrenceFrequency());
     TransactionResponse response = TransactionMapper.toResponse(transaction);
     URI location = URI.create("/api/v1/transactions/%s".formatted(response.id()));
     return ResponseEntity.created(location).body(response);

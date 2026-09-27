@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 /** Representacao publica de uma transacao cadastrada. */
@@ -22,6 +21,11 @@ public record TransactionResponse(
     LocalDate transactionDate,
     boolean isRecurring,
     RecurrenceFrequency recurrenceFrequency,
-    LocalDateTime lastOccurrenceDateTime,
+    @Schema(description = "Data da ultima ocorrencia gerada da serie, quando recorrente")
+        LocalDate lastOccurrenceDate,
+    @Schema(description = "Data da proxima ocorrencia da serie, quando recorrente")
+        LocalDate nextOccurrenceDate,
+    @Schema(description = "Transacao recorrente que originou esta ocorrencia, quando gerada")
+        UUID recurrenceOriginId,
     Instant createdAt,
     Instant updatedAt) {}

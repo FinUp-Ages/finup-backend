@@ -103,22 +103,30 @@ CREATE TABLE IF NOT EXISTS transactions (
   transaction_date DATE NOT NULL,
   is_recurring BOOLEAN NOT NULL DEFAULT FALSE,
   recurrence_frequency VARCHAR(50),
-  last_occurrence_date_time TIMESTAMP,
+  last_occurrence_date DATE,
+  recurrence_origin_id UUID,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_transactions_user FOREIGN KEY (user_id) REFERENCES users (id),
   CONSTRAINT fk_transactions_category FOREIGN KEY (category_id) REFERENCES categories (id),
   CONSTRAINT fk_transactions_payment_method FOREIGN KEY (payment_method_id) REFERENCES payment_methods (id),
+  CONSTRAINT fk_transactions_recurrence_origin FOREIGN KEY (recurrence_origin_id) REFERENCES transactions (id),
+  CONSTRAINT uq_transactions_recurrence_occurrence UNIQUE (recurrence_origin_id, transaction_date),
   CONSTRAINT chk_transactions_recurrence CHECK (
-  (
-    is_recurring = TRUE
-    AND recurrence_frequency IS NOT NULL
-    AND last_occurrence_date_time IS NOT NULL
-  )
-  OR (
-    is_recurring = FALSE
-    AND recurrence_frequency IS NULL
-    AND last_occurrence_date_time IS NULL
+    (
+      is_recurring = TRUE
+      AND recurrence_frequency IS NOT NULL
+      AND last_occurrence_date IS NOT NULL
+    )
+    OR (
+      is_recurring = FALSE
+      AND recurrence_frequency IS NULL
+      AND last_occurrence_date IS NULL
+    )
+  ),
+  CONSTRAINT chk_transactions_recurrence_origin CHECK (
+    recurrence_origin_id IS NULL
+    OR (is_recurring = FALSE AND recurrence_origin_id <> id)
   )
 );
 

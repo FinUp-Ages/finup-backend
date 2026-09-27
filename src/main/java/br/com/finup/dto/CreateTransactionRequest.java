@@ -9,7 +9,6 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 /** Corpo do cadastro de uma transacao financeira. */
@@ -40,9 +39,9 @@ public record CreateTransactionRequest(
     @Schema(description = "Indica se a transacao e recorrente", example = "false")
         @NotNull(message = "e obrigatorio")
         Boolean isRecurring,
-    @Schema(description = "Periodicidade da recorrencia", example = "MONTHLY")
-        RecurrenceFrequency recurrenceFrequency,
     @Schema(
-            description = "Data e hora da ultima ocorrencia da transacao recorrente",
-            example = "2026-09-05T08:00:00")
-        LocalDateTime lastOccurrenceDateTime) {}
+            description =
+                "Periodicidade da recorrencia. Obrigatoria quando isRecurring e true e ausente quando"
+                    + " e false. O dia de transactionDate vira o dia de referencia da serie",
+            example = "MONTHLY")
+        RecurrenceFrequency recurrenceFrequency) {}
