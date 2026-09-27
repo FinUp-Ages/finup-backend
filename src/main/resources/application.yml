@@ -29,6 +29,11 @@ server:
     include-message: never
 
 finup:
+  cognito:
+    # Os dois vem do console do Cognito. A regiao e derivada do prefixo do User Pool ID.
+    # Sem eles a aplicacao nao sobe, a menos que o profile mock-auth esteja ativo.
+    user-pool-id: ${COGNITO_USER_POOL_ID:}
+    client-id: ${COGNITO_CLIENT_ID:}
   cors:
     # Lista separada por virgula. Em producao, aponte para o dominio real do painel.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
