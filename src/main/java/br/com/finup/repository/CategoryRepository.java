@@ -8,5 +8,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CategoryRepository extends JpaRepository<Category, UUID> {
   // Categorias do usuário + padrões do sistema
-  List<Category> findByUserOrIsDefaultTrue(User user);
+  List<Category> findByUserOrIsDefaultTrueOrderByNameAsc(User user);
 }

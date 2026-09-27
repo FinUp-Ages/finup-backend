@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.finup.dto.CategoryListResponse;
 import br.com.finup.dto.CategoryRequest;
 import br.com.finup.dto.CategoryResponse;
 import br.com.finup.exception.ConflictException;
@@ -146,15 +147,21 @@ class CategoryServiceTest {
     User user = mockUser();
     AuthenticatedIdentity identity = identity(user);
     Category userCategory = mockCategory(user);
-    Category defaultCategory = mockDefaultCategory();
+    Category defaultCategory = org.mockito.Mockito.mock(Category.class);
+    when(defaultCategory.getName()).thenReturn("Salário");
+    when(defaultCategory.getType()).thenReturn(TransactionType.INCOME);
 
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
-    when(categoryRepository.findByUserOrIsDefaultTrue(user))
+    when(categoryRepository.findByUserOrIsDefaultTrueOrderByNameAsc(user))
         .thenReturn(List.of(userCategory, defaultCategory));
 
-    List<CategoryResponse> result = categoryService.findAvailable(identity);
+    List<CategoryListResponse> result = categoryService.findAvailable(identity);
 
-    assertThat(result).hasSize(2);
+    assertThat(result)
+        .extracting(CategoryListResponse::name)
+        .containsExactly("Alimentação", "Salário");
+    verify(categoryRepository, never()).save(any());
+    verify(categoryRepository, never()).deleteById(any());
   }
 
   @Test

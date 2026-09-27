@@ -44,12 +44,16 @@ class CategoryRepositoryTest {
         "Padrao",
         "EXPENSE",
         true);
+    jdbcTemplate.update(
+        "INSERT INTO categories (id, user_id, name, type, is_default, created_at, updated_at) "
+            + "VALUES (random_uuid(), NULL, ?, ?, ?, now(), now())",
+        "Lazer",
+        "EXPENSE",
+        true);
 
-    List<Category> result = categoryRepository.findByUserOrIsDefaultTrue(user);
+    List<Category> result = categoryRepository.findByUserOrIsDefaultTrueOrderByNameAsc(user);
 
-    assertThat(result)
-        .extracting(Category::getName)
-        .containsExactlyInAnyOrder("Academia", "Padrao");
+    assertThat(result).extracting(Category::getName).containsExactly("Academia", "Lazer", "Padrao");
     assertThat(result).extracting(Category::getName).doesNotContain("Outro usuario");
   }
 }

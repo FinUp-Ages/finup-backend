@@ -1,5 +1,6 @@
 package br.com.finup.controller;
 
+import br.com.finup.dto.CategoryListResponse;
 import br.com.finup.dto.CategoryRequest;
 import br.com.finup.dto.CategoryResponse;
 import br.com.finup.security.AuthenticatedIdentity;
@@ -111,7 +112,7 @@ public class CategoryController {
         description = "Usuário não encontrado",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   })
-  public ResponseEntity<List<CategoryResponse>> findAvailable() {
+  public ResponseEntity<List<CategoryListResponse>> findAvailable() {
     AuthenticatedIdentity identity = authenticatedIdentityResolver.resolveCurrent();
     return ResponseEntity.ok(categoryService.findAvailable(identity));
   }

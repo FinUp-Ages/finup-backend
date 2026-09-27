@@ -1,5 +1,6 @@
 package br.com.finup.service;
 
+import br.com.finup.dto.CategoryListResponse;
 import br.com.finup.dto.CategoryRequest;
 import br.com.finup.dto.CategoryResponse;
 import br.com.finup.exception.ConflictException;
@@ -49,10 +50,11 @@ public class CategoryService {
     return CategoryMapper.toResponse(categoryRepository.save(category));
   }
 
-  public List<CategoryResponse> findAvailable(AuthenticatedIdentity identity) {
+  @Transactional(readOnly = true)
+  public List<CategoryListResponse> findAvailable(AuthenticatedIdentity identity) {
     User user = userService.findByAuthenticatedIdentity(identity);
-    return categoryRepository.findByUserOrIsDefaultTrue(user).stream()
-        .map(CategoryMapper::toResponse)
+    return categoryRepository.findByUserOrIsDefaultTrueOrderByNameAsc(user).stream()
+        .map(CategoryMapper::toListResponse)
         .toList();
   }
 
