@@ -88,87 +88,43 @@ public class PaymentMethod {
     return id;
   }
 
-  public void setId(UUID id) {
-    this.id = id;
-  }
-
   public UUID getUserId() {
     return userId;
-  }
-
-  public void setUserId(UUID userId) {
-    this.userId = userId;
   }
 
   public String getType() {
     return type;
   }
 
-  public void setType(String type) {
-    this.type = type;
-  }
-
   public String getName() {
     return name;
-  }
-
-  public void setName(String name) {
-    this.name = name;
   }
 
   public String getInstitution() {
     return institution;
   }
 
-  public void setInstitution(String institution) {
-    this.institution = institution;
-  }
-
   public Integer getClosingDay() {
     return closingDay;
-  }
-
-  public void setClosingDay(Integer closingDay) {
-    this.closingDay = closingDay;
   }
 
   public Integer getDueDay() {
     return dueDay;
   }
 
-  public void setDueDay(Integer dueDay) {
-    this.dueDay = dueDay;
-  }
-
   public BigDecimal getCreditLimit() {
     return creditLimit;
-  }
-
-  public void setCreditLimit(BigDecimal creditLimit) {
-    this.creditLimit = creditLimit;
   }
 
   public Boolean getIsActive() {
     return isActive;
   }
 
-  public void setIsActive(Boolean isActive) {
-    this.isActive = isActive;
-  }
-
   public OffsetDateTime getCreatedAt() {
     return createdAt;
   }
 
-  public void setCreatedAt(OffsetDateTime createdAt) {
-    this.createdAt = createdAt;
-  }
-
   public OffsetDateTime getUpdatedAt() {
     return updatedAt;
-  }
-
-  public void setUpdatedAt(OffsetDateTime updatedAt) {
-    this.updatedAt = updatedAt;
   }
 }
