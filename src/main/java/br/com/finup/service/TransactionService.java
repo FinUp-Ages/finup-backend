@@ -1,6 +1,8 @@
 package br.com.finup.service;
 
+import br.com.finup.exception.InvalidTransactionRecurrenceException;
 import br.com.finup.exception.ResourceNotFoundException;
+import br.com.finup.model.RecurrenceFrequency;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
 import br.com.finup.model.User;
@@ -37,6 +39,8 @@ public class TransactionService {
    * Registra uma transacao no nome do usuario autenticado, depois de confirmar que as referencias
    * informadas existem e estao disponiveis para ele.
    *
+   * @throws InvalidTransactionRecurrenceException se {@code recurring} e {@code
+   *     recurrenceFrequency} se contradizem
    * @throws ResourceNotFoundException se a identidade nao tiver usuario local, ou se a categoria ou
    *     o meio de pagamento nao existir ou pertencer a outro usuario
    */
@@ -49,7 +53,11 @@ public class TransactionService {
       String description,
       BigDecimal amount,
       LocalDate transactionDate,
-      boolean recurring) {
+      boolean recurring,
+      RecurrenceFrequency recurrenceFrequency) {
+
+    validateRecurrence(recurring, recurrenceFrequency);
+
     User user = userService.findByAuthenticatedIdentity(identity);
     requireAvailableReferences(user.getId(), categoryId, paymentMethodId);
 
@@ -63,7 +71,8 @@ public class TransactionService {
                 description,
                 amount,
                 transactionDate,
-                recurring));
+                recurrenceFrequency));
+
     log.info("Transacao cadastrada: id={}, userId={}", transaction.getId(), user.getId());
     return transaction;
   }
@@ -76,9 +85,21 @@ public class TransactionService {
     if (!transactionRepository.existsCategoryAvailableForUser(categoryId, userId)) {
       throw new ResourceNotFoundException("Categoria", categoryId);
     }
+
     if (paymentMethodId != null
         && !transactionRepository.existsPaymentMethodForUser(paymentMethodId, userId)) {
       throw new ResourceNotFoundException("Meio de pagamento", paymentMethodId);
+    }
+  }
+
+  private void validateRecurrence(boolean recurring, RecurrenceFrequency recurrenceFrequency) {
+    if (recurring && recurrenceFrequency == null) {
+      throw new InvalidTransactionRecurrenceException(
+          "Transacao recorrente precisa informar recurrenceFrequency");
+    }
+    if (!recurring && recurrenceFrequency != null) {
+      throw new InvalidTransactionRecurrenceException(
+          "Transacao nao recorrente nao pode informar recurrenceFrequency");
     }
   }
 }

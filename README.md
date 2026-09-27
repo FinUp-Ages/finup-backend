@@ -80,11 +80,9 @@ botão **Authorize**.
 | `POST /api/v1/categories` | cria categoria do usuário |
 | `PUT /api/v1/categories/{id}` | edita categoria do usuário. Padrão do sistema devolve `403` |
 | `DELETE /api/v1/categories/{id}` | remove categoria do usuário. Em uso devolve `409` |
-| `POST /api/v1/transactions` | registra uma transação |
-| `POST /api/v1/transaction-recurrences` | cadastra uma recorrência |
-| `GET /api/v1/transaction-recurrences/due?date=…` | recorrências que caem na data (hoje, se omitida) |
+| `POST /api/v1/transactions` | registra uma transação, avulsa ou abrindo uma série recorrente |
 
-Categoria e meio de pagamento referenciados por uma transação ou recorrência precisam ser do
+Categoria e meio de pagamento referenciados por uma transação precisam ser do
 próprio usuário — categoria padrão do sistema também vale. Referência de outro usuário responde
 `404`, e não `403`: um `403` confirmaria a existência do id para quem não deveria saber dela.
 
@@ -616,3 +614,63 @@ Ao criar o banco pela primeira vez, o processo ocorre na seguinte ordem:
 3. O arquivo `02-required-data.sql` insere os dados obrigatórios.
 4. O arquivo `03-test-data.sql` insere os dados fictícios de desenvolvimento e testes.
 5. O banco fica disponível para utilização pela aplicação.
+
+### Recorrência de transações
+
+**Decisão:** a recorrência fica na própria tabela `transactions`, e não numa entidade separada.
+Foi alinhada com o Willian e substitui a tabela `transaction_recurrences` e os endpoints
+`/api/v1/transaction-recurrences`, que saíram. O motivo é a simplicidade: por enquanto só existe a
+periodicidade mensal, e a próxima ocorrência sai da última ocorrência mais a periodicidade.
+
+Colunas de recorrência em `transactions`:
+
+| Coluna | Na transação que abre a série | Na ocorrência gerada | Na transação avulsa |
+|---|---|---|---|
+| `is_recurring` | `TRUE` | `FALSE` | `FALSE` |
+| `recurrence_frequency` | `MONTHLY` | `NULL` | `NULL` |
+| `last_occurrence_date` | data da última ocorrência gerada | `NULL` | `NULL` |
+| `recurrence_origin_id` | `NULL` | `id` da transação que abriu a série | `NULL` |
+
+```mermaid
+erDiagram
+    transactions ||--o{ transactions : "recurrence_origin_id"
+    transactions {
+        UUID id PK
+        DATE transaction_date
+        BOOLEAN is_recurring
+        VARCHAR recurrence_frequency
+        DATE last_occurrence_date
+        UUID recurrence_origin_id FK
+    }
+```
+
+Regras:
+
+- A transação que abre a série é a primeira ocorrência. No cadastro, o backend preenche
+  `last_occurrence_date` com o `transaction_date`, e o cliente só informa `isRecurring` e
+  `recurrenceFrequency`.
+- O **dia de referência** da série é o dia do `transaction_date` da transação que a abriu.
+- **Próxima ocorrência** (mensal): o mês seguinte ao de `last_occurrence_date`, no dia de
+  referência, ou no último dia do mês quando esse dia não existe nele. Uma série do dia 31 cai em
+  28/02 e volta ao dia 31 em março. O cálculo fica em `Transaction.nextOccurrenceDate()`, e a API
+  devolve o resultado em `nextOccurrenceDate`.
+- Cada ocorrência gerada é uma transação nova, não recorrente, que aponta para a transação
+  original por `recurrence_origin_id`. Quem gerar a ocorrência também avança o
+  `last_occurrence_date` da original. **A geração em si ainda não existe**: esta modelagem só a
+  prepara.
+
+Constraints:
+
+- `chk_transactions_recurrence`: com `is_recurring = TRUE`, a periodicidade e a última ocorrência
+  são obrigatórias; com `FALSE`, as duas ficam nulas.
+- `chk_transactions_recurrence_origin`: só uma transação não recorrente pode ser ocorrência gerada,
+  e nunca de si mesma.
+- `fk_transactions_recurrence_origin`: a transação original precisa existir.
+- `uq_transactions_recurrence_occurrence`: no máximo uma ocorrência por série e data. Isso impede
+  gerar o mesmo mês duas vezes, se a geração rodar de novo.
+
+Exemplo: uma conta de luz cadastrada em `2026-09-05` com `MONTHLY` fica com
+`last_occurrence_date = 2026-09-05` e `nextOccurrenceDate = 2026-10-05`.
+
+Ainda não existe como encerrar uma série (data de término ou cancelamento): fica para uma próxima
+tarefa.

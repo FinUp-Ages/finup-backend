@@ -1,30 +1,33 @@
 {
   "stage": "REVIEWING",
-  "task": "Autenticacao real com AWS Cognito (JWT) no lugar da identidade mockada por header",
-  "objective": "Validar o access token do Cognito via Spring Security OAuth2 Resource Server e resolver a identidade autenticada a partir dele, sem mudar service nem regra de negocio.",
+  "task": "PR #24 — modelagem da recorrencia de transacoes (correcoes do review)",
+  "objective": "Representar no banco a recorrencia mensal (ex.: todo dia 5), a proxima ocorrencia e o vinculo das ocorrencias geradas, com constraints, scripts e documentacao atualizados.",
   "decisions": [
-    "E-mail e nome do cadastro vem do GetUser do Cognito, com o proprio access token do usuario",
-    "Mock por header mantido atras do profile mock-auth, nunca ativo junto de prod"
+    "Recorrencia na propria tabela transactions, alinhada com o Willian; saem a tabela transaction_recurrences e os endpoints /api/v1/transaction-recurrences",
+    "A transacao que abre a serie guarda is_recurring, recurrence_frequency e last_occurrence_date (DATE); o dia do transaction_date original e o dia de referencia",
+    "Ocorrencias geradas sao transacoes novas, nao recorrentes, com recurrence_origin_id e UNIQUE (recurrence_origin_id, transaction_date)",
+    "Proxima ocorrencia calculada em Transaction.nextOccurrenceDate(), com ajuste ao ultimo dia do mes; isRecurring e recurrenceFrequency contraditorios -> 422"
   ],
   "files_in_scope": [
-    "pom.xml",
-    "src/main/resources/application.yml",
-    ".env.example",
-    "src/main/java/br/com/finup/config/",
-    "src/main/java/br/com/finup/security/",
-    "src/main/java/br/com/finup/exception/IdentityProviderUnavailableException.java",
-    "src/main/java/br/com/finup/controller/",
+    "database/init/01-schema.sql",
+    "database/init/03-test-data.sql",
+    "src/main/java/br/com/finup/controller/TransactionController.java",
+    "src/main/java/br/com/finup/dto/",
+    "src/main/java/br/com/finup/exception/",
+    "src/main/java/br/com/finup/mapper/TransactionMapper.java",
+    "src/main/java/br/com/finup/model/",
+    "src/main/java/br/com/finup/service/TransactionService.java",
     "src/test/java/br/com/finup/",
-    "README.md",
-    "docs/finup-score.md"
+    "README.md"
   ],
   "validation": {
-    "mvn clean verify": "passed (153 testes, 0 falhas, spotless ok)",
-    "teste manual com User Pool real": "passed (us-east-2: SignUp + USER_AUTH, POST /users 201, GET /users/me 200, POST repetido 409, token adulterado 401; cognito_id = sub no banco)"
+    "mvn clean verify": "passed (146 testes, 0 falhas, spotless ok)",
+    "postgres 16 com database/init": "passed (schema e seed sobem; UNIQUE, CHECKs e FK da origem recusam os casos invalidos)",
+    "API com dev,mock-auth": "passed (recorrente 201 com nextOccurrenceDate, dia 31 -> 28/02; avulsa 201; contraditorios 422; Swagger com 422 e sem /transaction-recurrences)"
   },
   "review": "pending",
-  "updated_at": "2026-09-25",
+  "updated_at": "2026-09-27",
   "open_questions": [
-    "Pool usa username + e-mail alias (mobile precisa gerar username) e exige birthdate no Cognito, duplicando o birth_date da Etapa 2"
+    "Geracao das ocorrencias e encerramento de uma serie ficam para tarefas futuras"
   ]
 }
