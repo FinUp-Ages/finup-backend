@@ -1,5 +1,6 @@
 package br.com.finup.service;
 
+import br.com.finup.dto.CategoryListResponse;
 import br.com.finup.dto.CategoryRequest;
 import br.com.finup.dto.CategoryResponse;
 import br.com.finup.exception.ConflictException;
@@ -10,7 +11,10 @@ import br.com.finup.model.Category;
 import br.com.finup.model.User;
 import br.com.finup.repository.CategoryRepository;
 import br.com.finup.security.AuthenticatedIdentity;
+import java.text.Collator;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -49,10 +53,16 @@ public class CategoryService {
     return CategoryMapper.toResponse(categoryRepository.save(category));
   }
 
-  public List<CategoryResponse> findAvailable(AuthenticatedIdentity identity) {
+  @Transactional(readOnly = true)
+  public List<CategoryListResponse> findAvailable(AuthenticatedIdentity identity) {
     User user = userService.findByAuthenticatedIdentity(identity);
+    Collator collator = Collator.getInstance(Locale.forLanguageTag("pt-BR"));
+    Comparator<CategoryListResponse> byName =
+        Comparator.comparing(CategoryListResponse::name, collator);
+
     return categoryRepository.findByUserOrIsDefaultTrue(user).stream()
-        .map(CategoryMapper::toResponse)
+        .map(CategoryMapper::toListResponse)
+        .sorted(byName)
         .toList();
   }
 

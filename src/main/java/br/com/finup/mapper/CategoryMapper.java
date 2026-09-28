@@ -1,5 +1,6 @@
 package br.com.finup.mapper;
 
+import br.com.finup.dto.CategoryListResponse;
 import br.com.finup.dto.CategoryResponse;
 import br.com.finup.model.Category;
 
@@ -17,5 +18,9 @@ public final class CategoryMapper {
   public static CategoryResponse toResponse(Category category) {
     return new CategoryResponse(
         category.getId(), category.getName(), category.getType(), category.isDefault());
+  }
+
+  public static CategoryListResponse toListResponse(Category category) {
+    return new CategoryListResponse(category.getId(), category.getName(), category.getType());
   }
 }
