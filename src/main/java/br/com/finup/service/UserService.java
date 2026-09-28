@@ -53,7 +53,7 @@ public class UserService {
    */
   @Transactional
   public User createFromAuthenticatedIdentity(AuthenticatedIdentity identity) {
-    String normalizedEmail = identity.email().strip().toLowerCase();
+    String normalizedEmail = normalizeEmail(identity.email());
 
     if (userRepository.existsByCognitoId(identity.cognitoId())) {
       throw new UserAlreadyRegisteredException();
@@ -106,6 +106,24 @@ public class UserService {
    */
   public User findByAuthenticatedIdentity(AuthenticatedIdentity identity) {
     return findByIdentityOrThrow(identity);
+  }
+
+  /**
+   * Diz se nenhum usuario usa o e-mail — usado pelo formulario de cadastro, antes de a pessoa ter
+   * conta. Compara do mesmo jeito que {@link #createFromAuthenticatedIdentity}: sem espacos nas
+   * pontas e em minusculas, que e como o e-mail e gravado.
+   *
+   * <p>E so um aviso, nao uma reserva: outra pessoa pode cadastrar o mesmo e-mail logo depois da
+   * consulta. Quem garante a unicidade continua sendo o indice {@code UNIQUE} de {@code email}. So
+   * enxerga a tabela {@code users}: uma conta que existe no Cognito e ainda nao chegou aqui aparece
+   * como disponivel.
+   */
+  public boolean isEmailAvailable(String email) {
+    return !userRepository.existsByEmail(normalizeEmail(email));
+  }
+
+  private static String normalizeEmail(String email) {
+    return email.strip().toLowerCase();
   }
 
   private User findByIdentityOrThrow(AuthenticatedIdentity identity) {

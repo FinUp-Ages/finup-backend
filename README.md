@@ -67,11 +67,12 @@ controllers e DTOs da aplicação. Os metadados gerais da API ficam centralizado
 
 Nenhum deles recebe identificador de usuário do cliente: quem está chamando vem sempre da
 identidade autenticada — o header `Authorization: Bearer <access token do Cognito>`, ou os headers
-`X-Mock-Cognito-*` no profile `mock-auth`. Sem identidade, a resposta é `401`. No Swagger, use o
-botão **Authorize**.
+`X-Mock-Cognito-*` no profile `mock-auth`. Sem identidade, a resposta é `401` (a única exceção é a
+consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o botão **Authorize**.
 
 | Método e caminho | O que faz |
 |---|---|
+| `POST /api/v1/users/email-availability` | **público, sem token.** Diz se um e-mail já está cadastrado (`{"available": true\|false}`). Usado pelo formulário de cadastro |
 | `POST /api/v1/users` | cria o registro local da identidade autenticada. Corpo vazio |
 | `GET /api/v1/users/me` | devolve o usuário da identidade autenticada |
 | `PATCH /api/v1/users/me/additional-info` | grava as informações complementares (Etapa 2 do cadastro) |
@@ -85,6 +86,14 @@ botão **Authorize**.
 Categoria e meio de pagamento referenciados por uma transação precisam ser do
 próprio usuário — categoria padrão do sistema também vale. Referência de outro usuário responde
 `404`, e não `403`: um `403` confirmaria a existência do id para quem não deveria saber dela.
+
+**A consulta de e-mail é a exceção, de propósito.** O formulário de cadastro precisa avisar que o
+e-mail já existe antes de a pessoa ter conta e token, então `POST /api/v1/users/email-availability`
+é público e confirma se um e-mail está cadastrado. Isso permite sondar e-mails sem deixar rastro.
+Ainda **não há limite de requisições**; ele precisa existir (por IP ou no gateway) antes de
+produção. O e-mail vai no corpo, e não na URL, para não aparecer em log de acesso. A resposta é só
+um aviso: só enxerga a tabela `users` e não reserva o e-mail, então o cadastro continua podendo
+falhar com `409`.
 
 O detalhe de cada campo está no Swagger — a tabela acima é só o mapa.
 
