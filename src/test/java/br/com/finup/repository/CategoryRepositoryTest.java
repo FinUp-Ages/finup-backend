@@ -51,9 +51,11 @@ class CategoryRepositoryTest {
         "EXPENSE",
         true);
 
-    List<Category> result = categoryRepository.findByUserOrIsDefaultTrueOrderByNameAsc(user);
+    List<Category> result = categoryRepository.findByUserOrIsDefaultTrue(user);
 
-    assertThat(result).extracting(Category::getName).containsExactly("Academia", "Lazer", "Padrao");
+    assertThat(result)
+        .extracting(Category::getName)
+        .containsExactlyInAnyOrder("Academia", "Lazer", "Padrao");
     assertThat(result).extracting(Category::getName).doesNotContain("Outro usuario");
   }
 }

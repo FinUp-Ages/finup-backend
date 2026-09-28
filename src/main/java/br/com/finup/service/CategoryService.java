@@ -11,7 +11,10 @@ import br.com.finup.model.Category;
 import br.com.finup.model.User;
 import br.com.finup.repository.CategoryRepository;
 import br.com.finup.security.AuthenticatedIdentity;
+import java.text.Collator;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -53,8 +56,13 @@ public class CategoryService {
   @Transactional(readOnly = true)
   public List<CategoryListResponse> findAvailable(AuthenticatedIdentity identity) {
     User user = userService.findByAuthenticatedIdentity(identity);
-    return categoryRepository.findByUserOrIsDefaultTrueOrderByNameAsc(user).stream()
+    Collator collator = Collator.getInstance(Locale.forLanguageTag("pt-BR"));
+    Comparator<CategoryListResponse> byName =
+        Comparator.comparing(CategoryListResponse::name, collator);
+
+    return categoryRepository.findByUserOrIsDefaultTrue(user).stream()
         .map(CategoryMapper::toListResponse)
+        .sorted(byName)
         .toList();
   }
 

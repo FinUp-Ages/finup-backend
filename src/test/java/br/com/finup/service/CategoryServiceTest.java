@@ -142,24 +142,23 @@ class CategoryServiceTest {
   }
 
   @Test
-  @DisplayName("consulta retorna categorias do usuario e as padroes")
-  void findAvailableReturnsCategoriesForUser() {
+  @DisplayName("consulta ordena categorias por nome conforme o portugues do Brasil")
+  void findAvailableSortsCategoriesByNameInBrazilianPortuguese() {
     User user = mockUser();
     AuthenticatedIdentity identity = identity(user);
-    Category userCategory = mockCategory(user);
-    Category defaultCategory = org.mockito.Mockito.mock(Category.class);
-    when(defaultCategory.getName()).thenReturn("Salário");
-    when(defaultCategory.getType()).thenReturn(TransactionType.INCOME);
+    Category uppercase = Category.createForUser(user, "Zumba", TransactionType.EXPENSE);
+    Category lowercase = Category.createForUser(user, "academia", TransactionType.EXPENSE);
+    Category accented = Category.createForUser(user, "Água", TransactionType.EXPENSE);
 
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
-    when(categoryRepository.findByUserOrIsDefaultTrueOrderByNameAsc(user))
-        .thenReturn(List.of(userCategory, defaultCategory));
+    when(categoryRepository.findByUserOrIsDefaultTrue(user))
+        .thenReturn(List.of(uppercase, accented, lowercase));
 
     List<CategoryListResponse> result = categoryService.findAvailable(identity);
 
     assertThat(result)
         .extracting(CategoryListResponse::name)
-        .containsExactly("Alimentação", "Salário");
+        .containsExactly("academia", "Água", "Zumba");
     verify(categoryRepository, never()).save(any());
     verify(categoryRepository, never()).deleteById(any());
   }
