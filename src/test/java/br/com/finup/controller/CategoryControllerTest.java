@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.finup.dto.CategoryListResponse;
 import br.com.finup.dto.CategoryResponse;
 import br.com.finup.exception.ConflictException;
 import br.com.finup.exception.ForbiddenOperationException;
@@ -115,17 +116,25 @@ class CategoryControllerTest {
   @Test
   @DisplayName("GET devolve 200 com lista de categorias")
   void findAvailableReturns200() throws Exception {
-    List<CategoryResponse> response =
+    List<CategoryListResponse> response =
         List.of(
-            new CategoryResponse(UUID.randomUUID(), "Alimentação", TransactionType.EXPENSE, true),
-            new CategoryResponse(UUID.randomUUID(), "Academia", TransactionType.EXPENSE, false));
+            new CategoryListResponse(UUID.randomUUID(), "Alimentação", TransactionType.EXPENSE),
+            new CategoryListResponse(UUID.randomUUID(), "Lazer", TransactionType.EXPENSE),
+            new CategoryListResponse(UUID.randomUUID(), "Moradia", TransactionType.EXPENSE),
+            new CategoryListResponse(UUID.randomUUID(), "Salário", TransactionType.INCOME),
+            new CategoryListResponse(UUID.randomUUID(), "Saúde", TransactionType.EXPENSE),
+            new CategoryListResponse(UUID.randomUUID(), "Transporte", TransactionType.EXPENSE));
 
     when(categoryService.findAvailable(IDENTITY)).thenReturn(response);
 
     mockMvc
         .perform(get("/api/v1/categories"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(2));
+        .andExpect(jsonPath("$.length()").value(6))
+        .andExpect(jsonPath("$[0].name").value("Alimentação"))
+        .andExpect(jsonPath("$[3].name").value("Salário"))
+        .andExpect(jsonPath("$[3].type").value("INCOME"))
+        .andExpect(jsonPath("$[0].isDefault").doesNotExist());
   }
 
   @Test
