@@ -9,7 +9,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.finup.exception.InvalidTransactionRecurrenceException;
 import br.com.finup.exception.ResourceNotFoundException;
+import br.com.finup.model.RecurrenceFrequency;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
 import br.com.finup.security.AuthenticatedIdentity;
@@ -22,12 +24,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** Verifica o contrato HTTP do cadastro de transacoes e seus erros esperados. */
+@AutoConfigureMockMvc(addFilters = false)
 @WebMvcTest(TransactionController.class)
 class TransactionControllerTest {
 
@@ -60,7 +64,7 @@ class TransactionControllerTest {
             "Salario",
             new BigDecimal("5000.00"),
             date,
-            true);
+            RecurrenceFrequency.MONTHLY);
     when(transactionService.register(
             eq(IDENTITY),
             eq(categoryId),
@@ -69,7 +73,8 @@ class TransactionControllerTest {
             eq("Salario"),
             eq(new BigDecimal("5000.00")),
             eq(date),
-            eq(true)))
+            eq(true),
+            eq(RecurrenceFrequency.MONTHLY)))
         .thenReturn(transaction);
 
     mockMvc
@@ -84,7 +89,8 @@ class TransactionControllerTest {
                       "description": "Salario",
                       "amount": 5000.00,
                       "transactionDate": "2026-09-12",
-                      "isRecurring": true
+                      "isRecurring": true,
+                      "recurrenceFrequency": "MONTHLY"
                     }
                     """
                         .formatted(categoryId)))
@@ -96,7 +102,51 @@ class TransactionControllerTest {
         .andExpect(jsonPath("$.paymentMethodId").doesNotExist())
         .andExpect(jsonPath("$.type").value("INCOME"))
         .andExpect(jsonPath("$.amount").value(5000.00))
-        .andExpect(jsonPath("$.isRecurring").value(true));
+        .andExpect(jsonPath("$.isRecurring").value(true))
+        .andExpect(jsonPath("$.recurrenceFrequency").value("MONTHLY"))
+        .andExpect(jsonPath("$.lastOccurrenceDate").value("2026-09-12"))
+        .andExpect(jsonPath("$.nextOccurrenceDate").value("2026-10-12"))
+        .andExpect(jsonPath("$.recurrenceOriginId").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("isRecurring contradizendo a periodicidade devolve 422 no formato RFC 7807")
+  void contradictoryRecurrenceReturns422() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+    when(transactionService.register(
+            eq(IDENTITY),
+            eq(categoryId),
+            isNull(),
+            eq(TransactionType.EXPENSE),
+            isNull(),
+            eq(new BigDecimal("10.00")),
+            eq(LocalDate.of(2026, 9, 12)),
+            eq(true),
+            isNull()))
+        .thenThrow(
+            new InvalidTransactionRecurrenceException(
+                "Transacao recorrente precisa informar recurrenceFrequency"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/transactions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "categoryId": "%s",
+                      "type": "EXPENSE",
+                      "amount": 10.00,
+                      "transactionDate": "2026-09-12",
+                      "isRecurring": true
+                    }
+                    """
+                        .formatted(categoryId)))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.status").value(422))
+        .andExpect(
+            jsonPath("$.detail")
+                .value("Transacao recorrente precisa informar recurrenceFrequency"));
   }
 
   @Test
@@ -182,7 +232,8 @@ class TransactionControllerTest {
             isNull(),
             eq(new BigDecimal("10.00")),
             eq(date),
-            eq(false)))
+            eq(false),
+            isNull()))
         .thenThrow(new ResourceNotFoundException("Categoria", categoryId));
 
     mockMvc

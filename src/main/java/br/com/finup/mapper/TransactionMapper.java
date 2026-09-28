@@ -19,6 +19,10 @@ public final class TransactionMapper {
         transaction.getAmount(),
         transaction.getTransactionDate(),
         transaction.isRecurring(),
+        transaction.getRecurrenceFrequency(),
+        transaction.getLastOccurrenceDate(),
+        transaction.nextOccurrenceDate().orElse(null),
+        transaction.getRecurrenceOriginId(),
         transaction.getCreatedAt(),
         transaction.getUpdatedAt());
   }

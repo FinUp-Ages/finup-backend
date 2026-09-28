@@ -1,18 +1,33 @@
 {
   "stage": "REVIEWING",
-  "task": "PR #18 — fechar o contrato de identidade de transacoes e recorrencias",
-  "objective": "Tirar o userId do contrato de transacoes e recorrencias, aceitar so referencias do proprio usuario e fechar as brechas de validacao herdadas do #9 e do #4.",
+  "task": "PR #24 — modelagem da recorrencia de transacoes (correcoes do review)",
+  "objective": "Representar no banco a recorrencia mensal (ex.: todo dia 5), a proxima ocorrencia e o vinculo das ocorrencias geradas, com constraints, scripts e documentacao atualizados.",
+  "decisions": [
+    "Recorrencia na propria tabela transactions, alinhada com o Willian; saem a tabela transaction_recurrences e os endpoints /api/v1/transaction-recurrences",
+    "A transacao que abre a serie guarda is_recurring, recurrence_frequency e last_occurrence_date (DATE); o dia do transaction_date original e o dia de referencia",
+    "Ocorrencias geradas sao transacoes novas, nao recorrentes, com recurrence_origin_id e UNIQUE (recurrence_origin_id, transaction_date)",
+    "Proxima ocorrencia calculada em Transaction.nextOccurrenceDate(), com ajuste ao ultimo dia do mes; isRecurring e recurrenceFrequency contraditorios -> 422"
+  ],
   "files_in_scope": [
-    "src/main/java/br/com/finup/controller/",
+    "database/init/01-schema.sql",
+    "database/init/03-test-data.sql",
+    "src/main/java/br/com/finup/controller/TransactionController.java",
     "src/main/java/br/com/finup/dto/",
+    "src/main/java/br/com/finup/exception/",
+    "src/main/java/br/com/finup/mapper/TransactionMapper.java",
     "src/main/java/br/com/finup/model/",
-    "src/main/java/br/com/finup/repository/",
-    "src/main/java/br/com/finup/security/MockAuthenticatedIdentityResolver.java",
-    "src/main/java/br/com/finup/service/",
+    "src/main/java/br/com/finup/service/TransactionService.java",
     "src/test/java/br/com/finup/",
     "README.md"
   ],
-  "validation": {"mvn clean verify": "passed (121 testes, 0 falhas)"},
+  "validation": {
+    "mvn clean verify": "passed (146 testes, 0 falhas, spotless ok)",
+    "postgres 16 com database/init": "passed (schema e seed sobem; UNIQUE, CHECKs e FK da origem recusam os casos invalidos)",
+    "API com dev,mock-auth": "passed (recorrente 201 com nextOccurrenceDate, dia 31 -> 28/02; avulsa 201; contraditorios 422; Swagger com 422 e sem /transaction-recurrences)"
+  },
   "review": "pending",
-  "updated_at": "2026-09-25"
+  "updated_at": "2026-09-27",
+  "open_questions": [
+    "Geracao das ocorrencias e encerramento de uma serie ficam para tarefas futuras"
+  ]
 }

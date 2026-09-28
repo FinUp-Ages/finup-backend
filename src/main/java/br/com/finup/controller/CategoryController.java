@@ -6,9 +6,6 @@ import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.CategoryService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -53,23 +50,6 @@ public class CategoryController {
 
   @PostMapping
   @Operation(summary = "Cria uma nova categoria para o usuário autenticado")
-  @Parameters({
-    @Parameter(
-        name = "X-Mock-Cognito-Sub",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "Identificador (sub) da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Email",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "E-mail da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Name",
-        in = ParameterIn.HEADER,
-        required = false,
-        description = "Nome da identidade autenticada — mock do Cognito real. Opcional.")
-  })
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Categoria criada"),
     @ApiResponse(
@@ -93,23 +73,6 @@ public class CategoryController {
 
   @PutMapping("/{id}")
   @Operation(summary = "Atualiza uma categoria do usuário autenticado")
-  @Parameters({
-    @Parameter(
-        name = "X-Mock-Cognito-Sub",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "Identificador (sub) da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Email",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "E-mail da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Name",
-        in = ParameterIn.HEADER,
-        required = false,
-        description = "Nome da identidade autenticada — mock do Cognito real. Opcional.")
-  })
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Categoria atualizada"),
     @ApiResponse(
@@ -137,23 +100,6 @@ public class CategoryController {
 
   @GetMapping
   @Operation(summary = "Lista as categorias disponíveis: as do usuário e as padrão do sistema")
-  @Parameters({
-    @Parameter(
-        name = "X-Mock-Cognito-Sub",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "Identificador (sub) da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Email",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "E-mail da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Name",
-        in = ParameterIn.HEADER,
-        required = false,
-        description = "Nome da identidade autenticada — mock do Cognito real. Opcional.")
-  })
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
     @ApiResponse(
@@ -172,23 +118,6 @@ public class CategoryController {
 
   @DeleteMapping("/{id}")
   @Operation(summary = "Remove uma categoria do usuário autenticado")
-  @Parameters({
-    @Parameter(
-        name = "X-Mock-Cognito-Sub",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "Identificador (sub) da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Email",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "E-mail da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Name",
-        in = ParameterIn.HEADER,
-        required = false,
-        description = "Nome da identidade autenticada — mock do Cognito real. Opcional.")
-  })
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Categoria removida"),
     @ApiResponse(

@@ -367,7 +367,9 @@ INSERT INTO
     description,
     amount,
     transaction_date,
-    is_recurring
+    is_recurring,
+    recurrence_frequency,
+    last_occurrence_date
   )
 SELECT
   u.id,
@@ -377,7 +379,9 @@ SELECT
   'Salário mensal',
   5000.00,
   CURRENT_DATE,
-  TRUE
+  TRUE,
+  'MONTHLY',
+  CURRENT_DATE
 FROM
   users u
   JOIN categories c ON c.name = 'Salário'

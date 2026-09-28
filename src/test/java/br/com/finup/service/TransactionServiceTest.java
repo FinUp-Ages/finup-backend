@@ -5,9 +5,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import br.com.finup.exception.InvalidTransactionRecurrenceException;
 import br.com.finup.exception.ResourceNotFoundException;
+import br.com.finup.model.RecurrenceFrequency;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
 import br.com.finup.model.User;
@@ -41,8 +44,8 @@ class TransactionServiceTest {
   }
 
   @Test
-  @DisplayName("cadastra transacao sem consultar meio de pagamento quando ele nao e informado")
-  void registersWithoutPaymentMethod() {
+  @DisplayName("cadastra transacao recorrente sem consultar meio de pagamento nao informado")
+  void registersRecurringWithoutPaymentMethod() {
     User user = mockUser();
     AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
@@ -61,13 +64,17 @@ class TransactionServiceTest {
             "Salario",
             new BigDecimal("5000.00"),
             LocalDate.of(2026, 9, 12),
-            true);
+            true,
+            RecurrenceFrequency.MONTHLY);
 
     assertThat(transaction.getId()).isNotNull();
     assertThat(transaction.getUserId()).isEqualTo(user.getId());
     assertThat(transaction.getCategoryId()).isEqualTo(categoryId);
     assertThat(transaction.getPaymentMethodId()).isNull();
     assertThat(transaction.getType()).isEqualTo(TransactionType.INCOME);
+    assertThat(transaction.isRecurring()).isTrue();
+    assertThat(transaction.getRecurrenceFrequency()).isEqualTo(RecurrenceFrequency.MONTHLY);
+    assertThat(transaction.getLastOccurrenceDate()).isEqualTo(LocalDate.of(2026, 9, 12));
     verify(transactionRepository, never()).existsPaymentMethodForUser(any(), any());
   }
 
@@ -95,7 +102,8 @@ class TransactionServiceTest {
             "Supermercado",
             new BigDecimal("320.00"),
             LocalDate.of(2026, 9, 12),
-            false);
+            false,
+            null);
 
     assertThat(transaction.getPaymentMethodId()).isEqualTo(paymentMethodId);
   }
@@ -158,6 +166,40 @@ class TransactionServiceTest {
         "Compra",
         new BigDecimal("10.00"),
         LocalDate.of(2026, 9, 12),
-        false);
+        false,
+        null);
+  }
+
+  @Test
+  @DisplayName("recusa transacao recorrente sem periodicidade")
+  void rejectsRecurringTransactionWithoutFrequency() {
+    assertThatThrownBy(() -> registerWithRecurrence(true, null))
+        .isInstanceOf(InvalidTransactionRecurrenceException.class)
+        .hasMessageContaining("precisa informar recurrenceFrequency");
+    verifyNoInteractions(userService, transactionRepository);
+  }
+
+  @Test
+  @DisplayName("recusa transacao nao recorrente com periodicidade")
+  void rejectsNonRecurringTransactionWithFrequency() {
+    assertThatThrownBy(() -> registerWithRecurrence(false, RecurrenceFrequency.MONTHLY))
+        .isInstanceOf(InvalidTransactionRecurrenceException.class)
+        .hasMessageContaining("nao pode informar recurrenceFrequency");
+    verifyNoInteractions(userService, transactionRepository);
+  }
+
+  private Transaction registerWithRecurrence(
+      boolean recurring, RecurrenceFrequency recurrenceFrequency) {
+    User user = mockUser();
+    return transactionService.register(
+        identity(user),
+        UUID.randomUUID(),
+        null,
+        TransactionType.EXPENSE,
+        "Conta de luz",
+        new BigDecimal("250.00"),
+        LocalDate.of(2026, 9, 5),
+        recurring,
+        recurrenceFrequency);
   }
 }

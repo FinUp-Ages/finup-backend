@@ -6,5 +6,9 @@ package br.com.finup.security;
  * <p>{@code cognitoId} e o "sub" do token — o identificador imutavel da identidade no Cognito, e o
  * que vincula um {@link br.com.finup.model.User} local a essa identidade. O backend nunca gera nem
  * valida senha: essa responsabilidade e inteira do Cognito.
+ *
+ * <p>So {@code cognitoId} e garantido. {@code name} e {@code email} so vem preenchidos por {@link
+ * AuthenticatedIdentityResolver#resolveCurrentWithAttributes()}; em {@link
+ * AuthenticatedIdentityResolver#resolveCurrent()} podem vir nulos.
  */
 public record AuthenticatedIdentity(String cognitoId, String name, String email) {}

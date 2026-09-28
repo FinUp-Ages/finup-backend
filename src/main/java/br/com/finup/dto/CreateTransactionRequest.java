@@ -1,5 +1,6 @@
 package br.com.finup.dto;
 
+import br.com.finup.model.RecurrenceFrequency;
 import br.com.finup.model.TransactionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Digits;
@@ -37,4 +38,10 @@ public record CreateTransactionRequest(
         LocalDate transactionDate,
     @Schema(description = "Indica se a transacao e recorrente", example = "false")
         @NotNull(message = "e obrigatorio")
-        Boolean isRecurring) {}
+        Boolean isRecurring,
+    @Schema(
+            description =
+                "Periodicidade da recorrencia. Obrigatoria quando isRecurring e true e ausente quando"
+                    + " e false. O dia de transactionDate vira o dia de referencia da serie",
+            example = "MONTHLY")
+        RecurrenceFrequency recurrenceFrequency) {}
