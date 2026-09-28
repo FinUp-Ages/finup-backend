@@ -12,11 +12,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.finup.controller.CategoryController;
 import br.com.finup.controller.UserController;
 import br.com.finup.model.User;
 import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.security.ProblemDetailAuthenticationEntryPoint;
+import br.com.finup.service.CategoryService;
 import br.com.finup.service.UserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,7 +42,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * <p>{@code @ActiveProfiles("test")}: garante que {@code mock-auth} nao esta ativo, mesmo que a
  * maquina de quem roda tenha {@code SPRING_PROFILES_ACTIVE=dev,mock-auth}.
  */
-@WebMvcTest(UserController.class)
+@WebMvcTest({UserController.class, CategoryController.class})
 @Import({SecurityConfig.class, CognitoConfig.class, ProblemDetailAuthenticationEntryPoint.class})
 @ActiveProfiles("test")
 @TestPropertySource(
@@ -54,6 +56,8 @@ class SecurityConfigTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private UserService userService;
+
+  @MockitoBean private CategoryService categoryService;
 
   @MockitoBean private AuthenticatedIdentityResolver authenticatedIdentityResolver;
 
@@ -71,6 +75,19 @@ class SecurityConfigTest {
         .andExpect(jsonPath("$.timestamp").exists());
 
     verifyNoInteractions(authenticatedIdentityResolver, userService);
+  }
+
+  @Test
+  @DisplayName("listagem de categorias sem access token do Cognito devolve 401")
+  void categoriesWithoutTokenReturn401() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/categories"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.status").value(401));
+
+    verifyNoInteractions(authenticatedIdentityResolver, categoryService);
   }
 
   @Test
@@ -108,6 +125,36 @@ class SecurityConfigTest {
     when(userService.createFromAuthenticatedIdentity(identity)).thenReturn(user);
 
     mockMvc.perform(post("/api/v1/users").with(jwt())).andExpect(status().isCreated());
+  }
+
+  @Test
+  @DisplayName("consulta de e-mail do cadastro e publica: responde sem token")
+  void emailAvailabilityDoesNotRequireToken() throws Exception {
+    when(userService.isEmailAvailable("ana@exemplo.com")).thenReturn(true);
+
+    mockMvc
+        .perform(
+            post("/api/v1/users/email-availability")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"ana@exemplo.com\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.available").value(true));
+  }
+
+  @Test
+  @DisplayName("so o POST da consulta de e-mail e publico: GET no mesmo caminho exige token")
+  void emailAvailabilityIsPublicOnlyForPost() throws Exception {
+    mockMvc.perform(get("/api/v1/users/email-availability")).andExpect(status().isUnauthorized());
+
+    verifyNoInteractions(userService);
+  }
+
+  @Test
+  @DisplayName("liberar a consulta de e-mail nao abre o resto: POST /users sem token devolve 401")
+  void otherUserRoutesStillRequireToken() throws Exception {
+    mockMvc.perform(post("/api/v1/users")).andExpect(status().isUnauthorized());
+
+    verifyNoInteractions(authenticatedIdentityResolver, userService);
   }
 
   @Test

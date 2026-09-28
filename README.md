@@ -50,6 +50,60 @@ Depois de subir:
 |---|---|
 | Health check | http://localhost:8080/actuator/health |
 
+### Alternativa: subir banco + API pelo Docker (para testar com o mobile)
+
+O `docker-compose.yml` tem dois serviços: `db` e `app`. Para quem vai testar o cadastro pelo app
+(em vez de só chamar a API local com `curl`/Postman), é mais simples subir os dois de uma vez, sem
+`./mvnw spring-boot:run` à parte.
+
+Antes de subir, defina no `.env` **como a aplicação vai autenticar** — os mesmos dois caminhos da
+seção [Autenticação](#autenticação), porque o container roda a mesma aplicação:
+
+| Caminho | O que preencher no `.env` | Como chamar a API |
+|---|---|---|
+| Com o Cognito (é o que o app mobile usa) | `COGNITO_USER_POOL_ID` e `COGNITO_CLIENT_ID` | `Authorization: Bearer <access token>` |
+| Sem o Cognito, para teste local | `SPRING_PROFILES_ACTIVE=dev,mock-auth` | headers `X-Mock-Cognito-*` |
+
+Sem um dos dois o container `app` **não sobe**: fora do profile `mock-auth` a aplicação exige as duas
+variáveis do Cognito e falha na inicialização de propósito. Como o serviço tem `restart: unless-stopped`,
+o sintoma é o container reiniciando em loop — `docker compose logs app` mostra, repetido a cada
+tentativa:
+
+```
+APPLICATION FAILED TO START
+Binding to target br.com.finup.config.CognitoProperties failed:
+    Property: finup.cognito.userPoolId
+    Reason: must not be blank
+```
+
+Com isso definido:
+
+```bash
+cp .env.example .env      # se ainda não tiver feito, e ajuste conforme a tabela acima
+docker compose up -d --build
+```
+
+Isso builda a imagem da aplicação (a partir do `Dockerfile`) e sobe os dois containers juntos, com a
+API já esperando o banco ficar `healthy` antes de iniciar.
+
+> **Se você já rodou o `docker compose` antes:** o schema e a carga inicial de `database/init/` só são
+> executados quando o volume do Postgres está vazio. Vindo de uma versão anterior do banco, o container
+> sobe com o schema velho e os erros aparecem em SQL, não em configuração. Nesse caso, recrie o volume
+> antes — veja [Apagar o banco local e começar do zero](#apagar-o-banco-local-e-começar-do-zero).
+
+**Ponto de atenção ao testar com o app mobile na mesma rede:** o `CORS_ALLOWED_ORIGINS` do `.env`
+só libera as origens já cadastradas (por padrão, `localhost` em algumas portas). Se o app mobile
+estiver rodando em outra máquina/emulador acessando esta API pelo IP da rede local, adicione esse IP
+à lista (ex.: `http://192.168.0.10:8081`) e recrie o container da aplicação para aplicar:
+
+```bash
+docker compose up -d app
+```
+
+Isso normalmente não é necessário para o app mobile nativo (Android/iOS) — CORS só se aplica a
+requisições feitas por um navegador. É relevante apenas testando pela versão web do Expo
+(`npm run web`, no repositório `finup-mobile`), que roda dentro de um navegador.
+
 ## Swagger / OpenAPI
 
 Com a aplicação em execução, a documentação da API fica disponível nestas URLs:
@@ -67,11 +121,12 @@ controllers e DTOs da aplicação. Os metadados gerais da API ficam centralizado
 
 Nenhum deles recebe identificador de usuário do cliente: quem está chamando vem sempre da
 identidade autenticada — o header `Authorization: Bearer <access token do Cognito>`, ou os headers
-`X-Mock-Cognito-*` no profile `mock-auth`. Sem identidade, a resposta é `401`. No Swagger, use o
-botão **Authorize**.
+`X-Mock-Cognito-*` no profile `mock-auth`. Sem identidade, a resposta é `401` (a única exceção é a
+consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o botão **Authorize**.
 
 | Método e caminho | O que faz |
 |---|---|
+| `POST /api/v1/users/email-availability` | **público, sem token.** Diz se um e-mail já está cadastrado (`{"available": true\|false}`). Usado pelo formulário de cadastro |
 | `POST /api/v1/users` | cria o registro local da identidade autenticada. Corpo vazio |
 | `GET /api/v1/users/me` | devolve o usuário da identidade autenticada |
 | `PATCH /api/v1/users/me/additional-info` | grava as informações complementares (Etapa 2 do cadastro) |
@@ -85,6 +140,14 @@ botão **Authorize**.
 Categoria e meio de pagamento referenciados por uma transação precisam ser do
 próprio usuário — categoria padrão do sistema também vale. Referência de outro usuário responde
 `404`, e não `403`: um `403` confirmaria a existência do id para quem não deveria saber dela.
+
+**A consulta de e-mail é a exceção, de propósito.** O formulário de cadastro precisa avisar que o
+e-mail já existe antes de a pessoa ter conta e token, então `POST /api/v1/users/email-availability`
+é público e confirma se um e-mail está cadastrado. Isso permite sondar e-mails sem deixar rastro.
+Ainda **não há limite de requisições**; ele precisa existir (por IP ou no gateway) antes de
+produção. O e-mail vai no corpo, e não na URL, para não aparecer em log de acesso. A resposta é só
+um aviso: só enxerga a tabela `users` e não reserva o e-mail, então o cadastro continua podendo
+falhar com `409`.
 
 O detalhe de cada campo está no Swagger — a tabela acima é só o mapa.
 
@@ -163,6 +226,14 @@ apenas contra a lista do sistema em vez da lista embutida no JDK.
 > em macOS e quebraria o CI e quem não usa Windows. É configuração de máquina, por isso vive aqui.
 
 Em Linux/macOS, o equivalente é importar a CA com `keytool -importcert` num truststore próprio.
+
+**Dentro do container, essa correção não vale.** O `MAVEN_OPTS` da sua máquina não atravessa o
+`docker build`, e a imagem usa o `cacerts` do JDK, que não conhece a CA da ferramenta. Atrás de um
+proxy TLS desses, então, o `docker compose up -d --build` tende a falhar em dois pontos: no
+`dependency:go-offline` do build da imagem, e em runtime, nas chamadas da aplicação para o Cognito
+(JWKS e `GetUser`). Resolver isso exige importar a CA no truststore da imagem, o que ainda não está
+feito aqui — enquanto isso, nessas máquinas o caminho é o da seção [Como rodar](#como-rodar), com a
+aplicação rodando fora do container.
 
 ### Spotless reprova arquivos que você não editou
 
@@ -429,11 +500,12 @@ desenvolvimento (veja `.env.example`):
 | `SERVER_PORT` | `8080` | porta HTTP |
 | `SPRING_PROFILES_ACTIVE` | `dev` | perfil ativo; use `prod` no ambiente implantado |
 | `LOG_LEVEL` | `DEBUG` no perfil `dev`, `INFO` fora dele | nível de log de `br.com.finup` |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | origens do CORS, separadas por vírgula |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | origens do CORS, separadas por vírgula. O `.env.example` acrescenta `http://localhost:8081`, o Expo Web do `finup-mobile`, usado como fallback de teste do cadastro no navegador |
 | `DB_NAME` | `finup` | nome do banco |
 | `DB_USER` | `finup_user` | usuário do banco |
 | `DB_PASSWORD` | **sem default** | senha do banco; sem ela a aplicação não sobe |
 | `DB_PORT` | `5432` | porta publicada pelo container do PostgreSQL |
+| `DB_HOST` | `localhost` | host do banco; rodando `./mvnw spring-boot:run` mantenha `localhost` — no `docker compose up -d --build` o serviço `app` já sobrescreve para `db` (nome do serviço do Postgres na mesma rede do compose) |
 | `COGNITO_USER_POOL_ID` | **sem default** | ID do grupo de usuários (`us-east-2_AbCdEf123`); a região sai do prefixo. Dispensado com `mock-auth` |
 | `COGNITO_CLIENT_ID` | **sem default** | ID do App Client (sem client secret). Dispensado com `mock-auth` |
 
@@ -473,11 +545,14 @@ Dockerfile                    build multi-stage, runtime sem root
 O `CODEOWNERS` só tem efeito com **"Require review from Code Owners"** ligado na branch
 protection — sem isso o GitHub ignora o arquivo em silêncio.
 
-Sobre o `Dockerfile`: ele monta a imagem da aplicação e é usado pelo CI, mas **rodar essa imagem sozinha
-não funciona para desenvolvimento local**. O `spring.datasource.url` aponta para `localhost`, e dentro do
-container `localhost` é o próprio container, não o host onde o PostgreSQL está publicado. Enquanto a
-aplicação não entrar no `docker-compose.yml` como serviço — com um `DB_HOST` apontando para `db` — o
-caminho local é o da seção [Como rodar](#como-rodar): banco em container, aplicação na sua máquina.
+Sobre o `Dockerfile`: ele monta a imagem da aplicação, é usado pelo CI e é o build do serviço `app`
+do `docker-compose.yml`. Rodar essa imagem **fora** do compose não funciona para desenvolvimento
+local: o `spring.datasource.url` cai no default `localhost`, e dentro do container `localhost` é o
+próprio container, não o host onde o PostgreSQL está publicado. No compose isso se resolve porque o
+serviço `app` define `DB_HOST=db`, o nome do serviço do Postgres na mesma rede. São dois caminhos
+válidos, então: tudo em container, pela seção
+[Alternativa: subir banco + API pelo Docker](#alternativa-subir-banco--api-pelo-docker-para-testar-com-o-mobile),
+ou banco em container e aplicação na sua máquina, pela seção [Como rodar](#como-rodar).
 
 ## Banco de Dados com Docker
 

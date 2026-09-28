@@ -4,6 +4,7 @@ import br.com.finup.security.ProblemDetailAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -14,8 +15,9 @@ import org.springframework.security.web.SecurityFilterChain;
  * Quem pode chamar o que.
  *
  * <p>Com o Cognito (padrao): toda rota exige {@code Authorization: Bearer <access token>}, exceto
- * Swagger, contrato OpenAPI e health check. Token ausente ou invalido vira 401 em RFC 7807, no
- * mesmo formato do {@code ApiExceptionHandler}.
+ * Swagger, contrato OpenAPI, health check e a consulta de e-mail do cadastro ({@code POST
+ * /api/v1/users/email-availability}). Token ausente ou invalido vira 401 em RFC 7807, no mesmo
+ * formato do {@code ApiExceptionHandler}.
  *
  * <p>Com o profile {@code mock-auth}: nada e barrado aqui — a identidade vem dos headers {@code
  * X-Mock-Cognito-*}, e quem devolve 401 quando eles faltam e o {@code
@@ -33,6 +35,9 @@ public class SecurityConfig {
     "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/actuator/health", "/error"
   };
 
+  /** Consulta de e-mail do cadastro: publica so no POST, porque a pessoa ainda nao tem token. */
+  private static final String EMAIL_AVAILABILITY_PATH = "/api/v1/users/email-availability";
+
   @Bean
   @Profile("!mock-auth")
   public SecurityFilterChain cognitoSecurityFilterChain(
@@ -40,7 +45,13 @@ public class SecurityConfig {
       throws Exception {
     applyCommonSettings(http);
     http.authorizeHttpRequests(
-            auth -> auth.requestMatchers(PUBLIC_PATHS).permitAll().anyRequest().authenticated())
+            auth ->
+                auth.requestMatchers(PUBLIC_PATHS)
+                    .permitAll()
+                    .requestMatchers(HttpMethod.POST, EMAIL_AVAILABILITY_PATH)
+                    .permitAll()
+                    .anyRequest()
+                    .authenticated())
         .oauth2ResourceServer(
             oauth2 ->
                 oauth2

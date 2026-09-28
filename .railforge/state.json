@@ -1,5 +1,5 @@
 {
-  "stage": "COMPLETED",
+  "stage": "REVIEWING",
   "task": "[Backend] Implementar GET /api/v1/assistant/conversations",
   "objective": "Alimentar o menu de historico de conversas do chat: listar as conversas do usuario autenticado, ordenadas por updatedAt desc, sem vazar conversas de outros usuarios.",
   "decisions": [
@@ -19,16 +19,18 @@
     "src/main/java/br/com/finup/controller/ConversationController.java",
     "src/test/java/br/com/finup/repository/ConversationRepositoryTest.java",
     "src/test/java/br/com/finup/service/ConversationServiceTest.java",
-    "src/test/java/br/com/finup/controller/ConversationControllerTest.java"
+    "src/test/java/br/com/finup/controller/ConversationControllerTest.java",
+    "src/test/java/br/com/finup/config/SecurityConfigTest.java",
+    "src/test/java/br/com/finup/OpenApiIntegrationTests.java"
   ],
   "validation": {
     "mvn clean verify": "passed (179 testes, 0 falhas, spotless ok)",
     "ConversationRepositoryTest (@DataJpaTest, H2)": "passed (persiste todos os campos; findByUserOrderByUpdatedAtDesc filtra por usuario e ordena desc)",
-    "postgres real via docker compose": "nao executado neste ambiente (Docker indisponivel); risco baixo, script segue exatamente o padrao ja usado por transactions/categories/payment_methods em 01-schema.sql"
+    "postgres real via docker compose": "validado pelo revisor (fora deste ambiente, sem Docker disponivel): scripts de database/init sobem sem erro, seed cria as 2 conversas, usuario de teste recebe as 2 ordenadas por updatedAt desc, outro usuario cadastrado recebe [], usuario nao cadastrado recebe 404, rota aparece no Swagger com 200/401/404"
   },
-  "review": "pending",
-  "updated_at": "2026-09-27",
+  "review": "revisado em 2026-09-28: aprovado no comportamento (isolamento por usuario, ordenacao, identidade via AuthenticatedIdentityResolver, schema no padrao). Bloqueante resolvido: conflito de .railforge/state.json com a develop (apos #21/#25/#27), estado atualizado para REVIEWING. Nao bloqueantes endereçados: title marcado como nullable no @Schema de ConversationResponse; rota adicionada ao SecurityConfigTest (401 sem token) e ao OpenApiIntegrationTests (path presente), no mesmo padrao do #25 para /api/v1/categories.",
+  "updated_at": "2026-09-28",
   "open_questions": [
-    "Estrategia de geracao de title (recorte da primeira mensagem vs. resumo do modelo) precisa ser validada com o time antes de ser implementada; endpoint atual so le o campo, ainda sem escritor"
+    "Estrategia de geracao de title (recorte da primeira mensagem vs. resumo do modelo) e o proprio title vindo null no fallback do menu mobile precisam virar tarefa futura junto da criacao de conversas/mensagens, para nao se perder quando esta tarefa fechar — nao ha rastreador acessivel a partir deste ambiente para abrir esse item diretamente"
   ]
 }
