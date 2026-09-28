@@ -1,43 +1,36 @@
 {
   "stage": "REVIEWING",
-  "task": "Endpoint publico para consultar se um e-mail ja esta cadastrado (pedido do finup-mobile, cadastro)",
-  "objective": "Permitir que o app avise, ainda no formulario de cadastro, que o e-mail ja existe em users, em vez de so descobrir na confirmacao do codigo do Cognito (AliasExistsException) ou no 409 do POST /users",
-  "requirements": [
-    "POST /api/v1/users/email-availability com corpo {\"email\": \"...\"} devolve 200 {\"available\": true|false}",
-    "Publico: o app ainda nao tem token no cadastro. Liberado so para esse metodo e caminho; o resto de /api/v1 continua exigindo o access token",
-    "Compara o e-mail normalizado do mesmo jeito que o cadastro (strip + minusculas), contra users.email",
-    "E-mail em branco, sem formato de e-mail ou com mais de 255 caracteres devolve 400 em RFC 7807 com fields, como os outros corpos validados",
-    "Nao chama o Cognito e nao grava nada",
-    "No Swagger o endpoint aparece sem o cadeado de Authorize"
-  ],
+  "task": "[Backend] Implementar GET /api/v1/assistant/conversations",
+  "objective": "Alimentar o menu de historico de conversas do chat: listar as conversas do usuario autenticado, ordenadas por updatedAt desc, sem vazar conversas de outros usuarios.",
   "decisions": [
-    "POST com corpo e nao GET com query: o e-mail e dado pessoal e nao deve ir na URL, que aparece em log de acesso",
-    "Consulta so a tabela users. Conta que existe no Cognito e ainda nao chegou ao back aparece como disponivel; a barreira final continua sendo o Cognito (confirmacao) e o 409 do POST /users",
-    "A resposta e apenas um aviso de UX: nao reserva o e-mail (ha corrida entre a consulta e o cadastro)",
-    "O DTO tira os espacos das pontas antes da validacao (compact constructor): o @Email recusa espaco e a consulta com ' Ana@...' dava 400 em vez de comparar como o cadastro"
+    "Entidade Conversation nova (tabela conversations), com user_id FK para users, seguindo o padrao atual de Category (ManyToOne User, @UuidGenerator, sem receber userId do cliente)",
+    "Identidade sempre via AuthenticatedIdentityResolver.resolveCurrent() + UserService.findByAuthenticatedIdentity, igual a PaymentMethodController/CategoryController — nenhum endpoint novo recebe userId por parametro",
+    "title fica como coluna simples, nullable, populada por quem criar a conversa; a escolha entre recorte da primeira mensagem e resumo pedido ao modelo nao foi implementada aqui porque a propria tarefa pede validacao com o time antes de fixar a abordagem, e nao existe ainda persistencia de mensagens no sistema",
+    "Endpoint e somente leitura (GET); criacao de conversa e registro de mensagens ficam fora do escopo desta tarefa"
   ],
   "files_in_scope": [
-    "src/main/java/br/com/finup/config/SecurityConfig.java",
-    "src/main/java/br/com/finup/controller/UserController.java",
-    "src/main/java/br/com/finup/dto/EmailAvailabilityRequest.java",
-    "src/main/java/br/com/finup/dto/EmailAvailabilityResponse.java",
-    "src/main/java/br/com/finup/service/UserService.java",
+    "database/init/01-schema.sql",
+    "database/init/03-test-data.sql",
+    "src/main/java/br/com/finup/model/Conversation.java",
+    "src/main/java/br/com/finup/repository/ConversationRepository.java",
+    "src/main/java/br/com/finup/service/ConversationService.java",
+    "src/main/java/br/com/finup/dto/ConversationResponse.java",
+    "src/main/java/br/com/finup/mapper/ConversationMapper.java",
+    "src/main/java/br/com/finup/controller/ConversationController.java",
+    "src/test/java/br/com/finup/repository/ConversationRepositoryTest.java",
+    "src/test/java/br/com/finup/service/ConversationServiceTest.java",
+    "src/test/java/br/com/finup/controller/ConversationControllerTest.java",
     "src/test/java/br/com/finup/config/SecurityConfigTest.java",
-    "src/test/java/br/com/finup/controller/UserControllerTest.java",
-    "src/test/java/br/com/finup/service/UserServiceTest.java",
-    "README.md"
+    "src/test/java/br/com/finup/OpenApiIntegrationTests.java"
   ],
   "validation": {
-    "mvn clean verify": "passed (158 testes, 0 falhas, spotless ok)",
-    "api_real_com_dev_e_cognito": "passed, sem token, contra o Postgres local: e-mail de usuario cadastrado pelo app -> available false; mesmo e-mail em maiusculas e com espacos -> available false; e-mail inexistente -> available true; usuario antigo do seed -> available false; e-mail de 255 caracteres com formato valido -> 200 e de 260 -> 400 so pela regra de tamanho; formato invalido, em branco e sem o campo -> 400; GET no mesmo caminho, POST /users e GET /users/me sem token -> 401; token invalido no endpoint publico -> 401",
-    "swagger": "passed (POST /api/v1/users/email-availability com security [] e respostas 200 e 400; o global bearerAuth segue nos demais)",
-    "integracao_com_o_app": "passed, 2026-09-28: celular fisico via Expo Go, na mesma rede, chamou o endpoint 3 vezes com 200 (log de acesso do Tomcat) e o app mostrou 'Este e-mail ja esta cadastrado.' para e-mail existente; o usuario confirmou os demais casos"
+    "mvn clean verify": "passed (179 testes, 0 falhas, spotless ok)",
+    "ConversationRepositoryTest (@DataJpaTest, H2)": "passed (persiste todos os campos; findByUserOrderByUpdatedAtDesc filtra por usuario e ordena desc)",
+    "postgres real via docker compose": "validado pelo revisor (fora deste ambiente, sem Docker disponivel): scripts de database/init sobem sem erro, seed cria as 2 conversas, usuario de teste recebe as 2 ordenadas por updatedAt desc, outro usuario cadastrado recebe [], usuario nao cadastrado recebe 404, rota aparece no Swagger com 200/401/404"
   },
-  "review": "diff revisado em 2026-09-28 (8 arquivos e 2 novos, sem ruido de fim de linha). Achados corrigidos: espacos nas pontas davam 400; o README dizia que toda rota exige identidade sem citar a excecao; e-mail de pessoa e IP tinham ido parar neste arquivo e foram trocados por texto generico. Fronteira de tamanho confirmada no back real (255 passa, 260 barra so pela regra de tamanho)",
+  "review": "revisado em 2026-09-28: aprovado no comportamento (isolamento por usuario, ordenacao, identidade via AuthenticatedIdentityResolver, schema no padrao). Bloqueante resolvido: conflito de .railforge/state.json com a develop (apos #21/#25/#27), estado atualizado para REVIEWING. Nao bloqueantes endereçados: title marcado como nullable no @Schema de ConversationResponse; rota adicionada ao SecurityConfigTest (401 sem token) e ao OpenApiIntegrationTests (path presente), no mesmo padrao do #25 para /api/v1/categories.",
   "updated_at": "2026-09-28",
   "open_questions": [
-    "Risco aceito a pedido do time do mobile: o endpoint revela se um e-mail esta cadastrado, o que permite sondar e-mails sem deixar rastro (o README trata id de outro usuario como 404 justamente para nao confirmar existencia). Sem limite de requisicoes nesta tarefa: nao ha biblioteca nem infra para isso hoje. Pendente: limite por IP ou no gateway antes de producao",
-    "Cobrir tambem contas so do Cognito exigiria o back consultar o pool (ListUsers) e ter credencial da AWS, o que hoje ele nao tem por decisao de projeto",
-    "Um Authorization invalido ou vencido no endpoint publico devolve 401 (o filtro do resource server rejeita antes de liberar). O cliente deve chamar sem token ou aceitar esse 401"
+    "Estrategia de geracao de title (recorte da primeira mensagem vs. resumo do modelo) e o proprio title vindo null no fallback do menu mobile precisam virar tarefa futura junto da criacao de conversas/mensagens, para nao se perder quando esta tarefa fechar — nao ha rastreador acessivel a partir deste ambiente para abrir esse item diretamente"
   ]
 }
