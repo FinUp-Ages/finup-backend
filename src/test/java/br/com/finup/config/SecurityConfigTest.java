@@ -128,6 +128,36 @@ class SecurityConfigTest {
   }
 
   @Test
+  @DisplayName("consulta de e-mail do cadastro e publica: responde sem token")
+  void emailAvailabilityDoesNotRequireToken() throws Exception {
+    when(userService.isEmailAvailable("ana@exemplo.com")).thenReturn(true);
+
+    mockMvc
+        .perform(
+            post("/api/v1/users/email-availability")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"ana@exemplo.com\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.available").value(true));
+  }
+
+  @Test
+  @DisplayName("so o POST da consulta de e-mail e publico: GET no mesmo caminho exige token")
+  void emailAvailabilityIsPublicOnlyForPost() throws Exception {
+    mockMvc.perform(get("/api/v1/users/email-availability")).andExpect(status().isUnauthorized());
+
+    verifyNoInteractions(userService);
+  }
+
+  @Test
+  @DisplayName("liberar a consulta de e-mail nao abre o resto: POST /users sem token devolve 401")
+  void otherUserRoutesStillRequireToken() throws Exception {
+    mockMvc.perform(post("/api/v1/users")).andExpect(status().isUnauthorized());
+
+    verifyNoInteractions(authenticatedIdentityResolver, userService);
+  }
+
+  @Test
   @DisplayName("preflight de CORS passa sem token")
   void corsPreflightDoesNotRequireToken() throws Exception {
     mockMvc

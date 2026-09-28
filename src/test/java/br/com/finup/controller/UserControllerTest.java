@@ -2,6 +2,8 @@ package br.com.finup.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -233,5 +235,102 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"financialProfile\":\"MODERATE\"}"))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("consulta de e-mail livre devolve 200 com available true, sem usar a identidade")
+  void freeEmailReturnsAvailableTrue() throws Exception {
+    when(userService.isEmailAvailable("ana@exemplo.com")).thenReturn(true);
+
+    mockMvc
+        .perform(
+            post("/api/v1/users/email-availability")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"ana@exemplo.com\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.available").value(true));
+
+    verifyNoInteractions(authenticatedIdentityResolver);
+  }
+
+  @Test
+  @DisplayName("consulta de e-mail ja cadastrado devolve 200 com available false")
+  void takenEmailReturnsAvailableFalse() throws Exception {
+    when(userService.isEmailAvailable("ana@exemplo.com")).thenReturn(false);
+
+    mockMvc
+        .perform(
+            post("/api/v1/users/email-availability")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"ana@exemplo.com\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.available").value(false));
+  }
+
+  @Test
+  @DisplayName("consulta com espacos nas pontas do e-mail consulta o e-mail sem eles, e nao da 400")
+  void emailWithSurroundingSpacesIsTrimmed() throws Exception {
+    when(userService.isEmailAvailable("ana@exemplo.com")).thenReturn(false);
+
+    mockMvc
+        .perform(
+            post("/api/v1/users/email-availability")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"  ana@exemplo.com  \"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.available").value(false));
+
+    verify(userService).isEmailAvailable("ana@exemplo.com");
+  }
+
+  @Test
+  @DisplayName("consulta com e-mail sem formato valido devolve 400 apontando o campo")
+  void malformedEmailReturns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/users/email-availability")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"isso-nao-e-email\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.fields[0].field").value("email"));
+
+    verifyNoInteractions(userService);
+  }
+
+  @Test
+  @DisplayName("consulta com e-mail em branco ou ausente devolve 400")
+  void blankOrMissingEmailReturns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/users/email-availability")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"   \"}"))
+        .andExpect(status().isBadRequest());
+
+    mockMvc
+        .perform(
+            post("/api/v1/users/email-availability")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isBadRequest());
+
+    verifyNoInteractions(userService);
+  }
+
+  @Test
+  @DisplayName("consulta com e-mail de mais de 255 caracteres devolve 400")
+  void tooLongEmailReturns400() throws Exception {
+    // Formato valido (local de 64, tres rotulos de 63), mas com 260 caracteres: so o limite barra.
+    String longEmail = "a".repeat(64) + "@" + ("b".repeat(63) + ".").repeat(3) + "com";
+
+    mockMvc
+        .perform(
+            post("/api/v1/users/email-availability")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"" + longEmail + "\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.fields[0].field").value("email"));
+
+    verifyNoInteractions(userService);
   }
 }

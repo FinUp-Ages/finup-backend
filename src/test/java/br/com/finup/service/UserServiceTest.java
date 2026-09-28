@@ -198,4 +198,28 @@ class UserServiceTest {
     assertThatThrownBy(() -> userService.findByAuthenticatedIdentity(identity))
         .isInstanceOf(ResourceNotFoundException.class);
   }
+
+  @Test
+  @DisplayName("e-mail que nenhum usuario usa esta disponivel")
+  void emailIsAvailableWhenNoUserUsesIt() {
+    when(userRepository.existsByEmail("ana@exemplo.com")).thenReturn(false);
+
+    assertThat(userService.isEmailAvailable("ana@exemplo.com")).isTrue();
+  }
+
+  @Test
+  @DisplayName("e-mail de um usuario existente nao esta disponivel")
+  void emailIsNotAvailableWhenAUserUsesIt() {
+    when(userRepository.existsByEmail("ana@exemplo.com")).thenReturn(true);
+
+    assertThat(userService.isEmailAvailable("ana@exemplo.com")).isFalse();
+  }
+
+  @Test
+  @DisplayName("consulta de e-mail normaliza como o cadastro: sem espacos e em minusculas")
+  void emailAvailabilityNormalizesLikeRegistration() {
+    when(userRepository.existsByEmail("ana@exemplo.com")).thenReturn(true);
+
+    assertThat(userService.isEmailAvailable("  Ana@Exemplo.COM ")).isFalse();
+  }
 }

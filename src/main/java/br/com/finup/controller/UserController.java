@@ -1,5 +1,7 @@
 package br.com.finup.controller;
 
+import br.com.finup.dto.EmailAvailabilityRequest;
+import br.com.finup.dto.EmailAvailabilityResponse;
 import br.com.finup.dto.UpdateUserAdditionalInfoRequest;
 import br.com.finup.dto.UserResponse;
 import br.com.finup.mapper.UserMapper;
@@ -11,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -73,6 +76,31 @@ public class UserController {
     UserResponse response =
         UserMapper.toResponse(userService.createFromAuthenticatedIdentity(identity));
     return ResponseEntity.created(URI.create("/api/v1/users/me")).body(response);
+  }
+
+  /**
+   * Unico endpoint de usuarios publico: o formulario de cadastro consulta antes de a pessoa ter
+   * token. Nao usa a identidade autenticada, so o e-mail do corpo. O {@code SecurityConfig} libera
+   * so este metodo e caminho.
+   */
+  @PostMapping("/email-availability")
+  @SecurityRequirements
+  @Operation(
+      summary = "Consulta se um e-mail ja esta cadastrado",
+      description =
+          "Publico: nao exige token, porque o formulario de cadastro consulta antes de a pessoa"
+              + " ter conta. So olha os usuarios locais e e um aviso, nao uma reserva: o cadastro"
+              + " ainda pode devolver 409 se o e-mail for usado logo depois.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Consulta feita. Veja o campo available"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "E-mail em branco, sem formato de e-mail ou com mais de 255 caracteres",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  })
+  public EmailAvailabilityResponse checkEmailAvailability(
+      @Valid @RequestBody EmailAvailabilityRequest request) {
+    return new EmailAvailabilityResponse(userService.isEmailAvailable(request.email()));
   }
 
   @GetMapping("/me")
