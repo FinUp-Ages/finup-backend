@@ -1,33 +1,34 @@
 {
-  "stage": "REVIEWING",
-  "task": "PR #24 — modelagem da recorrencia de transacoes (correcoes do review)",
-  "objective": "Representar no banco a recorrencia mensal (ex.: todo dia 5), a proxima ocorrencia e o vinculo das ocorrencias geradas, com constraints, scripts e documentacao atualizados.",
+  "stage": "COMPLETED",
+  "task": "[Backend] Implementar GET /api/v1/assistant/conversations",
+  "objective": "Alimentar o menu de historico de conversas do chat: listar as conversas do usuario autenticado, ordenadas por updatedAt desc, sem vazar conversas de outros usuarios.",
   "decisions": [
-    "Recorrencia na propria tabela transactions, alinhada com o Willian; saem a tabela transaction_recurrences e os endpoints /api/v1/transaction-recurrences",
-    "A transacao que abre a serie guarda is_recurring, recurrence_frequency e last_occurrence_date (DATE); o dia do transaction_date original e o dia de referencia",
-    "Ocorrencias geradas sao transacoes novas, nao recorrentes, com recurrence_origin_id e UNIQUE (recurrence_origin_id, transaction_date)",
-    "Proxima ocorrencia calculada em Transaction.nextOccurrenceDate(), com ajuste ao ultimo dia do mes; isRecurring e recurrenceFrequency contraditorios -> 422"
+    "Entidade Conversation nova (tabela conversations), com user_id FK para users, seguindo o padrao atual de Category (ManyToOne User, @UuidGenerator, sem receber userId do cliente)",
+    "Identidade sempre via AuthenticatedIdentityResolver.resolveCurrent() + UserService.findByAuthenticatedIdentity, igual a PaymentMethodController/CategoryController — nenhum endpoint novo recebe userId por parametro",
+    "title fica como coluna simples, nullable, populada por quem criar a conversa; a escolha entre recorte da primeira mensagem e resumo pedido ao modelo nao foi implementada aqui porque a propria tarefa pede validacao com o time antes de fixar a abordagem, e nao existe ainda persistencia de mensagens no sistema",
+    "Endpoint e somente leitura (GET); criacao de conversa e registro de mensagens ficam fora do escopo desta tarefa"
   ],
   "files_in_scope": [
     "database/init/01-schema.sql",
     "database/init/03-test-data.sql",
-    "src/main/java/br/com/finup/controller/TransactionController.java",
-    "src/main/java/br/com/finup/dto/",
-    "src/main/java/br/com/finup/exception/",
-    "src/main/java/br/com/finup/mapper/TransactionMapper.java",
-    "src/main/java/br/com/finup/model/",
-    "src/main/java/br/com/finup/service/TransactionService.java",
-    "src/test/java/br/com/finup/",
-    "README.md"
+    "src/main/java/br/com/finup/model/Conversation.java",
+    "src/main/java/br/com/finup/repository/ConversationRepository.java",
+    "src/main/java/br/com/finup/service/ConversationService.java",
+    "src/main/java/br/com/finup/dto/ConversationResponse.java",
+    "src/main/java/br/com/finup/mapper/ConversationMapper.java",
+    "src/main/java/br/com/finup/controller/ConversationController.java",
+    "src/test/java/br/com/finup/repository/ConversationRepositoryTest.java",
+    "src/test/java/br/com/finup/service/ConversationServiceTest.java",
+    "src/test/java/br/com/finup/controller/ConversationControllerTest.java"
   ],
   "validation": {
-    "mvn clean verify": "passed (146 testes, 0 falhas, spotless ok)",
-    "postgres 16 com database/init": "passed (schema e seed sobem; UNIQUE, CHECKs e FK da origem recusam os casos invalidos)",
-    "API com dev,mock-auth": "passed (recorrente 201 com nextOccurrenceDate, dia 31 -> 28/02; avulsa 201; contraditorios 422; Swagger com 422 e sem /transaction-recurrences)"
+    "mvn clean verify": "passed (179 testes, 0 falhas, spotless ok)",
+    "ConversationRepositoryTest (@DataJpaTest, H2)": "passed (persiste todos os campos; findByUserOrderByUpdatedAtDesc filtra por usuario e ordena desc)",
+    "postgres real via docker compose": "nao executado neste ambiente (Docker indisponivel); risco baixo, script segue exatamente o padrao ja usado por transactions/categories/payment_methods em 01-schema.sql"
   },
   "review": "pending",
   "updated_at": "2026-09-27",
   "open_questions": [
-    "Geracao das ocorrencias e encerramento de uma serie ficam para tarefas futuras"
+    "Estrategia de geracao de title (recorte da primeira mensagem vs. resumo do modelo) precisa ser validada com o time antes de ser implementada; endpoint atual so le o campo, ainda sem escritor"
   ]
 }

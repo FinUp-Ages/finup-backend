@@ -398,3 +398,48 @@ WHERE
       AND t.description = 'Salário mensal'
       AND t.transaction_date = CURRENT_DATE
   );
+
+-- --------------------------------------------
+-- Conversas do assistente
+-- --------------------------------------------
+INSERT INTO
+  conversations (user_id, title, created_at, updated_at)
+SELECT
+  u.id,
+  'Como economizar na viagem de férias?',
+  CURRENT_TIMESTAMP - INTERVAL '2 days',
+  CURRENT_TIMESTAMP - INTERVAL '1 day'
+FROM
+  users u
+WHERE
+  u.email = 'teste@finup.local'
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      conversations c
+    WHERE
+      c.user_id = u.id
+      AND c.title = 'Como economizar na viagem de férias?'
+  );
+
+INSERT INTO
+  conversations (user_id, title, created_at, updated_at)
+SELECT
+  u.id,
+  'Vale a pena investir em CDB agora?',
+  CURRENT_TIMESTAMP - INTERVAL '5 days',
+  CURRENT_TIMESTAMP - INTERVAL '5 days'
+FROM
+  users u
+WHERE
+  u.email = 'teste@finup.local'
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      conversations c
+    WHERE
+      c.user_id = u.id
+      AND c.title = 'Vale a pena investir em CDB agora?'
+  );
