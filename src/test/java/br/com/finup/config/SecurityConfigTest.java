@@ -13,12 +13,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.finup.controller.CategoryController;
+import br.com.finup.controller.ConversationController;
 import br.com.finup.controller.UserController;
 import br.com.finup.model.User;
 import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.security.ProblemDetailAuthenticationEntryPoint;
 import br.com.finup.service.CategoryService;
+import br.com.finup.service.ConversationService;
 import br.com.finup.service.UserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,7 +44,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * <p>{@code @ActiveProfiles("test")}: garante que {@code mock-auth} nao esta ativo, mesmo que a
  * maquina de quem roda tenha {@code SPRING_PROFILES_ACTIVE=dev,mock-auth}.
  */
-@WebMvcTest({UserController.class, CategoryController.class})
+@WebMvcTest({UserController.class, CategoryController.class, ConversationController.class})
 @Import({SecurityConfig.class, CognitoConfig.class, ProblemDetailAuthenticationEntryPoint.class})
 @ActiveProfiles("test")
 @TestPropertySource(
@@ -58,6 +60,8 @@ class SecurityConfigTest {
   @MockitoBean private UserService userService;
 
   @MockitoBean private CategoryService categoryService;
+
+  @MockitoBean private ConversationService conversationService;
 
   @MockitoBean private AuthenticatedIdentityResolver authenticatedIdentityResolver;
 
@@ -88,6 +92,19 @@ class SecurityConfigTest {
         .andExpect(jsonPath("$.status").value(401));
 
     verifyNoInteractions(authenticatedIdentityResolver, categoryService);
+  }
+
+  @Test
+  @DisplayName("historico de conversas do assistente sem access token do Cognito devolve 401")
+  void conversationsWithoutTokenReturn401() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/assistant/conversations"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.status").value(401));
+
+    verifyNoInteractions(authenticatedIdentityResolver, conversationService);
   }
 
   @Test
