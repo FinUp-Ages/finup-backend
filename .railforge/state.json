@@ -17,7 +17,8 @@
   "validation": {
     "mvn clean verify": "passed (146 testes, 0 falhas, spotless ok)",
     "docker compose config": "passed (interpola sem erro com um .env sem as variaveis do Cognito; app resolve DB_HOST=db, SERVER_PORT=8080 e COGNITO_* vazias)",
-    "docker compose up -d --build": "pendente: daemon do Docker Desktop indisponivel na maquina onde o merge foi feito; precisa ser rodado antes de reenviar o PR, nos dois caminhos (dev,mock-auth e Cognito real)"
+    "docker compose up -d --build": "passed (projeto isolado, apos o merge): imagem builda, db fica healthy antes do app subir, health UP, POST /api/v1/users 201 com headers mock, 409 ao repetir, 401 sem headers, GET /api/v1/payment-methods 200",
+    "falha intencional sem Cognito": "passed: com SPRING_PROFILES_ACTIVE=dev e COGNITO_* vazias o app entra em loop de restart com finup.cognito.userPoolId must not be blank"
   },
   "review": "changes_requested; conflitos resolvidos e os tres bloqueantes mais os quatro nao bloqueantes enderecados; descricao do PR reescrita e aguardando reenvio",
   "updated_at": "2026-09-27",

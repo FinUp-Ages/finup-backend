@@ -66,8 +66,15 @@ seção [Autenticação](#autenticação), porque o container roda a mesma aplic
 
 Sem um dos dois o container `app` **não sobe**: fora do profile `mock-auth` a aplicação exige as duas
 variáveis do Cognito e falha na inicialização de propósito. Como o serviço tem `restart: unless-stopped`,
-o sintoma é o container reiniciando em loop — `docker compose logs app` mostra a mensagem dizendo que
-falta `finup.cognito.user-pool-id`.
+o sintoma é o container reiniciando em loop — `docker compose logs app` mostra, repetido a cada
+tentativa:
+
+```
+APPLICATION FAILED TO START
+Binding to target br.com.finup.config.CognitoProperties failed:
+    Property: finup.cognito.userPoolId
+    Reason: must not be blank
+```
 
 Com isso definido:
 
