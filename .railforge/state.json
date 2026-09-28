@@ -1,33 +1,28 @@
 {
   "stage": "REVIEWING",
-  "task": "PR #24 — modelagem da recorrencia de transacoes (correcoes do review)",
-  "objective": "Representar no banco a recorrencia mensal (ex.: todo dia 5), a proxima ocorrencia e o vinculo das ocorrencias geradas, com constraints, scripts e documentacao atualizados.",
+  "task": "PR da branch feat/integration-cadastro-usuario - subir banco e API juntos pelo docker compose (correcoes do review)",
+  "objective": "Permitir testar o cadastro pelo app mobile com um unico `docker compose up -d --build`, e realinhar o PR com a develop depois do Cognito (#23), dos metodos de pagamento (#22) e da recorrencia em transactions (#24).",
   "decisions": [
-    "Recorrencia na propria tabela transactions, alinhada com o Willian; saem a tabela transaction_recurrences e os endpoints /api/v1/transaction-recurrences",
-    "A transacao que abre a serie guarda is_recurring, recurrence_frequency e last_occurrence_date (DATE); o dia do transaction_date original e o dia de referencia",
-    "Ocorrencias geradas sao transacoes novas, nao recorrentes, com recurrence_origin_id e UNIQUE (recurrence_origin_id, transaction_date)",
-    "Proxima ocorrencia calculada em Transaction.nextOccurrenceDate(), com ajuste ao ultimo dia do mes; isRecurring e recurrenceFrequency contraditorios -> 422"
+    "SPRING_PROFILES_ACTIVE segue `dev` no .env.example, como o #23 deixou; a escolha entre Cognito real e mock-auth virou passo explicito do README em vez de default novo",
+    "O servico app repassa COGNITO_USER_POOL_ID e COGNITO_CLIENT_ID com default vazio; isso habilita o caminho com Cognito real, mas nao evita a falha de inicializacao, porque `${COGNITO_USER_POOL_ID:}` vazio ja reprova no @NotBlank de CognitoProperties",
+    "Porta interna do container fixa em 8080; SERVER_PORT do .env escolhe so a porta publicada no host",
+    "DB_HOST com default localhost no application.yml, para nao quebrar quem roda pelo ./mvnw"
   ],
   "files_in_scope": [
-    "database/init/01-schema.sql",
-    "database/init/03-test-data.sql",
-    "src/main/java/br/com/finup/controller/TransactionController.java",
-    "src/main/java/br/com/finup/dto/",
-    "src/main/java/br/com/finup/exception/",
-    "src/main/java/br/com/finup/mapper/TransactionMapper.java",
-    "src/main/java/br/com/finup/model/",
-    "src/main/java/br/com/finup/service/TransactionService.java",
-    "src/test/java/br/com/finup/",
-    "README.md"
+    "docker-compose.yml",
+    ".env.example",
+    "README.md",
+    "src/main/resources/application.yml"
   ],
   "validation": {
     "mvn clean verify": "passed (146 testes, 0 falhas, spotless ok)",
-    "postgres 16 com database/init": "passed (schema e seed sobem; UNIQUE, CHECKs e FK da origem recusam os casos invalidos)",
-    "API com dev,mock-auth": "passed (recorrente 201 com nextOccurrenceDate, dia 31 -> 28/02; avulsa 201; contraditorios 422; Swagger com 422 e sem /transaction-recurrences)"
+    "docker compose config": "passed (interpola sem erro com um .env sem as variaveis do Cognito; app resolve DB_HOST=db, SERVER_PORT=8080 e COGNITO_* vazias)",
+    "docker compose up -d --build": "passed (projeto isolado, apos o merge): imagem builda, db fica healthy antes do app subir, health UP, POST /api/v1/users 201 com headers mock, 409 ao repetir, 401 sem headers, GET /api/v1/payment-methods 200",
+    "falha intencional sem Cognito": "passed: com SPRING_PROFILES_ACTIVE=dev e COGNITO_* vazias o app entra em loop de restart com finup.cognito.userPoolId must not be blank"
   },
-  "review": "pending",
+  "review": "changes_requested; conflitos resolvidos e os tres bloqueantes mais os quatro nao bloqueantes enderecados; descricao do PR reescrita e aguardando reenvio",
   "updated_at": "2026-09-27",
   "open_questions": [
-    "Geracao das ocorrencias e encerramento de uma serie ficam para tarefas futuras"
+    "Truststore da CA corporativa dentro da imagem nao foi resolvido: atras de proxy TLS o build da imagem e as chamadas ao Cognito devem falhar. Documentado no README, fica para tarefa propria"
   ]
 }
