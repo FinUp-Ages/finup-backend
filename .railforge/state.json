@@ -1,9 +1,32 @@
 {
   "stage": "COMPLETED",
-  "task": null,
-  "objective": "Executar a CI em pushes para qualquer branch.",
-  "files_in_scope": [".github/workflows/ci.yml"],
-  "validation": {"git diff --check": "passed"},
-  "review": "approved",
-  "updated_at": "2026-09-13"
+  "task": "Integrar o Amazon Bedrock (padrao da nitra-ai) e registrar transacao a partir de texto livre.",
+  "objective": "POST /api/v1/ai/assistant recebe texto (ex.: 'gastei 7 reais na pucrs'), o Bedrock Converse devolve uma acao estruturada em JSON e o backend executa a acao (hoje: REGISTER_TRANSACTION via TransactionService). Novas acoes entram por AiAction. Saida do modelo e sempre validada (categoria do usuario, valor, tipo, data). Falhas do Bedrock viram 4xx/5xx em ProblemDetail.",
+  "files_in_scope": [
+    "pom.xml",
+    "src/main/resources/application.yml",
+    ".env.example",
+    "src/main/java/br/com/finup/config/BedrockProperties.java",
+    "src/main/java/br/com/finup/config/BedrockClientConfig.java",
+    "src/main/java/br/com/finup/model/AiModel.java",
+    "src/main/java/br/com/finup/service/BedrockLlmService.java",
+    "src/main/java/br/com/finup/service/AiAssistantService.java",
+    "src/main/java/br/com/finup/service/AiAction*.java",
+    "src/main/java/br/com/finup/service/RegisterTransactionAiAction.java",
+    "src/main/java/br/com/finup/dto/AiAssistant*.java",
+    "src/main/java/br/com/finup/controller/AiAssistantController.java",
+    "src/main/java/br/com/finup/exception/AiProviderException.java",
+    "src/test/java/br/com/finup/**"
+  ],
+  "validation": {
+    "./mvnw verify (133 testes + spotless:check)": "passed",
+    "git diff --check": "passed",
+    "chamada real ao Bedrock": "nao executada (sem credenciais)"
+  },
+  "review": "diff revisado; saida do modelo validada (categoria do usuario, tipo, valor, data) antes de gravar",
+  "open_questions": [
+    "'aberturas' interpretado como pontos de extensao (AiAction); confirmar.",
+    "Dependencia: a categoria 'Educação' nao existe entre as padrao. O assistente casa a categoria por nome (sem acento/caixa) entre as do usuario; ate a tarefa de criacao de categorias entregar, 'gastei 7 reais na pucrs' retorna 422 (categoria nao encontrada)."
+  ],
+  "updated_at": "2026-09-30"
 }
