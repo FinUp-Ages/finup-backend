@@ -11,13 +11,15 @@ import br.com.finup.exception.ConflictException;
 import br.com.finup.exception.EmailAlreadyRegisteredException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.exception.UserAlreadyRegisteredException;
-import br.com.finup.model.FinancialProfile;
 import br.com.finup.model.User;
+import br.com.finup.model.UserFinancialProfile;
+import br.com.finup.repository.UserFinancialProfileRepository;
 import br.com.finup.repository.UserRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +39,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 class UserServiceTest {
 
   @Mock private UserRepository userRepository;
+
+  @Mock private UserFinancialProfileRepository userFinancialProfileRepository;
 
   @InjectMocks private UserService userService;
 
@@ -134,25 +138,55 @@ class UserServiceTest {
   }
 
   @Test
-  @DisplayName("atualiza informacoes complementares de um usuario ja criado")
-  void updatesAdditionalInfoForExistingUser() {
+  @DisplayName("cria o perfil na primeira chamada de informacoes complementares")
+  void createsProfileOnFirstAdditionalInfo() {
     AuthenticatedIdentity identity =
         new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
     User existing =
         User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
     when(userRepository.findByCognitoId("cognito-sub-123")).thenReturn(Optional.of(existing));
-    when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(userFinancialProfileRepository.findByUserId(existing.getId()))
+        .thenReturn(Optional.empty());
+    when(userFinancialProfileRepository.save(any(UserFinancialProfile.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
 
-    User updated =
+    UserFinancialProfile saved =
         userService.updateAdditionalInfo(
             identity,
-            LocalDate.of(1998, 4, 12),
-            new BigDecimal("3500.00"),
-            FinancialProfile.MODERATE);
+            "+5511999998888",
+            "Analista",
+            LocalDate.of(2000, 1, 31),
+            new BigDecimal("3500.00"));
 
-    assertThat(updated.getBirthDate()).isEqualTo(LocalDate.of(1998, 4, 12));
-    assertThat(updated.getMonthlyIncome()).isEqualByComparingTo("3500.00");
-    assertThat(updated.getFinancialProfile()).isEqualTo(FinancialProfile.MODERATE);
+    assertThat(saved.getUser()).isSameAs(existing);
+    assertThat(saved.getPhone()).isEqualTo("+5511999998888");
+    assertThat(saved.getProfession()).isEqualTo("Analista");
+    assertThat(saved.getBirthDate()).isEqualTo(LocalDate.of(2000, 1, 31));
+    assertThat(saved.getMonthlyIncome()).isEqualByComparingTo("3500.00");
+  }
+
+  @Test
+  @DisplayName("PATCH parcial preserva os campos que nao vieram")
+  void partialUpdateKeepsOtherFields() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
+    User existing =
+        User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
+    UserFinancialProfile profile = UserFinancialProfile.createFor(existing);
+    profile.apply("+5511999998888", "Analista", LocalDate.of(2000, 1, 31), new BigDecimal("3500"));
+    when(userRepository.findByCognitoId("cognito-sub-123")).thenReturn(Optional.of(existing));
+    when(userFinancialProfileRepository.findByUserId(existing.getId()))
+        .thenReturn(Optional.of(profile));
+    when(userFinancialProfileRepository.save(any(UserFinancialProfile.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    UserFinancialProfile saved =
+        userService.updateAdditionalInfo(identity, null, "Engenheira", null, null);
+
+    assertThat(saved.getProfession()).isEqualTo("Engenheira");
+    assertThat(saved.getPhone()).isEqualTo("+5511999998888");
+    assertThat(saved.getBirthDate()).isEqualTo(LocalDate.of(2000, 1, 31));
+    assertThat(saved.getMonthlyIncome()).isEqualByComparingTo("3500");
   }
 
   @Test
@@ -165,13 +199,26 @@ class UserServiceTest {
     assertThatThrownBy(
             () ->
                 userService.updateAdditionalInfo(
-                    identity,
-                    LocalDate.of(1998, 4, 12),
-                    new BigDecimal("3500.00"),
-                    FinancialProfile.MODERATE))
+                    identity, "+5511999998888", null, LocalDate.of(2000, 1, 31), null))
         .isInstanceOf(ResourceNotFoundException.class);
 
-    verify(userRepository, never()).save(any());
+    verify(userFinancialProfileRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("busca por id devolve o usuario autenticado e recusa o id de outra pessoa")
+  void findsByIdOnlyForTheAuthenticatedUser() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
+    User existing =
+        User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
+    when(userRepository.findByCognitoId("cognito-sub-123")).thenReturn(Optional.of(existing));
+
+    assertThat(userService.findByIdForAuthenticatedIdentity(identity, existing.getId()))
+        .isSameAs(existing);
+    assertThatThrownBy(
+            () -> userService.findByIdForAuthenticatedIdentity(identity, UUID.randomUUID()))
+        .isInstanceOf(ResourceNotFoundException.class);
   }
 
   @Test

@@ -4,12 +4,15 @@ import br.com.finup.exception.ConflictException;
 import br.com.finup.exception.EmailAlreadyRegisteredException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.exception.UserAlreadyRegisteredException;
-import br.com.finup.model.FinancialProfile;
 import br.com.finup.model.User;
+import br.com.finup.model.UserFinancialProfile;
+import br.com.finup.repository.UserFinancialProfileRepository;
 import br.com.finup.repository.UserRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Optional;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -32,9 +35,13 @@ public class UserService {
   private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
   private final UserRepository userRepository;
+  private final UserFinancialProfileRepository userFinancialProfileRepository;
 
-  public UserService(UserRepository userRepository) {
+  public UserService(
+      UserRepository userRepository,
+      UserFinancialProfileRepository userFinancialProfileRepository) {
     this.userRepository = userRepository;
+    this.userFinancialProfileRepository = userFinancialProfileRepository;
   }
 
   /**
@@ -79,23 +86,47 @@ public class UserService {
   }
 
   /**
-   * Etapa 2 do cadastro: grava ou atualiza as informacoes complementares de um usuario que ja
-   * existe. So pode ser chamada depois da Etapa 1 — nao cria usuario, so complementa um que ja foi
-   * criado a partir da identidade do Cognito.
+   * Etapas 2 e 3 do cadastro: grava ou atualiza as informacoes complementares em {@code
+   * user_financial_profiles}, criando o perfil na primeira chamada. So pode ser chamada depois da
+   * Etapa 1 — nao cria usuario. Parametro {@code null} mantem o valor ja salvo (PATCH parcial).
    *
    * @throws ResourceNotFoundException se essa identidade ainda nao tiver usuario local
    */
   @Transactional
-  public User updateAdditionalInfo(
+  public UserFinancialProfile updateAdditionalInfo(
       AuthenticatedIdentity identity,
+      String phone,
+      String profession,
       LocalDate birthDate,
-      BigDecimal monthlyIncome,
-      FinancialProfile financialProfile) {
+      BigDecimal monthlyIncome) {
     User user = findByIdentityOrThrow(identity);
-    user.applyAdditionalInfo(birthDate, monthlyIncome, financialProfile);
-    User updated = userRepository.save(user);
-    log.info("Informacoes complementares atualizadas: id={}", updated.getId());
-    return updated;
+    UserFinancialProfile profile =
+        userFinancialProfileRepository
+            .findByUserId(user.getId())
+            .orElseGet(() -> UserFinancialProfile.createFor(user));
+    profile.apply(phone, profession, birthDate, monthlyIncome);
+    UserFinancialProfile saved = userFinancialProfileRepository.save(profile);
+    log.info("Informacoes complementares atualizadas: userId={}", user.getId());
+    return saved;
+  }
+
+  /** Informacoes complementares do usuario, ou vazio se ele ainda nao informou nenhuma. */
+  public Optional<UserFinancialProfile> findFinancialProfile(User user) {
+    return userFinancialProfileRepository.findByUserId(user.getId());
+  }
+
+  /**
+   * Busca o usuario por id, desde que seja o da identidade autenticada. Id de outra pessoa da o
+   * mesmo 404 de id inexistente: um 403 confirmaria que o id existe.
+   *
+   * @throws ResourceNotFoundException se o id nao for do usuario autenticado
+   */
+  public User findByIdForAuthenticatedIdentity(AuthenticatedIdentity identity, UUID id) {
+    User user = findByIdentityOrThrow(identity);
+    if (!user.getId().equals(id)) {
+      throw new ResourceNotFoundException("Usuario nao encontrado.");
+    }
+    return user;
   }
 
   /**
