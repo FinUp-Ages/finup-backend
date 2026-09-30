@@ -1,0 +1,351 @@
+{
+  "info": {
+    "name": "FinUp Backend",
+    "description": "Collection de validação dos endpoints do finup-backend (branch apresentacao). Cobre os fluxos de sucesso e os principais cenários de erro (400/404/422) de Users, Transactions e Transaction Recurrences.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "f1a4e6a0-9d3b-4e2b-9f5c-finupbackend01"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Actuator Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/actuator/health", "host": ["{{baseUrl}}"], "path": ["actuator", "health"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('status UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Cadastrar usuario (201)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Apresentacao Teste\",\n  \"email\": \"apresentacao.{{$randomInt}}@finup.local\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/users", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('possui id', () => pm.expect(body.id).to.be.a('string'));",
+                  "pm.collectionVariables.set('userId', body.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cadastrar usuario - campos invalidos (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"\",\n  \"email\": \"invalido\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/users", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('status 400', () => pm.response.to.have.status(400));"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar usuarios (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/users", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('e uma lista', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar usuario por id (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar usuario inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/00000000-0000-0000-0000-000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "00000000-0000-0000-0000-000000000000"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('status 404', () => pm.response.to.have.status(404));"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "Registrar transacao (201)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{seedUserId}}\",\n  \"categoryId\": \"{{seedCategoryAlimentacaoId}}\",\n  \"paymentMethodId\": \"{{seedPaymentMethodId}}\",\n  \"type\": \"EXPENSE\",\n  \"description\": \"Apresentacao - Restaurante\",\n  \"amount\": 89.90,\n  \"transactionDate\": \"2026-09-18\",\n  \"isRecurring\": false\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/transactions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "transactions"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('transactionId', body.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar transacao - usuario inexistente (404)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"00000000-0000-0000-0000-000000000000\",\n  \"categoryId\": \"{{seedCategoryAlimentacaoId}}\",\n  \"type\": \"EXPENSE\",\n  \"amount\": 10.00,\n  \"transactionDate\": \"2026-09-18\",\n  \"isRecurring\": false\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/transactions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "transactions"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('status 404', () => pm.response.to.have.status(404));"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar transacao - campos invalidos (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/transactions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "transactions"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('status 400', () => pm.response.to.have.status(400));"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Transaction Recurrences",
+      "item": [
+        {
+          "name": "Cadastrar recorrencia (201)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{seedUserId}}\",\n  \"categoryId\": \"{{seedCategoryMoradiaId}}\",\n  \"paymentMethodId\": \"{{seedPaymentMethodId}}\",\n  \"type\": \"EXPENSE\",\n  \"description\": \"Apresentacao - Conta de luz\",\n  \"amount\": 250.00,\n  \"frequency\": \"MONTHLY\",\n  \"dayOfMonth\": 5,\n  \"startDate\": \"2026-01-05\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transaction-recurrences",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "transaction-recurrences"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('possui nextOccurrenceDate', () => pm.expect(body.nextOccurrenceDate).to.be.a('string'));",
+                  "pm.collectionVariables.set('recurrenceId', body.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cadastrar recorrencia - endDate antes de startDate (422)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{seedUserId}}\",\n  \"categoryId\": \"{{seedCategoryMoradiaId}}\",\n  \"type\": \"EXPENSE\",\n  \"amount\": 100.00,\n  \"frequency\": \"MONTHLY\",\n  \"dayOfMonth\": 5,\n  \"startDate\": \"2026-09-05\",\n  \"endDate\": \"2026-01-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transaction-recurrences",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "transaction-recurrences"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('status 422', () => pm.response.to.have.status(422));"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar recorrencias devidas em data (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transaction-recurrences/due?userId={{seedUserId}}&date=2026-10-05",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "transaction-recurrences", "due"],
+              "query": [
+                { "key": "userId", "value": "{{seedUserId}}" },
+                { "key": "date", "value": "2026-10-05" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('e uma lista', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar recorrencias devidas - sem date, usa hoje (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transaction-recurrences/due?userId={{seedUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "transaction-recurrences", "due"],
+              "query": [{ "key": "userId", "value": "{{seedUserId}}" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    {
+      "key": "seedUserId",
+      "value": "e02caf9a-a786-469d-bec5-7cdfbc0c22e2",
+      "description": "Usuario 'teste@finup.local' semeado em database/init/03-test-data.sql"
+    },
+    {
+      "key": "seedCategoryAlimentacaoId",
+      "value": "f6779887-b740-4d8c-a674-fe8416810dc5",
+      "description": "Categoria default 'Alimentação' semeada em database/init/02-required-data.sql"
+    },
+    {
+      "key": "seedCategoryMoradiaId",
+      "value": "9850a854-3bee-4019-babb-8be26a2114d9",
+      "description": "Categoria default 'Moradia' semeada em database/init/02-required-data.sql"
+    },
+    {
+      "key": "seedPaymentMethodId",
+      "value": "cce8a119-a5dd-49c0-9260-9a994eef75ed",
+      "description": "Meio de pagamento 'Cartão Teste' semeado em database/init/03-test-data.sql"
+    },
+    { "key": "userId", "value": "" },
+    { "key": "transactionId", "value": "" },
+    { "key": "recurrenceId", "value": "" }
+  ]
+}
