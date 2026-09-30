@@ -61,7 +61,9 @@ public class TransactionController {
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
     @ApiResponse(
         responseCode = "422",
-        description = "isRecurring e recurrenceFrequency se contradizem",
+        description =
+            "Tipo da categoria diferente do tipo da transacao, ou isRecurring e"
+                + " recurrenceFrequency se contradizem",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   })
   public ResponseEntity<TransactionResponse> register(
