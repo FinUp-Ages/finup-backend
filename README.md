@@ -5,8 +5,9 @@ API REST do projeto **FinUp** — AGES 2026/2.
 Java 21 · Spring Boot 3.5 · Maven · PostgreSQL 16 · Docker
 
 > O cadastro de usuário existe como **exemplo de referência** das convenções (veja a seção mais abaixo).
-> O banco já está provisionado e populado, mas a **persistência ainda não está ligada**: o `User` é um POJO de
-> domínio sem `@Entity` e o repositório em uso é o `InMemoryUserRepository`. Fazer essa ponte é o próximo passo.
+> A persistência está ligada: as entidades são `@Entity` e gravam no PostgreSQL do `docker compose`.
+> A autenticação é o **AWS Cognito**: toda rota de `/api/v1` exige o access token do Cognito. Para
+> desenvolver sem usuário no Cognito, existe o profile `mock-auth` (veja [Autenticação](#autenticação)).
 
 ---
 
@@ -33,6 +34,10 @@ docker compose up -d
 ./mvnw spring-boot:run
 ```
 
+Antes do passo 3, preencha no `.env` `COGNITO_USER_POOL_ID` e `COGNITO_CLIENT_ID` — ou, sem
+Cognito, use `SPRING_PROFILES_ACTIVE=dev,mock-auth`. Sem um dos dois a aplicação não sobe, com uma
+mensagem dizendo que falta `finup.cognito.user-pool-id`. Detalhes em [Autenticação](#autenticação).
+
 O `.env` **não** é opcional: `DB_PASSWORD` não tem valor padrão. Sem ele, ou com o banco fora do ar, a
 aplicação morre com uma stack do Hibernate (`Unable to determine Dialect without JDBC metadata` ou
 `password authentication failed`), nunca com uma mensagem dizendo que falta configuração.
@@ -44,6 +49,60 @@ Depois de subir:
 | O quê | URL |
 |---|---|
 | Health check | http://localhost:8080/actuator/health |
+
+### Alternativa: subir banco + API pelo Docker (para testar com o mobile)
+
+O `docker-compose.yml` tem dois serviços: `db` e `app`. Para quem vai testar o cadastro pelo app
+(em vez de só chamar a API local com `curl`/Postman), é mais simples subir os dois de uma vez, sem
+`./mvnw spring-boot:run` à parte.
+
+Antes de subir, defina no `.env` **como a aplicação vai autenticar** — os mesmos dois caminhos da
+seção [Autenticação](#autenticação), porque o container roda a mesma aplicação:
+
+| Caminho | O que preencher no `.env` | Como chamar a API |
+|---|---|---|
+| Com o Cognito (é o que o app mobile usa) | `COGNITO_USER_POOL_ID` e `COGNITO_CLIENT_ID` | `Authorization: Bearer <access token>` |
+| Sem o Cognito, para teste local | `SPRING_PROFILES_ACTIVE=dev,mock-auth` | headers `X-Mock-Cognito-*` |
+
+Sem um dos dois o container `app` **não sobe**: fora do profile `mock-auth` a aplicação exige as duas
+variáveis do Cognito e falha na inicialização de propósito. Como o serviço tem `restart: unless-stopped`,
+o sintoma é o container reiniciando em loop — `docker compose logs app` mostra, repetido a cada
+tentativa:
+
+```
+APPLICATION FAILED TO START
+Binding to target br.com.finup.config.CognitoProperties failed:
+    Property: finup.cognito.userPoolId
+    Reason: must not be blank
+```
+
+Com isso definido:
+
+```bash
+cp .env.example .env      # se ainda não tiver feito, e ajuste conforme a tabela acima
+docker compose up -d --build
+```
+
+Isso builda a imagem da aplicação (a partir do `Dockerfile`) e sobe os dois containers juntos, com a
+API já esperando o banco ficar `healthy` antes de iniciar.
+
+> **Se você já rodou o `docker compose` antes:** o schema e a carga inicial de `database/init/` só são
+> executados quando o volume do Postgres está vazio. Vindo de uma versão anterior do banco, o container
+> sobe com o schema velho e os erros aparecem em SQL, não em configuração. Nesse caso, recrie o volume
+> antes — veja [Apagar o banco local e começar do zero](#apagar-o-banco-local-e-começar-do-zero).
+
+**Ponto de atenção ao testar com o app mobile na mesma rede:** o `CORS_ALLOWED_ORIGINS` do `.env`
+só libera as origens já cadastradas (por padrão, `localhost` em algumas portas). Se o app mobile
+estiver rodando em outra máquina/emulador acessando esta API pelo IP da rede local, adicione esse IP
+à lista (ex.: `http://192.168.0.10:8081`) e recrie o container da aplicação para aplicar:
+
+```bash
+docker compose up -d app
+```
+
+Isso normalmente não é necessário para o app mobile nativo (Android/iOS) — CORS só se aplica a
+requisições feitas por um navegador. É relevante apenas testando pela versão web do Expo
+(`npm run web`, no repositório `finup-mobile`), que roda dentro de um navegador.
 
 ## Swagger / OpenAPI
 
@@ -57,6 +116,40 @@ Com a aplicação em execução, a documentação da API fica disponível nestas
 O Swagger UI lê o contrato OpenAPI gerado automaticamente pelo `springdoc` a partir dos
 controllers e DTOs da aplicação. Os metadados gerais da API ficam centralizados em
 `config/OpenApiConfig.java`.
+
+### Endpoints disponíveis hoje
+
+Nenhum deles recebe identificador de usuário do cliente: quem está chamando vem sempre da
+identidade autenticada — o header `Authorization: Bearer <access token do Cognito>`, ou os headers
+`X-Mock-Cognito-*` no profile `mock-auth`. Sem identidade, a resposta é `401` (a única exceção é a
+consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o botão **Authorize**.
+
+| Método e caminho | O que faz |
+|---|---|
+| `POST /api/v1/users/email-availability` | **público, sem token.** Diz se um e-mail já está cadastrado (`{"available": true\|false}`). Usado pelo formulário de cadastro |
+| `POST /api/v1/users` | cria o registro local da identidade autenticada. Corpo vazio |
+| `GET /api/v1/users/me` | devolve o usuário da identidade autenticada |
+| `PATCH /api/v1/users/me/additional-info` | grava as informações complementares (Etapa 2 do cadastro) |
+| `POST /api/v1/users/me/finup-score/recalculate` | recalcula e persiste o FinUp Score |
+| `GET /api/v1/categories` | categorias do usuário **e** as padrão do sistema |
+| `POST /api/v1/categories` | cria categoria do usuário |
+| `PUT /api/v1/categories/{id}` | edita categoria do usuário. Padrão do sistema devolve `403` |
+| `DELETE /api/v1/categories/{id}` | remove categoria do usuário. Em uso devolve `409` |
+| `POST /api/v1/transactions` | registra uma transação, avulsa ou abrindo uma série recorrente |
+
+Categoria e meio de pagamento referenciados por uma transação precisam ser do
+próprio usuário — categoria padrão do sistema também vale. Referência de outro usuário responde
+`404`, e não `403`: um `403` confirmaria a existência do id para quem não deveria saber dela.
+
+**A consulta de e-mail é a exceção, de propósito.** O formulário de cadastro precisa avisar que o
+e-mail já existe antes de a pessoa ter conta e token, então `POST /api/v1/users/email-availability`
+é público e confirma se um e-mail está cadastrado. Isso permite sondar e-mails sem deixar rastro.
+Ainda **não há limite de requisições**; ele precisa existir (por IP ou no gateway) antes de
+produção. O e-mail vai no corpo, e não na URL, para não aparecer em log de acesso. A resposta é só
+um aviso: só enxerga a tabela `users` e não reserva o e-mail, então o cadastro continua podendo
+falhar com `409`.
+
+O detalhe de cada campo está no Swagger — a tabela acima é só o mapa.
 
 ### Como documentar novos endpoints
 
@@ -134,6 +227,14 @@ apenas contra a lista do sistema em vez da lista embutida no JDK.
 
 Em Linux/macOS, o equivalente é importar a CA com `keytool -importcert` num truststore próprio.
 
+**Dentro do container, essa correção não vale.** O `MAVEN_OPTS` da sua máquina não atravessa o
+`docker build`, e a imagem usa o `cacerts` do JDK, que não conhece a CA da ferramenta. Atrás de um
+proxy TLS desses, então, o `docker compose up -d --build` tende a falhar em dois pontos: no
+`dependency:go-offline` do build da imagem, e em runtime, nas chamadas da aplicação para o Cognito
+(JWKS e `GetUser`). Resolver isso exige importar a CA no truststore da imagem, o que ainda não está
+feito aqui — enquanto isso, nessas máquinas o caminho é o da seção [Como rodar](#como-rodar), com a
+aplicação rodando fora do container.
+
 ### Spotless reprova arquivos que você não editou
 
 Era falta de `.gitattributes` — já corrigido. O arquivo força **LF em todo o repositório**. Sem ele,
@@ -195,10 +296,12 @@ estrutura dele. Cada arquivo mostra a responsabilidade de uma camada:
 |---|---|
 | `controller/UserController.java` | recebe, `@Valid`, delega, escolhe o status. Sem `try/catch` |
 | `service/UserService.java` | a regra (e-mail duplicado). Não conhece HTTP |
-| `repository/UserRepository.java` | interface — é dela que o service depende |
-| `repository/InMemoryUserRepository.java` | implementação temporária, **sai quando o JPA entrar** |
-| `model/User.java` | entidade imutável, com as invariantes do domínio |
-| `dto/RegisterUserRequest.java` | entrada + validação + `@Schema` do OpenAPI |
+| `repository/UserRepository.java` | interface `JpaRepository` — é dela que o service depende |
+| `model/User.java` | `@Entity`, com as invariantes do domínio |
+| `security/AuthenticatedIdentityResolver.java` | de onde vem a identidade de quem chamou |
+| `security/CognitoAuthenticatedIdentityResolver.java` | implementação real: `sub` do access token, e-mail e nome via `GetUser` |
+| `security/MockAuthenticatedIdentityResolver.java` | implementação por header, só com o profile `mock-auth` |
+| `dto/UpdateUserAdditionalInfoRequest.java` | entrada + validação + `@Schema` do OpenAPI |
 | `dto/UserResponse.java` | saída. A entidade nunca é exposta |
 | `mapper/UserMapper.java` | conversão entidade ↔ DTO |
 | `exception/EmailAlreadyRegisteredException.java` | erro de negócio com o status que lhe cabe (409) |
@@ -209,11 +312,12 @@ Testes correspondentes, também de referência:
 - `controller/UserControllerTest.java` — `@WebMvcTest`, só a camada web.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/users   -H 'Content-Type: application/json'   -d '{"name":"Ana Souza","email":"ana@exemplo.com"}'
+curl -X POST http://localhost:8080/api/v1/users -H "Authorization: Bearer $TOKEN"
 ```
 
-Devolve `201` com `Location`. Repetir a mesma chamada devolve `409`; mandar `email` inválido
-devolve `400` listando os campos.
+O corpo é vazio: nome e e-mail vêm da identidade autenticada, não do cliente. Devolve `201` com
+`Location`. Repetir a mesma chamada devolve `409`; sem token devolve `401`. Como obter o `$TOKEN`
+está em [Autenticação](#autenticação).
 
 ### Idioma
 
@@ -245,6 +349,123 @@ contrato acompanha o código.
 
 > O exemplo é deletável. Quando o cadastro real de usuário for implementado, ele substitui este —
 > mas a estrutura permanece.
+
+## Autenticação
+
+A API valida o **access token** do AWS Cognito (Spring Security OAuth2 Resource Server). O token
+precisa ser assinado pelo User Pool configurado, estar dentro da validade, ter `token_use=access` e
+`client_id` igual ao App Client configurado. O ID token é recusado, mesmo sendo do mesmo pool.
+
+O access token só traz o `sub`. E-mail e nome, necessários só no cadastro (`POST /api/v1/users`),
+o backend busca na API `GetUser` do Cognito usando o próprio token do usuário — sem credencial da
+AWS. As demais rotas usam só o `sub`, sem chamada de rede.
+
+| Classe | Papel |
+|---|---|
+| `config/SecurityConfig.java` | o que exige token e o que é público (Swagger, `/actuator/health`) |
+| `config/CognitoConfig.java` | valida assinatura, issuer, `token_use` e `client_id` |
+| `security/CognitoAuthenticatedIdentityResolver.java` | monta a identidade a partir do token |
+| `security/CognitoUserAttributesClient.java` | chama o `GetUser` do Cognito |
+| `security/ProblemDetailAuthenticationEntryPoint.java` | 401 em RFC 7807, no mesmo formato do resto da API |
+
+### O que pegar no console da AWS
+
+Em **Cognito → Grupos de usuários → (o pool do FinUp)**:
+
+| Informação | Onde | Vai para o `.env` |
+|---|---|---|
+| ID do grupo de usuários (`us-east-2_AbCdEf123`) | página *Visão geral* do pool | `COGNITO_USER_POOL_ID` |
+| ID do cliente | *Clientes da aplicação → FinUp* (página de detalhes, não a de edição) | `COGNITO_CLIENT_ID` |
+
+A região vem do prefixo do ID do pool — não há variável para ela. No cliente da aplicação, confira:
+
+- **Segredo do cliente vazio.** É o cliente do app mobile, que não guarda segredo. Com segredo, o
+  login pelo terminal abaixo falha.
+- **Fluxos de autenticação:** `ALLOW_USER_AUTH`, `ALLOW_USER_SRP_AUTH` e `ALLOW_REFRESH_TOKEN_AUTH`.
+  **Não** é preciso habilitar `ALLOW_USER_PASSWORD_AUTH`: o teste abaixo usa o `ALLOW_USER_AUTH`.
+
+Como o pool do FinUp foi criado (e nada disso muda depois de criado):
+
+- o login é por **nome de usuário, com o e-mail como alias** — o `Username` do cadastro **não pode
+  ter formato de e-mail** (`Username cannot be of email format`). O login pelo e-mail só funciona
+  depois que o e-mail for confirmado pelo código;
+- **`birthdate` é atributo obrigatório** no cadastro do Cognito, no formato `AAAA-MM-DD`.
+
+### Rodar a API contra o Cognito
+
+A API busca as chaves públicas do pool e chama o `GetUser` da AWS. Numa máquina com TLS
+interceptado (o mesmo caso do `PKIX path building failed` acima), o Java da **aplicação** também
+precisa do truststore do Windows — o `MAVEN_OPTS` vale só para o Maven, não para a aplicação que ele
+inicia:
+
+```bash
+./mvnw spring-boot:run "-Dspring-boot.run.jvmArguments=-Djavax.net.ssl.trustStoreType=Windows-ROOT"
+```
+
+Sem isso, token válido volta `401` e o cadastro volta `503`, com `PKIX` no log.
+
+### Testar o cadastro de ponta a ponta
+
+Use um e-mail que você consiga abrir (o código de confirmação chega nele) e uma senha descartável.
+No Gmail, `seu.email+finup1@gmail.com` cai na sua caixa e conta como outro usuário para o Cognito.
+Nos comandos abaixo, `<regiao>` é o prefixo do ID do pool (ex.: `us-east-2`).
+
+1. Crie o usuário no pool (a API de cadastro do Cognito não exige credencial da AWS):
+
+   ```bash
+   curl -s -X POST "https://cognito-idp.<regiao>.amazonaws.com/" \
+     -H "Content-Type: application/x-amz-json-1.1" \
+     -H "X-Amz-Target: AWSCognitoIdentityProviderService.SignUp" \
+     -d '{"ClientId":"<client id>","Username":"ana-teste","Password":"<senha>",
+          "UserAttributes":[{"Name":"email","Value":"ana@exemplo.com"},
+                            {"Name":"name","Value":"Ana Souza"},
+                            {"Name":"birthdate","Value":"2000-05-20"}]}'
+   ```
+
+2. Confirme a conta com o código que chegou por e-mail (ou no console: *Usuários → o usuário →
+   Ações → Confirmar conta*):
+
+   ```bash
+   curl -s -X POST "https://cognito-idp.<regiao>.amazonaws.com/" \
+     -H "Content-Type: application/x-amz-json-1.1" \
+     -H "X-Amz-Target: AWSCognitoIdentityProviderService.ConfirmSignUp" \
+     -d '{"ClientId":"<client id>","Username":"ana-teste","ConfirmationCode":"<codigo>"}'
+   ```
+
+3. Faça login e copie o `AuthenticationResult.AccessToken` da resposta (não o `IdToken`):
+
+   ```bash
+   curl -s -X POST "https://cognito-idp.<regiao>.amazonaws.com/" \
+     -H "Content-Type: application/x-amz-json-1.1" \
+     -H "X-Amz-Target: AWSCognitoIdentityProviderService.InitiateAuth" \
+     -d '{"AuthFlow":"USER_AUTH","ClientId":"<client id>",
+          "AuthParameters":{"USERNAME":"ana-teste","PREFERRED_CHALLENGE":"PASSWORD","PASSWORD":"<senha>"}}'
+   ```
+
+4. Chame a API com o token (ou cole no **Authorize** do Swagger):
+
+   ```bash
+   curl -X POST http://localhost:8080/api/v1/users -H "Authorization: Bearer $TOKEN"   # 201
+   curl http://localhost:8080/api/v1/users/me -H "Authorization: Bearer $TOKEN"        # 200
+   ```
+
+   Repetir o `POST` devolve `409`. O access token vale 1 hora; depois disso a API devolve `401` e é
+   preciso repetir o passo 3.
+
+No Windows, se o `curl` falhar com `CRYPT_E_NO_REVOCATION_CHECK`, acrescente `--ssl-no-revoke`.
+
+### Sem Cognito: profile `mock-auth`
+
+Com `SPRING_PROFILES_ACTIVE=dev,mock-auth`, a API não exige token e a identidade vem dos headers
+`X-Mock-Cognito-Sub` (obrigatório), `X-Mock-Cognito-Email` (obrigatório) e `X-Mock-Cognito-Name`
+(opcional). As variáveis do Cognito deixam de ser necessárias.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/users -H 'X-Mock-Cognito-Sub: mock-sub-ana' -H 'X-Mock-Cognito-Email: ana@exemplo.com' -H 'X-Mock-Cognito-Name: Ana Souza'
+```
+
+O mock nunca vale em produção: com `prod` ativo, `mock-auth` é ignorado e a aplicação não sobe
+sem um resolver de identidade.
 
 ## Contrato de erro
 
@@ -279,11 +500,14 @@ desenvolvimento (veja `.env.example`):
 | `SERVER_PORT` | `8080` | porta HTTP |
 | `SPRING_PROFILES_ACTIVE` | `dev` | perfil ativo; use `prod` no ambiente implantado |
 | `LOG_LEVEL` | `DEBUG` no perfil `dev`, `INFO` fora dele | nível de log de `br.com.finup` |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | origens do CORS, separadas por vírgula |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | origens do CORS, separadas por vírgula. O `.env.example` acrescenta `http://localhost:8081`, o Expo Web do `finup-mobile`, usado como fallback de teste do cadastro no navegador |
 | `DB_NAME` | `finup` | nome do banco |
 | `DB_USER` | `finup_user` | usuário do banco |
 | `DB_PASSWORD` | **sem default** | senha do banco; sem ela a aplicação não sobe |
 | `DB_PORT` | `5432` | porta publicada pelo container do PostgreSQL |
+| `DB_HOST` | `localhost` | host do banco; rodando `./mvnw spring-boot:run` mantenha `localhost` — no `docker compose up -d --build` o serviço `app` já sobrescreve para `db` (nome do serviço do Postgres na mesma rede do compose) |
+| `COGNITO_USER_POOL_ID` | **sem default** | ID do grupo de usuários (`us-east-2_AbCdEf123`); a região sai do prefixo. Dispensado com `mock-auth` |
+| `COGNITO_CLIENT_ID` | **sem default** | ID do App Client (sem client secret). Dispensado com `mock-auth` |
 
 O `application.yml` importa o `.env` da raiz (`spring.config.import: optional:file:.env[.properties]`),
 então o mesmo arquivo serve para o `docker compose` e para a aplicação rodando via `./mvnw`. O `optional:`
@@ -292,17 +516,9 @@ porque essa é a única variável sem valor padrão.
 
 ## O que ainda não está aqui (e por quê)
 
-Estas dependências estão **comentadas no `pom.xml`**, prontas para serem descomentadas quando o escopo avançar:
+Não há mais dependência comentada no `pom.xml`. Já **entraram**: JPA e o driver do PostgreSQL,
+com o banco em `docker compose`, e o Spring Security, com o Cognito. Uma ressalva sobre esse estado:
 
-| Item | Quando habilitar |
-|---|---|
-| Spring Security | quando o fluxo de autenticação estiver definido |
-
-Já **entraram**, e por isso saíram desta lista: JPA e o driver do PostgreSQL, com o banco em
-`docker compose`. Duas ressalvas sobre esse estado:
-
-- **A persistência não está ligada.** Não existe nenhuma `@Entity`; o `UserRepository` em uso é o
-  `InMemoryUserRepository`, então o que a API grava se perde no restart e não chega ao PostgreSQL.
 - **Não há ferramenta de migration.** Os scripts de `database/init/` só rodam quando o volume é criado,
   então hoje mudar o schema exige `docker compose down -v` e perder o banco local. Flyway continua
   pendente e vai precisar entrar antes de o schema começar a evoluir de verdade.
@@ -329,11 +545,14 @@ Dockerfile                    build multi-stage, runtime sem root
 O `CODEOWNERS` só tem efeito com **"Require review from Code Owners"** ligado na branch
 protection — sem isso o GitHub ignora o arquivo em silêncio.
 
-Sobre o `Dockerfile`: ele monta a imagem da aplicação e é usado pelo CI, mas **rodar essa imagem sozinha
-não funciona para desenvolvimento local**. O `spring.datasource.url` aponta para `localhost`, e dentro do
-container `localhost` é o próprio container, não o host onde o PostgreSQL está publicado. Enquanto a
-aplicação não entrar no `docker-compose.yml` como serviço — com um `DB_HOST` apontando para `db` — o
-caminho local é o da seção [Como rodar](#como-rodar): banco em container, aplicação na sua máquina.
+Sobre o `Dockerfile`: ele monta a imagem da aplicação, é usado pelo CI e é o build do serviço `app`
+do `docker-compose.yml`. Rodar essa imagem **fora** do compose não funciona para desenvolvimento
+local: o `spring.datasource.url` cai no default `localhost`, e dentro do container `localhost` é o
+próprio container, não o host onde o PostgreSQL está publicado. No compose isso se resolve porque o
+serviço `app` define `DB_HOST=db`, o nome do serviço do Postgres na mesma rede. São dois caminhos
+válidos, então: tudo em container, pela seção
+[Alternativa: subir banco + API pelo Docker](#alternativa-subir-banco--api-pelo-docker-para-testar-com-o-mobile),
+ou banco em container e aplicação na sua máquina, pela seção [Como rodar](#como-rodar).
 
 ## Banco de Dados com Docker
 
@@ -470,3 +689,63 @@ Ao criar o banco pela primeira vez, o processo ocorre na seguinte ordem:
 3. O arquivo `02-required-data.sql` insere os dados obrigatórios.
 4. O arquivo `03-test-data.sql` insere os dados fictícios de desenvolvimento e testes.
 5. O banco fica disponível para utilização pela aplicação.
+
+### Recorrência de transações
+
+**Decisão:** a recorrência fica na própria tabela `transactions`, e não numa entidade separada.
+Foi alinhada com o Willian e substitui a tabela `transaction_recurrences` e os endpoints
+`/api/v1/transaction-recurrences`, que saíram. O motivo é a simplicidade: por enquanto só existe a
+periodicidade mensal, e a próxima ocorrência sai da última ocorrência mais a periodicidade.
+
+Colunas de recorrência em `transactions`:
+
+| Coluna | Na transação que abre a série | Na ocorrência gerada | Na transação avulsa |
+|---|---|---|---|
+| `is_recurring` | `TRUE` | `FALSE` | `FALSE` |
+| `recurrence_frequency` | `MONTHLY` | `NULL` | `NULL` |
+| `last_occurrence_date` | data da última ocorrência gerada | `NULL` | `NULL` |
+| `recurrence_origin_id` | `NULL` | `id` da transação que abriu a série | `NULL` |
+
+```mermaid
+erDiagram
+    transactions ||--o{ transactions : "recurrence_origin_id"
+    transactions {
+        UUID id PK
+        DATE transaction_date
+        BOOLEAN is_recurring
+        VARCHAR recurrence_frequency
+        DATE last_occurrence_date
+        UUID recurrence_origin_id FK
+    }
+```
+
+Regras:
+
+- A transação que abre a série é a primeira ocorrência. No cadastro, o backend preenche
+  `last_occurrence_date` com o `transaction_date`, e o cliente só informa `isRecurring` e
+  `recurrenceFrequency`.
+- O **dia de referência** da série é o dia do `transaction_date` da transação que a abriu.
+- **Próxima ocorrência** (mensal): o mês seguinte ao de `last_occurrence_date`, no dia de
+  referência, ou no último dia do mês quando esse dia não existe nele. Uma série do dia 31 cai em
+  28/02 e volta ao dia 31 em março. O cálculo fica em `Transaction.nextOccurrenceDate()`, e a API
+  devolve o resultado em `nextOccurrenceDate`.
+- Cada ocorrência gerada é uma transação nova, não recorrente, que aponta para a transação
+  original por `recurrence_origin_id`. Quem gerar a ocorrência também avança o
+  `last_occurrence_date` da original. **A geração em si ainda não existe**: esta modelagem só a
+  prepara.
+
+Constraints:
+
+- `chk_transactions_recurrence`: com `is_recurring = TRUE`, a periodicidade e a última ocorrência
+  são obrigatórias; com `FALSE`, as duas ficam nulas.
+- `chk_transactions_recurrence_origin`: só uma transação não recorrente pode ser ocorrência gerada,
+  e nunca de si mesma.
+- `fk_transactions_recurrence_origin`: a transação original precisa existir.
+- `uq_transactions_recurrence_occurrence`: no máximo uma ocorrência por série e data. Isso impede
+  gerar o mesmo mês duas vezes, se a geração rodar de novo.
+
+Exemplo: uma conta de luz cadastrada em `2026-09-05` com `MONTHLY` fica com
+`last_occurrence_date = 2026-09-05` e `nextOccurrenceDate = 2026-10-05`.
+
+Ainda não existe como encerrar uma série (data de término ou cancelamento): fica para uma próxima
+tarefa.

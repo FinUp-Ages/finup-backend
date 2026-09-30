@@ -7,15 +7,31 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
-/** Transacao financeira persistida exatamente na estrutura da tabela {@code transactions}. */
+/**
+ * Transacao financeira persistida exatamente na estrutura da tabela {@code transactions}.
+ *
+ * <p>A recorrencia mora na propria transacao: a transacao original de uma serie tem {@code
+ * recurring = true}, a periodicidade e a data da ultima ocorrencia gerada. O dia do seu {@code
+ * transactionDate} e o dia de referencia da serie. Cada ocorrencia gerada depois e uma transacao
+ * nova, nao recorrente, que aponta para a original por {@code recurrenceOriginId} — no maximo uma
+ * por data.
+ */
 @Entity
-@Table(name = "transactions")
+@Table(
+    name = "transactions",
+    uniqueConstraints =
+        @UniqueConstraint(
+            name = "uq_transactions_recurrence_occurrence",
+            columnNames = {"recurrence_origin_id", "transaction_date"}))
 public class Transaction {
 
   @Id private UUID id;
@@ -45,6 +61,16 @@ public class Transaction {
   @Column(name = "is_recurring", nullable = false)
   private boolean recurring;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "recurrence_frequency", length = 50)
+  private RecurrenceFrequency recurrenceFrequency;
+
+  @Column(name = "last_occurrence_date")
+  private LocalDate lastOccurrenceDate;
+
+  @Column(name = "recurrence_origin_id")
+  private UUID recurrenceOriginId;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -61,7 +87,7 @@ public class Transaction {
       String description,
       BigDecimal amount,
       LocalDate transactionDate,
-      boolean recurring) {
+      RecurrenceFrequency recurrenceFrequency) {
     this.id = UUID.randomUUID();
     this.userId = Objects.requireNonNull(userId);
     this.categoryId = Objects.requireNonNull(categoryId);
@@ -70,11 +96,17 @@ public class Transaction {
     this.description = description;
     this.amount = Objects.requireNonNull(amount);
     this.transactionDate = Objects.requireNonNull(transactionDate);
-    this.recurring = recurring;
+    this.recurring = recurrenceFrequency != null;
+    this.recurrenceFrequency = recurrenceFrequency;
+    this.lastOccurrenceDate = this.recurring ? transactionDate : null;
     this.createdAt = Instant.now();
     this.updatedAt = createdAt;
   }
 
+  /**
+   * Registra uma transacao. Com {@code recurrenceFrequency} informada, ela abre uma serie
+   * recorrente e conta como a primeira ocorrencia; com {@code null}, e uma transacao avulsa.
+   */
   public static Transaction register(
       UUID userId,
       UUID categoryId,
@@ -83,9 +115,39 @@ public class Transaction {
       String description,
       BigDecimal amount,
       LocalDate transactionDate,
-      boolean recurring) {
+      RecurrenceFrequency recurrenceFrequency) {
     return new Transaction(
-        userId, categoryId, paymentMethodId, type, description, amount, transactionDate, recurring);
+        userId,
+        categoryId,
+        paymentMethodId,
+        type,
+        description,
+        amount,
+        transactionDate,
+        recurrenceFrequency);
+  }
+
+  /**
+   * Data da proxima ocorrencia da serie, a partir da ultima gerada. Vazio para transacao nao
+   * recorrente.
+   *
+   * <p>Mensal: o mes seguinte ao da ultima ocorrencia, no dia de referencia da serie (o dia do
+   * {@code transactionDate} original) — ou no ultimo dia do mes, quando esse dia nao existe nele.
+   * Por partir do dia de referencia, e nao do dia da ultima ocorrencia, uma serie do dia 31 volta
+   * ao dia 31 depois de fevereiro.
+   */
+  public Optional<LocalDate> nextOccurrenceDate() {
+    if (!recurring) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        switch (recurrenceFrequency) {
+          case MONTHLY -> {
+            YearMonth nextMonth = YearMonth.from(lastOccurrenceDate).plusMonths(1);
+            int day = Math.min(transactionDate.getDayOfMonth(), nextMonth.lengthOfMonth());
+            yield nextMonth.atDay(day);
+          }
+        });
   }
 
   @PreUpdate
@@ -127,6 +189,18 @@ public class Transaction {
 
   public boolean isRecurring() {
     return recurring;
+  }
+
+  public RecurrenceFrequency getRecurrenceFrequency() {
+    return recurrenceFrequency;
+  }
+
+  public LocalDate getLastOccurrenceDate() {
+    return lastOccurrenceDate;
+  }
+
+  public UUID getRecurrenceOriginId() {
+    return recurrenceOriginId;
   }
 
   public Instant getCreatedAt() {

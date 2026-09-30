@@ -367,7 +367,9 @@ INSERT INTO
     description,
     amount,
     transaction_date,
-    is_recurring
+    is_recurring,
+    recurrence_frequency,
+    last_occurrence_date
   )
 SELECT
   u.id,
@@ -377,7 +379,9 @@ SELECT
   'Salário mensal',
   5000.00,
   CURRENT_DATE,
-  TRUE
+  TRUE,
+  'MONTHLY',
+  CURRENT_DATE
 FROM
   users u
   JOIN categories c ON c.name = 'Salário'
@@ -393,4 +397,49 @@ WHERE
       t.user_id = u.id
       AND t.description = 'Salário mensal'
       AND t.transaction_date = CURRENT_DATE
+  );
+
+-- --------------------------------------------
+-- Conversas do assistente
+-- --------------------------------------------
+INSERT INTO
+  conversations (user_id, title, created_at, updated_at)
+SELECT
+  u.id,
+  'Como economizar na viagem de férias?',
+  CURRENT_TIMESTAMP - INTERVAL '2 days',
+  CURRENT_TIMESTAMP - INTERVAL '1 day'
+FROM
+  users u
+WHERE
+  u.email = 'teste@finup.local'
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      conversations c
+    WHERE
+      c.user_id = u.id
+      AND c.title = 'Como economizar na viagem de férias?'
+  );
+
+INSERT INTO
+  conversations (user_id, title, created_at, updated_at)
+SELECT
+  u.id,
+  'Vale a pena investir em CDB agora?',
+  CURRENT_TIMESTAMP - INTERVAL '5 days',
+  CURRENT_TIMESTAMP - INTERVAL '5 days'
+FROM
+  users u
+WHERE
+  u.email = 'teste@finup.local'
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      conversations c
+    WHERE
+      c.user_id = u.id
+      AND c.title = 'Vale a pena investir em CDB agora?'
   );

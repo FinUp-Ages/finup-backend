@@ -19,11 +19,11 @@
     "src/test/java/br/com/finup/**"
   ],
   "validation": {
-    "./mvnw verify (133 testes + spotless:check)": "passed",
+    "./mvnw verify (187 testes + spotless:check)": "passed",
     "git diff --check": "passed",
     "chamada real ao Bedrock": "nao executada (sem credenciais)"
   },
-  "review": "diff revisado; saida do modelo validada (categoria do usuario, tipo, valor, data) antes de gravar",
+  "review": "diff revisado; saida do modelo validada (categoria do usuario, tipo, valor, data) antes de gravar. Merge com develop: RegisterTransactionAiAction adaptada ao novo TransactionService.register(identity, ...) e a Category.getType() em TransactionType.",
   "open_questions": [
     "'aberturas' interpretado como pontos de extensao (AiAction); confirmar.",
     "Dependencia: a categoria 'Educação' nao existe entre as padrao. O assistente casa a categoria por nome (sem acento/caixa) entre as do usuario; ate a tarefa de criacao de categorias entregar, 'gastei 7 reais na pucrs' retorna 422 (categoria nao encontrada)."

@@ -2,7 +2,7 @@ package br.com.finup.service;
 
 import br.com.finup.model.Category;
 import br.com.finup.model.Transaction;
-import br.com.finup.model.User;
+import br.com.finup.security.AuthenticatedIdentity;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDate;
 import java.util.List;
@@ -31,7 +31,11 @@ public interface AiAction {
   Result execute(Context context, JsonNode payload);
 
   /** O que a acao precisa saber sobre quem pediu. */
-  record Context(User user, List<Category> categories, String originalMessage, LocalDate today) {}
+  record Context(
+      AuthenticatedIdentity identity,
+      List<Category> categories,
+      String originalMessage,
+      LocalDate today) {}
 
   /** Resultado para o cliente; {@code transaction} so vem preenchida por acoes que a criam. */
   record Result(String message, Transaction transaction) {}

@@ -5,19 +5,24 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import br.com.finup.exception.InvalidTransactionRecurrenceException;
 import br.com.finup.exception.ResourceNotFoundException;
+import br.com.finup.model.RecurrenceFrequency;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
+import br.com.finup.model.User;
 import br.com.finup.repository.TransactionRepository;
+import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -26,120 +31,175 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class TransactionServiceTest {
 
   @Mock private TransactionRepository transactionRepository;
+  @Mock private UserService userService;
 
-  private TransactionService transactionService;
+  @InjectMocks private TransactionService transactionService;
 
-  @BeforeEach
-  void setUp() {
-    transactionService = new TransactionService(transactionRepository);
+  private User mockUser() {
+    return User.createFromCognitoIdentity("cognito-sub-ana", "Ana Souza", "ana@exemplo.com");
+  }
+
+  private AuthenticatedIdentity identity(User user) {
+    return new AuthenticatedIdentity(user.getCognitoId(), user.getName(), user.getEmail());
   }
 
   @Test
-  @DisplayName("cadastra transacao sem consultar meio de pagamento quando ele nao e informado")
-  void registersWithoutPaymentMethod() {
-    UUID userId = UUID.randomUUID();
+  @DisplayName("cadastra transacao recorrente sem consultar meio de pagamento nao informado")
+  void registersRecurringWithoutPaymentMethod() {
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
-    when(transactionRepository.existsUserById(userId)).thenReturn(true);
-    when(transactionRepository.existsCategoryById(categoryId)).thenReturn(true);
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
+    when(transactionRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
+        .thenReturn(true);
     when(transactionRepository.save(any(Transaction.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     Transaction transaction =
         transactionService.register(
-            userId,
+            identity,
             categoryId,
             null,
             TransactionType.INCOME,
             "Salario",
             new BigDecimal("5000.00"),
             LocalDate.of(2026, 9, 12),
-            true);
+            true,
+            RecurrenceFrequency.MONTHLY);
 
     assertThat(transaction.getId()).isNotNull();
-    assertThat(transaction.getUserId()).isEqualTo(userId);
+    assertThat(transaction.getUserId()).isEqualTo(user.getId());
     assertThat(transaction.getCategoryId()).isEqualTo(categoryId);
     assertThat(transaction.getPaymentMethodId()).isNull();
     assertThat(transaction.getType()).isEqualTo(TransactionType.INCOME);
-    verify(transactionRepository, never()).existsPaymentMethodById(any());
+    assertThat(transaction.isRecurring()).isTrue();
+    assertThat(transaction.getRecurrenceFrequency()).isEqualTo(RecurrenceFrequency.MONTHLY);
+    assertThat(transaction.getLastOccurrenceDate()).isEqualTo(LocalDate.of(2026, 9, 12));
+    verify(transactionRepository, never()).existsPaymentMethodForUser(any(), any());
   }
 
   @Test
   @DisplayName("associa o meio de pagamento quando ele e informado e existe")
   void registersWithExistingPaymentMethod() {
-    UUID userId = UUID.randomUUID();
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
     UUID paymentMethodId = UUID.randomUUID();
-    when(transactionRepository.existsUserById(userId)).thenReturn(true);
-    when(transactionRepository.existsCategoryById(categoryId)).thenReturn(true);
-    when(transactionRepository.existsPaymentMethodById(paymentMethodId)).thenReturn(true);
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
+    when(transactionRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
+        .thenReturn(true);
+    when(transactionRepository.existsPaymentMethodForUser(paymentMethodId, user.getId()))
+        .thenReturn(true);
     when(transactionRepository.save(any(Transaction.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     Transaction transaction =
         transactionService.register(
-            userId,
+            identity,
             categoryId,
             paymentMethodId,
             TransactionType.EXPENSE,
             "Supermercado",
             new BigDecimal("320.00"),
             LocalDate.of(2026, 9, 12),
-            false);
+            false,
+            null);
 
     assertThat(transaction.getPaymentMethodId()).isEqualTo(paymentMethodId);
   }
 
   @Test
-  @DisplayName("recusa transacao quando o usuario nao existe")
-  void rejectsUnknownUser() {
-    UUID userId = UUID.randomUUID();
-    when(transactionRepository.existsUserById(userId)).thenReturn(false);
+  @DisplayName("propaga o 404 quando a identidade autenticada ainda nao tem usuario local")
+  void rejectsIdentityWithoutLocalUser() {
+    AuthenticatedIdentity identity = new AuthenticatedIdentity("sub-sem-usuario", null, "x@y.com");
+    when(userService.findByAuthenticatedIdentity(identity))
+        .thenThrow(new ResourceNotFoundException("Usuario nao encontrado"));
 
-    assertThatThrownBy(() -> register(userId, UUID.randomUUID(), null))
+    assertThatThrownBy(() -> register(identity, UUID.randomUUID(), null))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("Usuario");
     verify(transactionRepository, never()).save(any());
   }
 
   @Test
-  @DisplayName("recusa transacao quando a categoria nao existe")
+  @DisplayName("recusa transacao quando a categoria nao existe ou e de outro usuario")
   void rejectsUnknownCategory() {
-    UUID userId = UUID.randomUUID();
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
-    when(transactionRepository.existsUserById(userId)).thenReturn(true);
-    when(transactionRepository.existsCategoryById(categoryId)).thenReturn(false);
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
+    when(transactionRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
+        .thenReturn(false);
 
-    assertThatThrownBy(() -> register(userId, categoryId, null))
+    assertThatThrownBy(() -> register(identity, categoryId, null))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("Categoria");
     verify(transactionRepository, never()).save(any());
   }
 
   @Test
-  @DisplayName("recusa transacao quando o meio de pagamento informado nao existe")
+  @DisplayName("recusa transacao quando o meio de pagamento nao existe ou e de outro usuario")
   void rejectsUnknownPaymentMethod() {
-    UUID userId = UUID.randomUUID();
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
     UUID paymentMethodId = UUID.randomUUID();
-    when(transactionRepository.existsUserById(userId)).thenReturn(true);
-    when(transactionRepository.existsCategoryById(categoryId)).thenReturn(true);
-    when(transactionRepository.existsPaymentMethodById(paymentMethodId)).thenReturn(false);
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
+    when(transactionRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
+        .thenReturn(true);
+    when(transactionRepository.existsPaymentMethodForUser(paymentMethodId, user.getId()))
+        .thenReturn(false);
 
-    assertThatThrownBy(() -> register(userId, categoryId, paymentMethodId))
+    assertThatThrownBy(() -> register(identity, categoryId, paymentMethodId))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("Meio de pagamento");
     verify(transactionRepository, never()).save(any());
   }
 
-  private Transaction register(UUID userId, UUID categoryId, UUID paymentMethodId) {
+  private Transaction register(
+      AuthenticatedIdentity identity, UUID categoryId, UUID paymentMethodId) {
     return transactionService.register(
-        userId,
+        identity,
         categoryId,
         paymentMethodId,
         TransactionType.EXPENSE,
         "Compra",
         new BigDecimal("10.00"),
         LocalDate.of(2026, 9, 12),
-        false);
+        false,
+        null);
+  }
+
+  @Test
+  @DisplayName("recusa transacao recorrente sem periodicidade")
+  void rejectsRecurringTransactionWithoutFrequency() {
+    assertThatThrownBy(() -> registerWithRecurrence(true, null))
+        .isInstanceOf(InvalidTransactionRecurrenceException.class)
+        .hasMessageContaining("precisa informar recurrenceFrequency");
+    verifyNoInteractions(userService, transactionRepository);
+  }
+
+  @Test
+  @DisplayName("recusa transacao nao recorrente com periodicidade")
+  void rejectsNonRecurringTransactionWithFrequency() {
+    assertThatThrownBy(() -> registerWithRecurrence(false, RecurrenceFrequency.MONTHLY))
+        .isInstanceOf(InvalidTransactionRecurrenceException.class)
+        .hasMessageContaining("nao pode informar recurrenceFrequency");
+    verifyNoInteractions(userService, transactionRepository);
+  }
+
+  private Transaction registerWithRecurrence(
+      boolean recurring, RecurrenceFrequency recurrenceFrequency) {
+    User user = mockUser();
+    return transactionService.register(
+        identity(user),
+        UUID.randomUUID(),
+        null,
+        TransactionType.EXPENSE,
+        "Conta de luz",
+        new BigDecimal("250.00"),
+        LocalDate.of(2026, 9, 5),
+        recurring,
+        recurrenceFrequency);
   }
 }

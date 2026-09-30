@@ -7,9 +7,6 @@ import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.FinUpScoreService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -44,25 +41,6 @@ public class FinUpScoreController {
 
   @PostMapping("/recalculate")
   @Operation(summary = "Recalcula e persiste o FinUp Score do usuario autenticado")
-  @Parameters({
-    @Parameter(
-        name = "X-Mock-Cognito-Sub",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "Identificador (sub) da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Email",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "E-mail da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Name",
-        in = ParameterIn.HEADER,
-        required = false,
-        description =
-            "Nome da identidade autenticada — mock do Cognito real. Opcional: alguns provedores"
-                + " (ex.: login com Apple) so mandam o nome no primeiro acesso.")
-  })
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",

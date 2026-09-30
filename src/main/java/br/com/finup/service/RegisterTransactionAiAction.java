@@ -60,7 +60,15 @@ public class RegisterTransactionAiAction implements AiAction {
 
     Transaction transaction =
         transactionService.register(
-            context.user().getId(), category.getId(), null, type, description, amount, date, false);
+            context.identity(),
+            category.getId(),
+            null,
+            type,
+            description,
+            amount,
+            date,
+            false,
+            null);
 
     String message =
         "%s de R$ %s registrada em %s."
@@ -99,7 +107,7 @@ public class RegisterTransactionAiAction implements AiAction {
   private Category findCategory(Context context, TransactionType type, JsonNode node) {
     String wanted = normalize(node.isNull() ? "" : node.asText(""));
     return context.categories().stream()
-        .filter(category -> category.getType().name().equals(type.name()))
+        .filter(category -> category.getType() == type)
         .filter(category -> normalize(category.getName()).equals(wanted))
         .findFirst()
         .orElseThrow(

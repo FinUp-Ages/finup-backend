@@ -80,7 +80,8 @@ public class AiAssistantService {
     }
 
     AiAction.Result result =
-        action.execute(new AiAction.Context(user, categories, request.message(), today), payload);
+        action.execute(
+            new AiAction.Context(identity, categories, request.message(), today), payload);
     log.info("Assistente executou acao: userId={}, action={}", user.getId(), actionName);
 
     return new AiAssistantResponse(

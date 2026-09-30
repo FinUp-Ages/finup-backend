@@ -1,5 +1,7 @@
 package br.com.finup.controller;
 
+import br.com.finup.dto.EmailAvailabilityRequest;
+import br.com.finup.dto.EmailAvailabilityResponse;
 import br.com.finup.dto.UpdateUserAdditionalInfoRequest;
 import br.com.finup.dto.UserResponse;
 import br.com.finup.mapper.UserMapper;
@@ -7,13 +9,11 @@ import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -54,26 +54,8 @@ public class UserController {
   @Operation(
       summary = "Cria o usuario local a partir da identidade autenticada pelo Cognito",
       description =
-          "Nao recebe corpo. A identidade (sub, nome, e-mail) vem da requisicao autenticada.")
-  @Parameters({
-    @Parameter(
-        name = "X-Mock-Cognito-Sub",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "Identificador (sub) da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Email",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "E-mail da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Name",
-        in = ParameterIn.HEADER,
-        required = false,
-        description =
-            "Nome da identidade autenticada — mock do Cognito real. Opcional: alguns provedores"
-                + " (ex.: login com Apple) so mandam o nome no primeiro acesso.")
-  })
+          "Nao recebe corpo. A identidade (sub, nome, e-mail) vem do access token do Cognito:"
+              + " o sub do proprio token, nome e e-mail consultados no Cognito.")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Usuario criado"),
     @ApiResponse(
@@ -83,13 +65,42 @@ public class UserController {
     @ApiResponse(
         responseCode = "409",
         description = "Ja existe usuario para esta identidade ou e-mail",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
+        responseCode = "503",
+        description = "Cognito indisponivel ao buscar e-mail e nome da identidade",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   })
   public ResponseEntity<UserResponse> create() {
-    AuthenticatedIdentity identity = authenticatedIdentityResolver.resolveCurrent();
+    AuthenticatedIdentity identity = authenticatedIdentityResolver.resolveCurrentWithAttributes();
     UserResponse response =
         UserMapper.toResponse(userService.createFromAuthenticatedIdentity(identity));
     return ResponseEntity.created(URI.create("/api/v1/users/me")).body(response);
+  }
+
+  /**
+   * Unico endpoint de usuarios publico: o formulario de cadastro consulta antes de a pessoa ter
+   * token. Nao usa a identidade autenticada, so o e-mail do corpo. O {@code SecurityConfig} libera
+   * so este metodo e caminho.
+   */
+  @PostMapping("/email-availability")
+  @SecurityRequirements
+  @Operation(
+      summary = "Consulta se um e-mail ja esta cadastrado",
+      description =
+          "Publico: nao exige token, porque o formulario de cadastro consulta antes de a pessoa"
+              + " ter conta. So olha os usuarios locais e e um aviso, nao uma reserva: o cadastro"
+              + " ainda pode devolver 409 se o e-mail for usado logo depois.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Consulta feita. Veja o campo available"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "E-mail em branco, sem formato de e-mail ou com mais de 255 caracteres",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  })
+  public EmailAvailabilityResponse checkEmailAvailability(
+      @Valid @RequestBody EmailAvailabilityRequest request) {
+    return new EmailAvailabilityResponse(userService.isEmailAvailable(request.email()));
   }
 
   @GetMapping("/me")
@@ -97,25 +108,6 @@ public class UserController {
       summary = "Busca o usuario correspondente a identidade autenticada",
       description =
           "E o endpoint que o mobile usa apos o login, para saber se a Etapa 1 ja foi feita.")
-  @Parameters({
-    @Parameter(
-        name = "X-Mock-Cognito-Sub",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "Identificador (sub) da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Email",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "E-mail da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Name",
-        in = ParameterIn.HEADER,
-        required = false,
-        description =
-            "Nome da identidade autenticada — mock do Cognito real. Opcional: alguns provedores"
-                + " (ex.: login com Apple) so mandam o nome no primeiro acesso.")
-  })
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Usuario encontrado"),
     @ApiResponse(
@@ -138,25 +130,6 @@ public class UserController {
       description =
           "Etapa 2 do cadastro. So funciona depois da Etapa 1 (POST /api/v1/users). Cada campo do"
               + " corpo e opcional: so o que vier preenchido e atualizado.")
-  @Parameters({
-    @Parameter(
-        name = "X-Mock-Cognito-Sub",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "Identificador (sub) da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Email",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "E-mail da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Name",
-        in = ParameterIn.HEADER,
-        required = false,
-        description =
-            "Nome da identidade autenticada — mock do Cognito real. Opcional: alguns provedores"
-                + " (ex.: login com Apple) so mandam o nome no primeiro acesso.")
-  })
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Informacoes atualizadas"),
     @ApiResponse(

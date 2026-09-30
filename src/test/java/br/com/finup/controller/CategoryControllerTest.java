@@ -11,11 +11,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.finup.dto.CategoryListResponse;
 import br.com.finup.dto.CategoryResponse;
 import br.com.finup.exception.ConflictException;
 import br.com.finup.exception.ForbiddenOperationException;
 import br.com.finup.exception.ResourceNotFoundException;
-import br.com.finup.model.CategoryType;
+import br.com.finup.model.TransactionType;
 import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.CategoryService;
@@ -24,11 +25,13 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+@AutoConfigureMockMvc(addFilters = false)
 @WebMvcTest(CategoryController.class)
 class CategoryControllerTest {
 
@@ -50,7 +53,7 @@ class CategoryControllerTest {
   @DisplayName("POST valido devolve 201 com a categoria criada")
   void validCreateReturns201() throws Exception {
     CategoryResponse response =
-        new CategoryResponse(UUID.randomUUID(), "Academia", CategoryType.EXPENSE, false);
+        new CategoryResponse(UUID.randomUUID(), "Academia", TransactionType.EXPENSE, false);
 
     when(categoryService.create(eq(IDENTITY), any())).thenReturn(response);
 
@@ -81,7 +84,7 @@ class CategoryControllerTest {
   void validUpdateReturns200() throws Exception {
     UUID categoryId = UUID.randomUUID();
     CategoryResponse response =
-        new CategoryResponse(categoryId, "Academia e Esportes", CategoryType.EXPENSE, false);
+        new CategoryResponse(categoryId, "Academia e Esportes", TransactionType.EXPENSE, false);
 
     when(categoryService.update(eq(IDENTITY), eq(categoryId), any())).thenReturn(response);
 
@@ -113,17 +116,25 @@ class CategoryControllerTest {
   @Test
   @DisplayName("GET devolve 200 com lista de categorias")
   void findAvailableReturns200() throws Exception {
-    List<CategoryResponse> response =
+    List<CategoryListResponse> response =
         List.of(
-            new CategoryResponse(UUID.randomUUID(), "Alimentação", CategoryType.EXPENSE, true),
-            new CategoryResponse(UUID.randomUUID(), "Academia", CategoryType.EXPENSE, false));
+            new CategoryListResponse(UUID.randomUUID(), "Alimentação", TransactionType.EXPENSE),
+            new CategoryListResponse(UUID.randomUUID(), "Lazer", TransactionType.EXPENSE),
+            new CategoryListResponse(UUID.randomUUID(), "Moradia", TransactionType.EXPENSE),
+            new CategoryListResponse(UUID.randomUUID(), "Salário", TransactionType.INCOME),
+            new CategoryListResponse(UUID.randomUUID(), "Saúde", TransactionType.EXPENSE),
+            new CategoryListResponse(UUID.randomUUID(), "Transporte", TransactionType.EXPENSE));
 
     when(categoryService.findAvailable(IDENTITY)).thenReturn(response);
 
     mockMvc
         .perform(get("/api/v1/categories"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(2));
+        .andExpect(jsonPath("$.length()").value(6))
+        .andExpect(jsonPath("$[0].name").value("Alimentação"))
+        .andExpect(jsonPath("$[3].name").value("Salário"))
+        .andExpect(jsonPath("$[3].type").value("INCOME"))
+        .andExpect(jsonPath("$[0].isDefault").doesNotExist());
   }
 
   @Test

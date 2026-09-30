@@ -101,12 +101,42 @@ CREATE TABLE IF NOT EXISTS transactions (
   description VARCHAR(255),
   amount DECIMAL(12, 2) NOT NULL,
   transaction_date DATE NOT NULL,
-  is_recurring BOOLEAN DEFAULT FALSE,
+  is_recurring BOOLEAN NOT NULL DEFAULT FALSE,
+  recurrence_frequency VARCHAR(50),
+  last_occurrence_date DATE,
+  recurrence_origin_id UUID,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_transactions_user FOREIGN KEY (user_id) REFERENCES users (id),
   CONSTRAINT fk_transactions_category FOREIGN KEY (category_id) REFERENCES categories (id),
-  CONSTRAINT fk_transactions_payment_method FOREIGN KEY (payment_method_id) REFERENCES payment_methods (id)
+  CONSTRAINT fk_transactions_payment_method FOREIGN KEY (payment_method_id) REFERENCES payment_methods (id),
+  CONSTRAINT fk_transactions_recurrence_origin FOREIGN KEY (recurrence_origin_id) REFERENCES transactions (id),
+  CONSTRAINT uq_transactions_recurrence_occurrence UNIQUE (recurrence_origin_id, transaction_date),
+  CONSTRAINT chk_transactions_recurrence CHECK (
+    (
+      is_recurring = TRUE
+      AND recurrence_frequency IS NOT NULL
+      AND last_occurrence_date IS NOT NULL
+    )
+    OR (
+      is_recurring = FALSE
+      AND recurrence_frequency IS NULL
+      AND last_occurrence_date IS NULL
+    )
+  ),
+  CONSTRAINT chk_transactions_recurrence_origin CHECK (
+    recurrence_origin_id IS NULL
+    OR (is_recurring = FALSE AND recurrence_origin_id <> id)
+  )
+);
+
+CREATE TABLE IF NOT EXISTS conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  title VARCHAR(255),
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_conversations_user FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
 CREATE TABLE IF NOT EXISTS debts (

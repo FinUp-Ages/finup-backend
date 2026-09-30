@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import br.com.finup.exception.InvalidAuthenticatedIdentityException;
 import br.com.finup.exception.MissingAuthenticatedIdentityException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.DisplayName;
@@ -73,6 +74,32 @@ class MockAuthenticatedIdentityResolverTest {
   }
 
   @Test
+  @DisplayName("nome acima de 255 caracteres lanca InvalidAuthenticatedIdentityException")
+  void throwsWhenNameExceedsColumnLength() {
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getHeader("X-Mock-Cognito-Sub")).thenReturn("cognito-sub-123");
+    when(request.getHeader("X-Mock-Cognito-Name")).thenReturn("a".repeat(256));
+    when(request.getHeader("X-Mock-Cognito-Email")).thenReturn("ana@exemplo.com");
+    MockAuthenticatedIdentityResolver resolver = new MockAuthenticatedIdentityResolver(request);
+
+    assertThatThrownBy(resolver::resolveCurrent)
+        .isInstanceOf(InvalidAuthenticatedIdentityException.class)
+        .hasMessageContaining("X-Mock-Cognito-Name");
+  }
+
+  @Test
+  @DisplayName("nome com exatamente 255 caracteres continua valendo")
+  void acceptsNameAtColumnLimit() {
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getHeader("X-Mock-Cognito-Sub")).thenReturn("cognito-sub-123");
+    when(request.getHeader("X-Mock-Cognito-Name")).thenReturn("a".repeat(255));
+    when(request.getHeader("X-Mock-Cognito-Email")).thenReturn("ana@exemplo.com");
+    MockAuthenticatedIdentityResolver resolver = new MockAuthenticatedIdentityResolver(request);
+
+    assertThat(resolver.resolveCurrent().name()).hasSize(255);
+  }
+
+  @Test
   @DisplayName("header de sub em branco conta como ausente")
   void treatsBlankSubAsMissing() {
     HttpServletRequest request = mock(HttpServletRequest.class);
@@ -82,5 +109,18 @@ class MockAuthenticatedIdentityResolverTest {
 
     assertThatThrownBy(resolver::resolveCurrent)
         .isInstanceOf(MissingAuthenticatedIdentityException.class);
+  }
+
+  @Test
+  @DisplayName("resolveCurrentWithAttributes le os mesmos headers")
+  void resolveWithAttributesReadsSameHeaders() {
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getHeader("X-Mock-Cognito-Sub")).thenReturn("cognito-sub-123");
+    when(request.getHeader("X-Mock-Cognito-Name")).thenReturn("Ana Souza");
+    when(request.getHeader("X-Mock-Cognito-Email")).thenReturn("ana@exemplo.com");
+    MockAuthenticatedIdentityResolver resolver = new MockAuthenticatedIdentityResolver(request);
+
+    assertThat(resolver.resolveCurrentWithAttributes())
+        .isEqualTo(new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com"));
   }
 }

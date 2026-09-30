@@ -16,7 +16,6 @@ import br.com.finup.dto.AiAssistantResponse;
 import br.com.finup.exception.AiProviderException;
 import br.com.finup.exception.BusinessException;
 import br.com.finup.model.Category;
-import br.com.finup.model.CategoryType;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
 import br.com.finup.model.User;
@@ -57,12 +56,12 @@ class AiAssistantServiceTest {
   private final UUID userId = UUID.randomUUID();
   private final User user = mock(User.class);
   private final UUID educationId = UUID.randomUUID();
-  private final Category education = category("Educação", CategoryType.EXPENSE);
-  private final Category salary = category("Salário", CategoryType.INCOME);
+  private final Category education = category("Educação", TransactionType.EXPENSE);
+  private final Category salary = category("Salário", TransactionType.INCOME);
 
   private AiAssistantService service;
 
-  private static Category category(String name, CategoryType type) {
+  private static Category category(String name, TransactionType type) {
     Category category = mock(Category.class);
     org.mockito.Mockito.lenient().when(category.getName()).thenReturn(name);
     org.mockito.Mockito.lenient().when(category.getType()).thenReturn(type);
@@ -101,31 +100,33 @@ class AiAssistantServiceTest {
         """
         {"action":"REGISTER_TRANSACTION","type":"EXPENSE","amount":7,"category":"Educação",
          "description":"PUCRS","date":null}""");
-    when(transactionService.register(any(), any(), any(), any(), any(), any(), any(), anyBoolean()))
+    when(transactionService.register(
+            any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any()))
         .thenAnswer(
             i ->
                 Transaction.register(
-                    i.getArgument(0),
+                    userId,
                     i.getArgument(1),
                     null,
                     i.getArgument(3),
                     i.getArgument(4),
                     i.getArgument(5),
                     i.getArgument(6),
-                    false));
+                    null));
 
     AiAssistantResponse response = ask("gastei 7 reais na pucrs");
 
     verify(transactionService)
         .register(
-            eq(userId),
+            eq(IDENTITY),
             eq(educationId),
             isNull(),
             eq(TransactionType.EXPENSE),
             eq("PUCRS"),
             eq(new BigDecimal("7.00")),
             eq(TODAY),
-            eq(false));
+            eq(false),
+            isNull());
     assertThat(response.action()).isEqualTo("REGISTER_TRANSACTION");
     assertThat(response.transaction().amount()).isEqualByComparingTo("7.00");
     assertThat(response.message()).contains("Despesa").contains("7.00").contains("Educação");
@@ -156,31 +157,33 @@ class AiAssistantServiceTest {
         {"action":"REGISTER_TRANSACTION","type":"expense","amount":"7,5","category":"educacao",
          "description":"","date":"2026-09-28"}
         ```""");
-    when(transactionService.register(any(), any(), any(), any(), any(), any(), any(), anyBoolean()))
+    when(transactionService.register(
+            any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any()))
         .thenAnswer(
             i ->
                 Transaction.register(
-                    i.getArgument(0),
+                    userId,
                     i.getArgument(1),
                     null,
                     i.getArgument(3),
                     i.getArgument(4),
                     i.getArgument(5),
                     i.getArgument(6),
-                    false));
+                    null));
 
     ask("paguei 7,50 na pucrs");
 
     verify(transactionService)
         .register(
-            eq(userId),
+            eq(IDENTITY),
             eq(educationId),
             isNull(),
             eq(TransactionType.EXPENSE),
             eq("paguei 7,50 na pucrs"),
             eq(new BigDecimal("7.50")),
             eq(LocalDate.of(2026, 9, 28)),
-            eq(false));
+            eq(false),
+            isNull());
   }
 
   @Test
@@ -193,7 +196,7 @@ class AiAssistantServiceTest {
             BusinessException.class,
             e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY));
     verify(transactionService, never())
-        .register(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+        .register(any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any());
   }
 
   @Test
@@ -215,7 +218,7 @@ class AiAssistantServiceTest {
 
     assertThatThrownBy(() -> ask("gastei 7 na viagem")).isInstanceOf(BusinessException.class);
     verify(transactionService, never())
-        .register(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+        .register(any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any());
   }
 
   @Test
@@ -226,7 +229,7 @@ class AiAssistantServiceTest {
 
     assertThatThrownBy(() -> ask("gastei 7")).isInstanceOf(BusinessException.class);
     verify(transactionService, never())
-        .register(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+        .register(any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any());
   }
 
   @Test
@@ -239,7 +242,7 @@ class AiAssistantServiceTest {
       assertThatThrownBy(() -> ask("gastei")).isInstanceOf(BusinessException.class);
     }
     verify(transactionService, never())
-        .register(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+        .register(any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any());
   }
 
   @Test
@@ -250,6 +253,6 @@ class AiAssistantServiceTest {
 
     assertThatThrownBy(() -> ask("gastei 7 amanha")).isInstanceOf(BusinessException.class);
     verify(transactionService, never())
-        .register(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+        .register(any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any());
   }
 }
