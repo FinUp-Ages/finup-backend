@@ -55,6 +55,14 @@ public class CognitoAuthenticatedIdentityResolver implements AuthenticatedIdenti
     return new AuthenticatedIdentity(token.getSubject(), attributes.name(), attributes.email());
   }
 
+  @Override
+  public boolean isCurrentUserAdmin() {
+    Jwt token = currentToken();
+    var groups = token.getClaimAsStringList("cognito:groups");
+
+    return groups != null && groups.contains("admins");
+  }
+
   private Jwt currentToken() {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
     if (authentication instanceof JwtAuthenticationToken jwtAuthentication) {
