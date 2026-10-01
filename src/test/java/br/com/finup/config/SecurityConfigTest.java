@@ -137,6 +137,19 @@ class SecurityConfigTest {
   }
 
   @Test
+  @DisplayName("mensagens de uma conversa do assistente sem access token do Cognito devolve 401")
+  void conversationMessagesWithoutTokenReturn401() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/assistant/conversations/{id}/messages", UUID.randomUUID()))
+        .andExpect(status().isUnauthorized())
+        .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.status").value(401));
+
+    verifyNoInteractions(authenticatedIdentityResolver, conversationService);
+  }
+
+  @Test
   @DisplayName("token que nao e JWT devolve 401")
   void malformedTokenReturns401() throws Exception {
     mockMvc

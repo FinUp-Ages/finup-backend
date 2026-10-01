@@ -151,6 +151,18 @@ CREATE TABLE IF NOT EXISTS conversations (
   CONSTRAINT fk_conversations_user FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
+CREATE TABLE IF NOT EXISTS conversation_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id UUID NOT NULL,
+  role VARCHAR(20) NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_conversation_messages_conversation FOREIGN KEY (conversation_id) REFERENCES conversations (id),
+  CONSTRAINT chk_conversation_messages_role CHECK (role IN ('USER', 'ASSISTANT'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_conversation_messages_conversation_created_at ON conversation_messages (conversation_id, created_at);
+
 CREATE TABLE IF NOT EXISTS debts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,
