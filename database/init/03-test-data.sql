@@ -443,3 +443,51 @@ WHERE
       c.user_id = u.id
       AND c.title = 'Vale a pena investir em CDB agora?'
   );
+
+-- --------------------------------------------
+-- Mensagens das conversas do assistente
+-- --------------------------------------------
+INSERT INTO
+  conversation_messages (conversation_id, role, content, created_at)
+SELECT
+  c.id,
+  m.role,
+  m.content,
+  c.created_at + m.offset_from_start
+FROM
+  conversations c
+  JOIN users u ON u.id = c.user_id
+  CROSS JOIN (
+    VALUES
+      (
+        'USER',
+        'Como economizar na viagem de férias?',
+        INTERVAL '0 minutes'
+      ),
+      (
+        'ASSISTANT',
+        'Defina um teto de gastos diário e reserve o valor das passagens com antecedência. Quer que eu monte um orçamento a partir das suas transações?',
+        INTERVAL '1 minute'
+      ),
+      (
+        'USER',
+        'Quero sim, a viagem é em dezembro.',
+        INTERVAL '23 hours 58 minutes'
+      ),
+      (
+        'ASSISTANT',
+        'Separando R$ 300,00 por mês até dezembro você cobre hospedagem e alimentação sem usar o cartão de crédito.',
+        INTERVAL '23 hours 59 minutes'
+      )
+  ) AS m (role, content, offset_from_start)
+WHERE
+  u.email = 'teste@finup.local'
+  AND c.title = 'Como economizar na viagem de férias?'
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      conversation_messages cm
+    WHERE
+      cm.conversation_id = c.id
+  );

@@ -1,40 +1,50 @@
 {
   "stage": "REVIEWING",
-  "task": "[Backend] Implementar PATCH /api/v1/users/me/additional-info",
-  "objective": "Receber os dados das Etapas 2 e 3 do cadastro (phone, profession, birthDate, monthlyIncome) e persistir em user_financial_profiles, recuperaveis por GET /api/v1/users/{id}, com PATCH parcial real.",
+  "task": "[Backend] Implementar GET /api/v1/assistant/conversations/{id}/messages",
+  "objective": "Carregar as mensagens de uma conversa do historico do chat, na ordem de renderizacao, sem expor conversas de outros usuarios. Respostas: 200, 401, 403 (conversa de outro usuario), 404 (conversa inexistente).",
   "decisions": [
-    "Persistencia na tabela user_financial_profiles (nova entidade UserFinancialProfile, 1 por usuario, criada na primeira chamada). Colunas phone, profession, birth_date e monthly_income adicionadas via ALTER TABLE ... IF NOT EXISTS mais indice UNIQUE em user_id, em database/init/01-schema.sql",
-    "financialProfile saiu do corpo do PATCH (nao consta do contrato); users.financial_profile continua na tabela e na resposta, mas nao e mais gravado por este endpoint",
-    "GET /api/v1/users/{id} criado; so devolve o proprio usuario autenticado, id de outra pessoa da 404 (mesmo criterio do README para recursos de outros usuarios)",
-    "UserResponse ganhou phone e profession; birthDate e monthlyIncome passaram a vir do perfil. POST /users, GET /me, GET /{id} e PATCH usam o mesmo DTO",
-    "FinUp Score passou a ler a renda de user_financial_profiles (InMemoryFinUpScoreDataProvider via UserFinancialProfileRepository), para o PATCH continuar alimentando o calculo e a mensagem de dado insuficiente seguir correta",
-    "profession em branco responde 400; updatedAt da resposta e o mais recente entre users e user_financial_profiles"
+    "Nao existia persistencia de mensagens em nenhuma branch (develop, feature/integrate-ai-bedrock, docs/contrato-rest-rotas-pendentes). Foi criada a estrutura minima para a rota: tabela conversation_messages (FK para conversations, CHECK de role, indice por conversation_id e created_at), entidade ConversationMessage e enum MessageRole (USER, ASSISTANT). A gravacao das mensagens fica com a tarefa do POST /api/v1/assistant/messages",
+    "Ordem cronologica crescente (created_at ASC, id ASC so como desempate deterministico), que e a ordem de renderizacao do chat. O inverso do GET /conversations, que lista da mais recente para a mais antiga",
+    "Resposta e um array simples, sem paginacao, no mesmo formato do GET /conversations. Paginacao fica para quando houver volume que justifique",
+    "Conversa de outro usuario responde 403 porque o ticket define esse codigo. Diverge da convencao de categorias e transacoes, que respondem 404 para nao confirmar a existencia do id; registrado em open_questions",
+    "Ordem das verificacoes: usuario nao cadastrado (404), conversa inexistente (404), conversa de outro usuario (403). As mensagens so sao lidas depois da verificacao de dono",
+    "Mensagem de 404 usa o construtor de texto pronto de ResourceNotFoundException: o template generico gera 'Conversa nao encontrado'"
   ],
   "files_in_scope": [
     "database/init/01-schema.sql",
-    "src/main/java/br/com/finup/model/UserFinancialProfile.java",
-    "src/main/java/br/com/finup/repository/UserFinancialProfileRepository.java",
-    "src/main/java/br/com/finup/service/UserService.java",
-    "src/main/java/br/com/finup/dto/UpdateUserAdditionalInfoRequest.java",
-    "src/main/java/br/com/finup/dto/UserResponse.java",
-    "src/main/java/br/com/finup/mapper/UserMapper.java",
-    "src/main/java/br/com/finup/controller/UserController.java",
-    "src/test/java/br/com/finup/repository/UserFinancialProfileRepositoryTest.java",
-    "src/test/java/br/com/finup/service/UserServiceTest.java",
-    "src/test/java/br/com/finup/controller/UserControllerTest.java",
-    "README.md",
-    "src/main/java/br/com/finup/repository/InMemoryFinUpScoreDataProvider.java",
-    "src/test/java/br/com/finup/repository/InMemoryFinUpScoreDataProviderTest.java",
-    "src/test/java/br/com/finup/service/FinUpScoreServiceTest.java"
+    "database/init/03-test-data.sql",
+    "src/main/java/br/com/finup/model/ConversationMessage.java",
+    "src/main/java/br/com/finup/model/MessageRole.java",
+    "src/main/java/br/com/finup/repository/ConversationMessageRepository.java",
+    "src/main/java/br/com/finup/dto/ConversationMessageResponse.java",
+    "src/main/java/br/com/finup/mapper/ConversationMessageMapper.java",
+    "src/main/java/br/com/finup/service/ConversationService.java",
+    "src/main/java/br/com/finup/controller/ConversationController.java",
+    "src/test/java/br/com/finup/repository/ConversationMessageRepositoryTest.java",
+    "src/test/java/br/com/finup/service/ConversationServiceTest.java",
+    "src/test/java/br/com/finup/controller/ConversationControllerTest.java",
+    "src/test/java/br/com/finup/config/SecurityConfigTest.java",
+    "src/test/java/br/com/finup/OpenApiIntegrationTests.java",
+    "README.md"
   ],
   "validation": {
-    "mvn clean verify": "passed (178 testes, 0 falhas, spotless ok)",
-    "postgres real via docker compose": "validado pelo revisor no PR #31: ALTER, indice unico e seed passam; fluxo completo do PATCH/GET ok"
+    "mvn clean verify (SPRING_PROFILES_ACTIVE=dev)": "passed apos rebase sobre a develop com os PRs #31 e #32 (204 testes, 0 falhas, spotless ok)",
+    "mvn clean verify (com o .env local em dev,mock-auth)": "1 falha preexistente em OpenApiIntegrationTests.exposesOpenApiContractWithProjectMetadata, reproduzida na develop sem esta mudanca; ver open_questions",
+    "postgres real via docker compose (profile dev,mock-auth)": "volume criado do zero com os scripts de database/init em projeto compose isolado, removido ao final",
+    "200 dono": "4 mensagens seed na ordem USER, ASSISTANT, USER, ASSISTANT com createdAt crescente",
+    "200 conversa sem mensagens": "[]",
+    "401": "sem headers de identidade",
+    "403": "conversa de outro usuario responde 403 em RFC 7807 sem nenhum conteudo de mensagem no corpo",
+    "404": "conversa inexistente ('Conversa nao encontrada: <id>') e usuario sem cadastro",
+    "400": "id que nao e UUID",
+    "openapi": "rota documenta 200/400/401/403/404 e ConversationMessageResponse expoe role como enum USER/ASSISTANT"
   },
-  "review": "pendente",
-  "updated_at": "2026-09-30",
+  "review": "implementado em 2026-10-01 na branch feat/listar-mensagens-conversa. Commit, push e PR autorizados pelo solicitante em 2026-10-01. Pendente: revisao humana do PR.",
+  "updated_at": "2026-10-01",
   "open_questions": [
-    "Banco local ja existente precisa de docker compose down -v (ou aplicar o ALTER e o indice a mao): os scripts de database/init so rodam na criacao do volume",
-    "Sobras para uma issue: User.applyAdditionalInfo e as colunas users.birth_date e users.monthly_income nao sao mais usados pelo codigo de producao, e financialProfile segue na resposta sem endpoint que o grave"
+    "403 para conversa de outro usuario confirma a existencia do id, ao contrario de categorias e transacoes, que respondem 404. Implementado como o ticket pede; vale decidir no time se a convencao deve ser unica",
+    "OpenApiIntegrationTests nao fixa @ActiveProfiles(\"test\"): com SPRING_PROFILES_ACTIVE=dev,mock-auth no .env local, o esquema bearerAuth some do OpenAPI e o teste falha. Preexistente, fora do escopo",
+    "A tabela de endpoints do README nao lista GET /api/v1/assistant/conversations (PR #26). Fora do escopo",
+    "A gravacao de mensagens (POST /api/v1/assistant/messages) ainda responde 501 no contrato publicado; ate ela existir, so os dados seed alimentam esta rota"
   ]
 }

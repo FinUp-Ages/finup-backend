@@ -55,6 +55,8 @@ class OpenApiIntegrationTests {
         .andExpect(jsonPath("$.paths['/api/v1/transactions'].post").exists())
         .andExpect(jsonPath("$.paths['/api/v1/categories'].get").exists())
         .andExpect(jsonPath("$.paths['/api/v1/assistant/conversations'].get").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/assistant/conversations/{id}/messages'].get").exists())
         .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type").value("http"))
         .andExpect(jsonPath("$.components.schemas.CategoryListResponse.properties.id").exists())
         .andExpect(jsonPath("$.components.schemas.CategoryListResponse.properties.name").exists())
