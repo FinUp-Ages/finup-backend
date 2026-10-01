@@ -1,40 +1,25 @@
 {
   "stage": "REVIEWING",
-  "task": "[Backend] Ajustar POST /api/v1/transactions para usuario autenticado e categoria compativel",
-  "objective": "Impedir que o POST aceite categoria incompativel com o tipo da transacao, respondendo 422 em RFC 7807. Identidade autenticada e amount > 0 ja estavam corretos antes desta tarefa e ficam cobertos por teste de regressao.",
+  "task": "Publicar contrato REST das rotas pendentes",
+  "objective": "Fechar path, metodo, request, response e erros das rotas pendentes no Swagger e no Postman, para o App integrar com mocks.",
   "decisions": [
-    "Identidade e amount ja estavam corretos na develop antes desta tarefa: CreateTransactionRequest nunca teve userId (PR #18) e amount ja usa @Positive. O escopo real e a validacao de tipo da categoria; os outros itens do ticket viram teste de regressao",
-    "recurrenceFrequency permanece no contrato de entrada. O ticket omitiu o campo, mas ele foi introduzido no PR #24, e obrigatorio quando isRecurring e true e e exigido pela constraint chk_transactions_recurrence. Confirmado com o solicitante em 2026-09-29",
-    "amount <= 0 continua respondendo 400 (Bean Validation), nao 422. Verificado no repositorio finup-mobile que nenhuma branch tem codigo de transacoes nem tratamento por status code (o unico status testado e 204), portanto nao ha consumidor impactado. Mantem a convencao do projeto: formato e 400, regra de negocio e 422",
-    "A disponibilidade da categoria e a leitura do tipo ficam na mesma query nativa (findAvailableCategoryTypeForUser) em vez de injetar CategoryRepository no TransactionService: evita duplicar a regra de que categoria vale se e do usuario ou padrao do sistema, e evita duas consultas",
-    "O 404 de categoria indisponivel e avaliado antes do 422 de incompatibilidade. Invertido, um 422 em categoria privada de outro usuario confirmaria a existencia do id — o mesmo vazamento que a decisao de responder 404 em vez de 403 evita",
-    "categories.type e VARCHAR(50) nullable e sem CHECK no schema. Como a conversao para o enum passou a acontecer na leitura, uma categoria com type NULL passa a responder 404 e uma com valor fora do enum responde 500. Nenhum dos dois e alcancavel pela aplicacao (a entidade Category declara type como @Column(nullable = false) com @Enumerated(STRING)), so por escrita manual no banco. Nao foi adicionada defesa nem CHECK para nao expandir o escopo desta tarefa para persistencia"
+    "Rebase na develop (2026-10-01): POST /users com Bearer, PATCH additional-info, GET /categories, GET /payment-methods e POST /transactions (422, recurrenceFrequency) ja estavam implementados. Restaram como stub 501 so GET /transactions e POST /assistant/messages",
+    "Contrato do GET /transactions: filtros startDate, endDate, type, categoryId, page, size; resposta paginada {items,page,size,totalItems,totalPages}",
+    "Contrato do POST /assistant/messages: {conversationId?,message<=2000} -> {conversationId,messageId,reply,createdAt}",
+    "userId removido de TransactionResponse (a identidade do dono nunca e devolvida ao cliente)",
+    "GET /transactions devolve tambem as series recorrentes: a transacao original (isRecurring=true) e as ocorrencias geradas (recurrenceOriginId preenchido)"
   ],
   "files_in_scope": [
-    "src/main/java/br/com/finup/exception/IncompatibleTransactionCategoryException.java",
-    "src/main/java/br/com/finup/repository/TransactionRepository.java",
-    "src/main/java/br/com/finup/service/TransactionService.java",
     "src/main/java/br/com/finup/controller/TransactionController.java",
-    "src/test/java/br/com/finup/repository/TransactionRepositoryTest.java",
-    "src/test/java/br/com/finup/service/TransactionServiceTest.java",
-    "src/test/java/br/com/finup/controller/TransactionControllerTest.java",
+    "src/main/java/br/com/finup/controller/AssistantController.java",
+    "src/main/java/br/com/finup/dto/",
+    "src/test/java/br/com/finup/",
+    "postman/",
     "README.md"
   ],
   "validation": {
-    "mvn clean verify": "passed (173 testes, 0 falhas, spotless ok). Eram 167 antes: +3 em TransactionServiceTest, +2 em TransactionControllerTest, +1 em TransactionRepositoryTest",
-    "postgres real via docker compose (profile dev,mock-auth)": "validado neste ambiente, volume criado do zero com os scripts de database/init",
-    "categoria incompativel (Salario INCOME + type EXPENSE)": "422 em RFC 7807, detail='Categoria do tipo INCOME nao pode ser usada em transacao do tipo EXPENSE'",
-    "userId falso no corpo": "201 e a transacao fica com o user_id da identidade autenticada; SELECT confirma 0 transacoes com o userId enviado pelo cliente",
-    "ordem 404 antes de 422": "categoria privada INCOME de outro usuario com type EXPENSE responde 404, nunca 422 — nao confirma a existencia do id",
-    "regressao de recorrencia (PR #24)": "Salario INCOME + type INCOME + MONTHLY em 2026-01-31 responde 201 com lastOccurrenceDate=2026-01-31 e nextOccurrenceDate=2026-02-28",
-    "regressao de amount": "amount negativo responde 400 com fields[0].message='deve ser maior que zero', mantido de proposito",
-    "integridade no banco": "0 transacoes com categoria de tipo divergente; user_id de todas as transacoes criadas pertence a mock-sub-usuario-teste",
-    "openapi": "POST /api/v1/transactions documenta 201/400/401/404/422, o 422 cita a incompatibilidade de tipo, e CreateTransactionRequest nao expoe userId"
+    "mvn clean verify": "passed (178 testes, 0 falhas, spotless ok)"
   },
-  "review": "implementado em 2026-09-29 na branch fix/transaction-category-type-validation. Nenhuma alteracao foi feita na develop. Os tres itens do ticket que ja estavam corretos (identidade, amount, contrato sem userId) ficaram cobertos por teste de regressao em vez de reimplementados. Criterio de aceite do GET movido para a tarefa do colega por decisao do solicitante; o lado do POST foi validado por SELECT direto no banco. Pendente: revisao humana do diff e autorizacao para commit, push e PR.",
-  "updated_at": "2026-09-29",
-  "open_questions": [
-    "Criterio de aceite 'GET /api/v1/transactions reflete a transacao recem-criada imediatamente' NAO e verificavel nesta tarefa: o endpoint nao existe no repositorio (TransactionController so tem @PostMapping). Por decisao do solicitante em 2026-09-29 o criterio foi movido para a tarefa do GET, que esta com outro dev e ainda nao iniciada, e esta tarefa segue sem ele. O lado sob controle do POST (a transacao e comitada com o user_id da identidade autenticada) fica validado por teste e por consulta direta ao banco",
-    "A tarefa do GET /api/v1/transactions precisa definir se ocorrencias geradas de series recorrentes aparecem na listagem ou somente as transacoes originais. Decisao do GET, mas afeta o contrato que o POST cria. Nao ha rastreador acessivel a partir deste ambiente para registrar isso na tarefa do colega"
-  ]
+  "review": "pending",
+  "updated_at": "2026-10-01"
 }

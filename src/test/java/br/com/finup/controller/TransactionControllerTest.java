@@ -99,7 +99,7 @@ class TransactionControllerTest {
         .andExpect(status().isCreated())
         .andExpect(header().string("Location", "/api/v1/transactions/" + transaction.getId()))
         .andExpect(jsonPath("$.id").value(transaction.getId().toString()))
-        .andExpect(jsonPath("$.userId").value(userId.toString()))
+        .andExpect(jsonPath("$.userId").doesNotExist())
         .andExpect(jsonPath("$.categoryId").value(categoryId.toString()))
         .andExpect(jsonPath("$.paymentMethodId").doesNotExist())
         .andExpect(jsonPath("$.type").value("INCOME"))
@@ -314,8 +314,7 @@ class TransactionControllerTest {
                     """
                         .formatted(spoofedUserId, categoryId)))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.userId").value(authenticatedUserId.toString()))
-        .andExpect(jsonPath("$.userId").value(not(spoofedUserId.toString())));
+        .andExpect(jsonPath("$.userId").doesNotExist());
   }
 
   @Test

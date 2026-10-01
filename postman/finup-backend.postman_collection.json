@@ -1,0 +1,1671 @@
+{
+  "info": {
+    "name": "finup-backend",
+    "description": "Contrato REST das rotas do FinUp. As respostas salvas em cada request sao os exemplos de mock para o App.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Criar usuario (Etapa 1)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "description": "Token JWT do Cognito"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users"
+          ]
+        },
+        "description": "Exige o access token do Cognito (Authorization: Bearer). Sem corpo: a identidade vem do token."
+      },
+      "response": [
+        {
+          "name": "201 Criado",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "description": "Exige token Bearer. Sem corpo: a identidade vem do token."
+          },
+          "status": "Created",
+          "code": 201,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"id\": \"3f0c1a52-7a5d-4c0e-9d0b-1a2b3c4d5e6f\",\n  \"name\": \"Ana Souza\",\n  \"email\": \"ana@exemplo.com\",\n  \"birthDate\": null,\n  \"monthlyIncome\": null,\n  \"financialProfile\": null,\n  \"createdAt\": \"2026-10-01T15:00:00Z\",\n  \"updatedAt\": \"2026-10-01T15:00:00Z\"\n}"
+        },
+        {
+          "name": "401 Token ausente",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "description": "Exige token Bearer. Sem corpo: a identidade vem do token."
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Token ausente, invalido ou expirado\"\n}"
+        },
+        {
+          "name": "409 Usuario ja existe",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "description": "Exige token Bearer. Sem corpo: a identidade vem do token."
+          },
+          "status": "Conflict",
+          "code": 409,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Conflict\",\n  \"status\": 409,\n  \"detail\": \"Ja existe usuario para esta identidade ou e-mail\"\n}"
+        },
+        {
+          "name": "503 Cognito indisponivel",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "description": "Exige token Bearer. Sem corpo: a identidade vem do token."
+          },
+          "status": "Service Unavailable",
+          "code": 503,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Service Unavailable\",\n  \"status\": 503,\n  \"detail\": \"Cognito indisponivel ao buscar e-mail e nome da identidade\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Atualizar informacoes complementares (Etapa 2)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "description": "Token JWT do Cognito"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/me/additional-info",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users",
+            "me",
+            "additional-info"
+          ]
+        },
+        "description": "Todos os campos sao opcionais; so o que vier preenchido e atualizado.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"birthDate\": \"1998-04-12\",\n  \"monthlyIncome\": 3500.0,\n  \"financialProfile\": \"MODERATE\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [
+        {
+          "name": "200 Atualizado",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/additional-info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "additional-info"
+              ]
+            },
+            "description": "Todos os campos sao opcionais; so o que vier preenchido e atualizado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"birthDate\": \"1998-04-12\",\n  \"monthlyIncome\": 3500.0,\n  \"financialProfile\": \"MODERATE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"id\": \"3f0c1a52-7a5d-4c0e-9d0b-1a2b3c4d5e6f\",\n  \"name\": \"Ana Souza\",\n  \"email\": \"ana@exemplo.com\",\n  \"birthDate\": \"1998-04-12\",\n  \"monthlyIncome\": 3500.0,\n  \"financialProfile\": \"MODERATE\",\n  \"createdAt\": \"2026-10-01T15:00:00Z\",\n  \"updatedAt\": \"2026-10-01T15:05:00Z\"\n}"
+        },
+        {
+          "name": "400 Campos invalidos",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/additional-info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "additional-info"
+              ]
+            },
+            "description": "Todos os campos sao opcionais; so o que vier preenchido e atualizado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"birthDate\": \"1998-04-12\",\n  \"monthlyIncome\": 3500.0,\n  \"financialProfile\": \"MODERATE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "status": "Bad Request",
+          "code": 400,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/validation\",\n  \"title\": \"Requisicao invalida\",\n  \"status\": 400,\n  \"detail\": \"Um ou mais campos estao invalidos.\",\n  \"fields\": [\n    {\n      \"field\": \"monthlyIncome\",\n      \"message\": \"nao pode ser negativa\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "401 Nao autenticado",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/additional-info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "additional-info"
+              ]
+            },
+            "description": "Todos os campos sao opcionais; so o que vier preenchido e atualizado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"birthDate\": \"1998-04-12\",\n  \"monthlyIncome\": 3500.0,\n  \"financialProfile\": \"MODERATE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Identidade autenticada ausente ou incompleta\"\n}"
+        },
+        {
+          "name": "404 Etapa 1 nao feita",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/additional-info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "additional-info"
+              ]
+            },
+            "description": "Todos os campos sao opcionais; so o que vier preenchido e atualizado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"birthDate\": \"1998-04-12\",\n  \"monthlyIncome\": 3500.0,\n  \"financialProfile\": \"MODERATE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "status": "Not Found",
+          "code": 404,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"Usuario nao encontrado\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Listar categorias",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "description": "Token JWT do Cognito"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/categories",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "categories"
+          ]
+        },
+        "description": "Categorias do usuario e as padrao do sistema."
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ]
+            },
+            "description": "Categorias do usuario e as padrao do sistema."
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "[\n  {\n    \"id\": \"8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b\",\n    \"name\": \"Alimentacao\",\n    \"type\": \"EXPENSE\"\n  },\n  {\n    \"id\": \"d4e5f6a7-b8c9-4d0e-8f1a-2b3c4d5e6f70\",\n    \"name\": \"Salario\",\n    \"type\": \"INCOME\"\n  }\n]"
+        },
+        {
+          "name": "401 Nao autenticado",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ]
+            },
+            "description": "Categorias do usuario e as padrao do sistema."
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Identidade autenticada ausente ou incompleta\"\n}"
+        },
+        {
+          "name": "404 Etapa 1 nao feita",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ]
+            },
+            "description": "Categorias do usuario e as padrao do sistema."
+          },
+          "status": "Not Found",
+          "code": 404,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"Usuario nao encontrado\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Listar meios de pagamento",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "description": "Token JWT do Cognito"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/payment-methods",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "payment-methods"
+          ]
+        },
+        "description": "Meios de pagamento ativos do usuario autenticado."
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payment-methods",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payment-methods"
+              ]
+            },
+            "description": "Meios de pagamento ativos do usuario autenticado. Hoje responde 501; use o exemplo 200 como mock."
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "[\n  {\n    \"id\": \"b7c8d9e0-f1a2-4b3c-9d4e-5f6a7b8c9d0e\",\n    \"name\": \"Cartao Nubank\"\n  },\n  {\n    \"id\": \"e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a81\",\n    \"name\": \"Pix\"\n  }\n]"
+        },
+        {
+          "name": "401 Nao autenticado",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payment-methods",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payment-methods"
+              ]
+            },
+            "description": "Meios de pagamento ativos do usuario autenticado. Hoje responde 501; use o exemplo 200 como mock."
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Identidade autenticada ausente ou incompleta\"\n}"
+        },
+        {
+          "name": "404 Etapa 1 nao feita",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payment-methods",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payment-methods"
+              ]
+            },
+            "description": "Meios de pagamento ativos do usuario autenticado. Hoje responde 501; use o exemplo 200 como mock."
+          },
+          "status": "Not Found",
+          "code": 404,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"Usuario nao encontrado\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Listar transacoes",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "description": "Token JWT do Cognito"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/transactions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "transactions"
+          ],
+          "query": [
+            {
+              "key": "startDate",
+              "value": "2026-09-01",
+              "disabled": true
+            },
+            {
+              "key": "endDate",
+              "value": "2026-09-30",
+              "disabled": true
+            },
+            {
+              "key": "type",
+              "value": "EXPENSE",
+              "disabled": true
+            },
+            {
+              "key": "categoryId",
+              "value": "8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b",
+              "disabled": true
+            },
+            {
+              "key": "page",
+              "value": "0",
+              "disabled": true
+            },
+            {
+              "key": "size",
+              "value": "20",
+              "disabled": true
+            }
+          ]
+        },
+        "description": "Paginada, da mais recente para a mais antiga. Devolve as transacoes avulsas, as que abrem uma serie recorrente (isRecurring=true) e as ocorrencias geradas das series (recurrenceOriginId aponta para a transacao original). Filtros opcionais combinados com E. size de 1 a 100. Hoje responde 501."
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-09-01",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-09-30",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "EXPENSE",
+                  "disabled": true
+                },
+                {
+                  "key": "categoryId",
+                  "value": "8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "20",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Paginada, da mais recente para a mais antiga. Filtros opcionais combinados com E. size de 1 a 100. Hoje responde 501."
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"items\": [\n    {\n      \"id\": \"c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f\",\n      \"categoryId\": \"8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b\",\n      \"paymentMethodId\": \"b7c8d9e0-f1a2-4b3c-9d4e-5f6a7b8c9d0e\",\n      \"type\": \"EXPENSE\",\n      \"description\": \"Supermercado\",\n      \"amount\": 320.0,\n      \"transactionDate\": \"2026-09-12\",\n      \"isRecurring\": false,\n      \"createdAt\": \"2026-10-01T15:10:00Z\",\n      \"updatedAt\": \"2026-10-01T15:10:00Z\"\n    },\n    {\n      \"id\": \"66666666-7777-4888-8999-000000000000\",\n      \"categoryId\": \"8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b\",\n      \"paymentMethodId\": \"b7c8d9e0-f1a2-4b3c-9d4e-5f6a7b8c9d0e\",\n      \"type\": \"EXPENSE\",\n      \"description\": \"Aluguel\",\n      \"amount\": 320.0,\n      \"transactionDate\": \"2026-09-05\",\n      \"isRecurring\": false,\n      \"createdAt\": \"2026-10-01T15:10:00Z\",\n      \"updatedAt\": \"2026-10-01T15:10:00Z\",\n      \"recurrenceFrequency\": null,\n      \"lastOccurrenceDate\": null,\n      \"nextOccurrenceDate\": null,\n      \"recurrenceOriginId\": \"11111111-2222-4333-8444-555555555555\"\n    },\n    {\n      \"id\": \"11111111-2222-4333-8444-555555555555\",\n      \"categoryId\": \"8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b\",\n      \"paymentMethodId\": \"b7c8d9e0-f1a2-4b3c-9d4e-5f6a7b8c9d0e\",\n      \"type\": \"EXPENSE\",\n      \"description\": \"Aluguel\",\n      \"amount\": 320.0,\n      \"transactionDate\": \"2026-08-05\",\n      \"isRecurring\": true,\n      \"createdAt\": \"2026-10-01T15:10:00Z\",\n      \"updatedAt\": \"2026-10-01T15:10:00Z\",\n      \"recurrenceFrequency\": \"MONTHLY\",\n      \"lastOccurrenceDate\": \"2026-09-05\",\n      \"nextOccurrenceDate\": \"2026-10-05\"\n    }\n  ],\n  \"page\": 0,\n  \"size\": 20,\n  \"totalItems\": 3,\n  \"totalPages\": 1\n}"
+        },
+        {
+          "name": "400 Filtro invalido",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-09-01",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-09-30",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "EXPENSE",
+                  "disabled": true
+                },
+                {
+                  "key": "categoryId",
+                  "value": "8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "20",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Paginada, da mais recente para a mais antiga. Filtros opcionais combinados com E. size de 1 a 100. Hoje responde 501."
+          },
+          "status": "Bad Request",
+          "code": 400,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/validation\",\n  \"title\": \"Requisicao invalida\",\n  \"status\": 400,\n  \"detail\": \"Um ou mais campos estao invalidos.\",\n  \"fields\": [\n    {\n      \"field\": \"size\",\n      \"message\": \"deve ser no maximo 100\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "401 Nao autenticado",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-09-01",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-09-30",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "EXPENSE",
+                  "disabled": true
+                },
+                {
+                  "key": "categoryId",
+                  "value": "8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "20",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Paginada, da mais recente para a mais antiga. Filtros opcionais combinados com E. size de 1 a 100. Hoje responde 501."
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Identidade autenticada ausente ou incompleta\"\n}"
+        },
+        {
+          "name": "404 Etapa 1 nao feita",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-09-01",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-09-30",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "EXPENSE",
+                  "disabled": true
+                },
+                {
+                  "key": "categoryId",
+                  "value": "8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "20",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Paginada, da mais recente para a mais antiga. Filtros opcionais combinados com E. size de 1 a 100. Hoje responde 501."
+          },
+          "status": "Not Found",
+          "code": 404,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"Usuario nao encontrado\"\n}"
+        },
+        {
+          "name": "501 Ainda nao implementado",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-09-01",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-09-30",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "EXPENSE",
+                  "disabled": true
+                },
+                {
+                  "key": "categoryId",
+                  "value": "8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "20",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Paginada, da mais recente para a mais antiga. Filtros opcionais combinados com E. size de 1 a 100. Hoje responde 501."
+          },
+          "status": "Not Implemented",
+          "code": 501,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"about:blank\",\n  \"title\": \"Not Implemented\",\n  \"status\": 501\n}"
+        }
+      ]
+    },
+    {
+      "name": "Registrar transacao",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "description": "Token JWT do Cognito"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/transactions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "transactions"
+          ]
+        },
+        "description": "categoryId, type, amount (>0, ate 10 inteiros e 2 decimais), transactionDate e isRecurring sao obrigatorios. recurrenceFrequency e obrigatoria quando isRecurring e true e ausente quando e false. description ate 255 caracteres. paymentMethodId opcional. Categoria e meio de pagamento precisam ser do proprio usuario (categoria padrao tambem vale) e a categoria precisa ter o mesmo tipo da transacao.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"categoryId\": \"8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b\",\n  \"paymentMethodId\": \"b7c8d9e0-f1a2-4b3c-9d4e-5f6a7b8c9d0e\",\n  \"type\": \"EXPENSE\",\n  \"description\": \"Supermercado\",\n  \"amount\": 320.0,\n  \"transactionDate\": \"2026-09-12\",\n  \"isRecurring\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [
+        {
+          "name": "201 Criada",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ]
+            },
+            "description": "categoryId, type, amount (>0, ate 10 inteiros e 2 decimais), transactionDate e isRecurring sao obrigatorios. description ate 255 caracteres. paymentMethodId opcional. Categoria e meio de pagamento precisam ser do proprio usuario (ou categoria padrao).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b\",\n  \"paymentMethodId\": \"b7c8d9e0-f1a2-4b3c-9d4e-5f6a7b8c9d0e\",\n  \"type\": \"EXPENSE\",\n  \"description\": \"Supermercado\",\n  \"amount\": 320.0,\n  \"transactionDate\": \"2026-09-12\",\n  \"isRecurring\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "status": "Created",
+          "code": 201,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"id\": \"c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f\",\n  \"categoryId\": \"8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b\",\n  \"paymentMethodId\": \"b7c8d9e0-f1a2-4b3c-9d4e-5f6a7b8c9d0e\",\n  \"type\": \"EXPENSE\",\n  \"description\": \"Supermercado\",\n  \"amount\": 320.0,\n  \"transactionDate\": \"2026-09-12\",\n  \"isRecurring\": false,\n  \"recurrenceFrequency\": null,\n  \"lastOccurrenceDate\": null,\n  \"nextOccurrenceDate\": null,\n  \"recurrenceOriginId\": null,\n  \"createdAt\": \"2026-10-01T15:10:00Z\",\n  \"updatedAt\": \"2026-10-01T15:10:00Z\"\n}"
+        },
+        {
+          "name": "400 Campos invalidos",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ]
+            },
+            "description": "categoryId, type, amount (>0, ate 10 inteiros e 2 decimais), transactionDate e isRecurring sao obrigatorios. description ate 255 caracteres. paymentMethodId opcional. Categoria e meio de pagamento precisam ser do proprio usuario (ou categoria padrao).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b\",\n  \"paymentMethodId\": \"b7c8d9e0-f1a2-4b3c-9d4e-5f6a7b8c9d0e\",\n  \"type\": \"EXPENSE\",\n  \"description\": \"Supermercado\",\n  \"amount\": 320.0,\n  \"transactionDate\": \"2026-09-12\",\n  \"isRecurring\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "status": "Bad Request",
+          "code": 400,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/validation\",\n  \"title\": \"Requisicao invalida\",\n  \"status\": 400,\n  \"detail\": \"Um ou mais campos estao invalidos.\",\n  \"fields\": [\n    {\n      \"field\": \"amount\",\n      \"message\": \"deve ser maior que zero\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "401 Nao autenticado",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ]
+            },
+            "description": "categoryId, type, amount (>0, ate 10 inteiros e 2 decimais), transactionDate e isRecurring sao obrigatorios. description ate 255 caracteres. paymentMethodId opcional. Categoria e meio de pagamento precisam ser do proprio usuario (ou categoria padrao).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b\",\n  \"paymentMethodId\": \"b7c8d9e0-f1a2-4b3c-9d4e-5f6a7b8c9d0e\",\n  \"type\": \"EXPENSE\",\n  \"description\": \"Supermercado\",\n  \"amount\": 320.0,\n  \"transactionDate\": \"2026-09-12\",\n  \"isRecurring\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Identidade autenticada ausente ou incompleta\"\n}"
+        },
+        {
+          "name": "404 Referencia inexistente",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ]
+            },
+            "description": "categoryId, type, amount (>0, ate 10 inteiros e 2 decimais), transactionDate e isRecurring sao obrigatorios. description ate 255 caracteres. paymentMethodId opcional. Categoria e meio de pagamento precisam ser do proprio usuario (ou categoria padrao).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b\",\n  \"paymentMethodId\": \"b7c8d9e0-f1a2-4b3c-9d4e-5f6a7b8c9d0e\",\n  \"type\": \"EXPENSE\",\n  \"description\": \"Supermercado\",\n  \"amount\": 320.0,\n  \"transactionDate\": \"2026-09-12\",\n  \"isRecurring\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "status": "Not Found",
+          "code": 404,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"Categoria nao encontrada\"\n}"
+        },
+        {
+          "name": "422 Categoria incompativel",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ]
+            },
+            "description": "categoryId, type, amount (>0, ate 10 inteiros e 2 decimais), transactionDate e isRecurring sao obrigatorios. description ate 255 caracteres. paymentMethodId opcional. Categoria e meio de pagamento precisam ser do proprio usuario (ou categoria padrao).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"8a1e2b34-5c6d-4e7f-8a9b-0c1d2e3f4a5b\",\n  \"paymentMethodId\": \"b7c8d9e0-f1a2-4b3c-9d4e-5f6a7b8c9d0e\",\n  \"type\": \"EXPENSE\",\n  \"description\": \"Supermercado\",\n  \"amount\": 320.0,\n  \"transactionDate\": \"2026-09-12\",\n  \"isRecurring\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "status": "Unprocessable Entity",
+          "code": 422,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"Categoria do tipo INCOME nao pode ser usada em transacao do tipo EXPENSE\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Enviar mensagem ao assistente",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "description": "Token JWT do Cognito"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/assistant/messages",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "assistant",
+            "messages"
+          ]
+        },
+        "description": "Resposta sincrona. Omita conversationId na primeira mensagem e reenvie o valor devolvido nas seguintes. Hoje responde 501. O historico de conversas ja existe em GET /api/v1/assistant/conversations.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"Quanto gastei com alimentacao este mes?\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "messages"
+              ]
+            },
+            "description": "Resposta sincrona. Omita conversationId na primeira mensagem e reenvie o valor devolvido nas seguintes. Hoje responde 501.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Quanto gastei com alimentacao este mes?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"conversationId\": \"f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b92\",\n  \"messageId\": \"a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9c03\",\n  \"reply\": \"Neste mes voce gastou R$ 820,00 com alimentacao.\",\n  \"createdAt\": \"2026-10-01T15:20:00Z\"\n}"
+        },
+        {
+          "name": "400 Mensagem invalida",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "messages"
+              ]
+            },
+            "description": "Resposta sincrona. Omita conversationId na primeira mensagem e reenvie o valor devolvido nas seguintes. Hoje responde 501.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Quanto gastei com alimentacao este mes?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "status": "Bad Request",
+          "code": 400,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/validation\",\n  \"title\": \"Requisicao invalida\",\n  \"status\": 400,\n  \"detail\": \"Um ou mais campos estao invalidos.\",\n  \"fields\": [\n    {\n      \"field\": \"message\",\n      \"message\": \"nao pode estar em branco\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "401 Nao autenticado",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "messages"
+              ]
+            },
+            "description": "Resposta sincrona. Omita conversationId na primeira mensagem e reenvie o valor devolvido nas seguintes. Hoje responde 501.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Quanto gastei com alimentacao este mes?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Identidade autenticada ausente ou incompleta\"\n}"
+        },
+        {
+          "name": "429 Limite excedido",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "messages"
+              ]
+            },
+            "description": "Resposta sincrona. Omita conversationId na primeira mensagem e reenvie o valor devolvido nas seguintes. Hoje responde 501.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Quanto gastei com alimentacao este mes?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "status": "Too Many Requests",
+          "code": 429,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Too Many Requests\",\n  \"status\": 429,\n  \"detail\": \"Limite de mensagens excedido\"\n}"
+        },
+        {
+          "name": "503 Indisponivel",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "messages"
+              ]
+            },
+            "description": "Resposta sincrona. Omita conversationId na primeira mensagem e reenvie o valor devolvido nas seguintes. Hoje responde 501.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Quanto gastei com alimentacao este mes?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "status": "Service Unavailable",
+          "code": 503,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"https://finup.com.br/errors/business-rule\",\n  \"title\": \"Service Unavailable\",\n  \"status\": 503,\n  \"detail\": \"Assistente temporariamente indisponivel\"\n}"
+        },
+        {
+          "name": "501 Ainda nao implementado",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Token JWT do Cognito"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "messages"
+              ]
+            },
+            "description": "Resposta sincrona. Omita conversationId na primeira mensagem e reenvie o valor devolvido nas seguintes. Hoje responde 501.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Quanto gastei com alimentacao este mes?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "status": "Not Implemented",
+          "code": 501,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/problem+json"
+            }
+          ],
+          "body": "{\n  \"type\": \"about:blank\",\n  \"title\": \"Not Implemented\",\n  \"status\": 501\n}"
+        }
+      ]
+    }
+  ]
+}

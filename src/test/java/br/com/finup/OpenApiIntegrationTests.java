@@ -65,6 +65,21 @@ class OpenApiIntegrationTests {
   }
 
   @Test
+  @DisplayName("contrato OpenAPI publica as rotas do contrato REST")
+  void exposesPendingRoutes() throws Exception {
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/api/v1/users/me/additional-info'].patch").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/categories'].get").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/payment-methods'].get").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/transactions'].get").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/transactions'].post").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/assistant/messages'].post").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/transactions'].get.parameters").isArray());
+  }
+
+  @Test
   @DisplayName("Swagger UI redireciona para a interface")
   void redirectsSwaggerUiToItsInterface() throws Exception {
     mockMvc
