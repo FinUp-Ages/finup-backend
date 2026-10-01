@@ -47,6 +47,10 @@ class TransactionRepositoryTest {
   }
 
   private UUID insertCategory(UUID ownerId, boolean isDefault) {
+    return insertCategory(ownerId, isDefault, TransactionType.EXPENSE);
+  }
+
+  private UUID insertCategory(UUID ownerId, boolean isDefault, TransactionType type) {
     UUID categoryId = UUID.randomUUID();
     jdbcTemplate.update(
         "INSERT INTO categories (id, user_id, name, type, is_default, created_at, updated_at)"
@@ -54,7 +58,7 @@ class TransactionRepositoryTest {
         categoryId,
         ownerId,
         "Alimentação",
-        "EXPENSE",
+        type.name(),
         isDefault);
     return categoryId;
   }
@@ -73,12 +77,25 @@ class TransactionRepositoryTest {
     UUID ownCategoryId = insertCategory(userId, false);
     UUID defaultCategoryId = insertCategory(null, true);
 
-    assertThat(transactionRepository.existsCategoryAvailableForUser(ownCategoryId, userId))
-        .isTrue();
-    assertThat(transactionRepository.existsCategoryAvailableForUser(defaultCategoryId, userId))
-        .isTrue();
-    assertThat(transactionRepository.existsCategoryAvailableForUser(UUID.randomUUID(), userId))
-        .isFalse();
+    assertThat(transactionRepository.findAvailableCategoryTypeForUser(ownCategoryId, userId))
+        .contains("EXPENSE");
+    assertThat(transactionRepository.findAvailableCategoryTypeForUser(defaultCategoryId, userId))
+        .contains("EXPENSE");
+    assertThat(transactionRepository.findAvailableCategoryTypeForUser(UUID.randomUUID(), userId))
+        .isEmpty();
+  }
+
+  @Test
+  @DisplayName("devolve o tipo real de cada categoria disponivel")
+  void returnsTypeOfAvailableCategory() {
+    UUID userId = insertUser();
+    UUID incomeCategoryId = insertCategory(userId, false, TransactionType.INCOME);
+    UUID expenseCategoryId = insertCategory(null, true, TransactionType.EXPENSE);
+
+    assertThat(transactionRepository.findAvailableCategoryTypeForUser(incomeCategoryId, userId))
+        .contains("INCOME");
+    assertThat(transactionRepository.findAvailableCategoryTypeForUser(expenseCategoryId, userId))
+        .contains("EXPENSE");
   }
 
   @Test
@@ -89,10 +106,11 @@ class TransactionRepositoryTest {
     UUID otherUsersCategoryId = insertCategory(otherUserId, false);
 
     assertThat(
-            transactionRepository.existsCategoryAvailableForUser(otherUsersCategoryId, otherUserId))
-        .isTrue();
-    assertThat(transactionRepository.existsCategoryAvailableForUser(otherUsersCategoryId, userId))
-        .isFalse();
+            transactionRepository.findAvailableCategoryTypeForUser(
+                otherUsersCategoryId, otherUserId))
+        .contains("EXPENSE");
+    assertThat(transactionRepository.findAvailableCategoryTypeForUser(otherUsersCategoryId, userId))
+        .isEmpty();
   }
 
   @Test

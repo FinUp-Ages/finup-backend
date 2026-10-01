@@ -1,5 +1,6 @@
 package br.com.finup.service;
 
+import br.com.finup.exception.IncompatibleTransactionCategoryException;
 import br.com.finup.exception.InvalidTransactionRecurrenceException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.RecurrenceFrequency;
@@ -41,6 +42,8 @@ public class TransactionService {
    *
    * @throws InvalidTransactionRecurrenceException se {@code recurring} e {@code
    *     recurrenceFrequency} se contradizem
+   * @throws IncompatibleTransactionCategoryException se o tipo da categoria nao for o mesmo tipo da
+   *     transacao
    * @throws ResourceNotFoundException se a identidade nao tiver usuario local, ou se a categoria ou
    *     o meio de pagamento nao existir ou pertencer a outro usuario
    */
@@ -59,7 +62,7 @@ public class TransactionService {
     validateRecurrence(recurring, recurrenceFrequency);
 
     User user = userService.findByAuthenticatedIdentity(identity);
-    requireAvailableReferences(user.getId(), categoryId, paymentMethodId);
+    requireAvailableReferences(user.getId(), categoryId, type, paymentMethodId);
 
     Transaction transaction =
         transactionRepository.save(
@@ -80,10 +83,21 @@ public class TransactionService {
   /**
    * Referencia de outro usuario responde 404, e nao 403: um 403 confirmaria a existencia do id para
    * quem nao deveria saber dela. Mesma decisao tomada no CRUD de categorias.
+   *
+   * <p>Por isso a indisponibilidade da categoria (404) e avaliada antes da incompatibilidade de
+   * tipo (422): na ordem inversa, um 422 em categoria privada de outro usuario confirmaria a
+   * existencia daquele id — exatamente o vazamento que o 404 evita.
    */
-  private void requireAvailableReferences(UUID userId, UUID categoryId, UUID paymentMethodId) {
-    if (!transactionRepository.existsCategoryAvailableForUser(categoryId, userId)) {
-      throw new ResourceNotFoundException("Categoria", categoryId);
+  private void requireAvailableReferences(
+      UUID userId, UUID categoryId, TransactionType type, UUID paymentMethodId) {
+    TransactionType categoryType =
+        transactionRepository
+            .findAvailableCategoryTypeForUser(categoryId, userId)
+            .map(TransactionType::valueOf)
+            .orElseThrow(() -> new ResourceNotFoundException("Categoria", categoryId));
+
+    if (categoryType != type) {
+      throw new IncompatibleTransactionCategoryException(categoryType, type);
     }
 
     if (paymentMethodId != null

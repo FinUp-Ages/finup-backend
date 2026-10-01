@@ -1,5 +1,6 @@
 package br.com.finup.controller;
 
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -9,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.finup.exception.IncompatibleTransactionCategoryException;
 import br.com.finup.exception.InvalidTransactionRecurrenceException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.RecurrenceFrequency;
@@ -217,6 +219,103 @@ class TransactionControllerTest {
                         .formatted(UUID.randomUUID())))
         .andExpect(status().isBadRequest());
     verifyNoInteractions(transactionService);
+  }
+
+  @Test
+  @DisplayName("categoria com tipo incompativel devolve 422 no formato RFC 7807, nunca 201")
+  void incompatibleCategoryTypeReturns422() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+    when(transactionService.register(
+            eq(IDENTITY),
+            eq(categoryId),
+            isNull(),
+            eq(TransactionType.EXPENSE),
+            isNull(),
+            eq(new BigDecimal("10.00")),
+            eq(LocalDate.of(2026, 9, 12)),
+            eq(false),
+            isNull()))
+        .thenThrow(
+            new IncompatibleTransactionCategoryException(
+                TransactionType.INCOME, TransactionType.EXPENSE));
+
+    mockMvc
+        .perform(
+            post("/api/v1/transactions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "categoryId": "%s",
+                      "type": "EXPENSE",
+                      "amount": 10.00,
+                      "transactionDate": "2026-09-12",
+                      "isRecurring": false
+                    }
+                    """
+                        .formatted(categoryId)))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(status().is(not(201)))
+        .andExpect(jsonPath("$.status").value(422))
+        .andExpect(
+            jsonPath("$.detail")
+                .value("Categoria do tipo INCOME nao pode ser usada em transacao do tipo EXPENSE"))
+        .andExpect(jsonPath("$.traceId").exists());
+  }
+
+  /**
+   * Regressao do contrato de identidade: {@code userId} nao faz parte do corpo, entao um {@code
+   * userId} enviado pelo cliente e ignorado e a transacao sai no nome de quem esta autenticado.
+   */
+  @Test
+  @DisplayName("userId enviado no corpo e ignorado: a transacao fica com o usuario autenticado")
+  void userIdInBodyIsIgnored() throws Exception {
+    UUID authenticatedUserId = UUID.randomUUID();
+    UUID spoofedUserId = UUID.randomUUID();
+    UUID categoryId = UUID.randomUUID();
+    LocalDate date = LocalDate.of(2026, 9, 12);
+    Transaction transaction =
+        Transaction.register(
+            authenticatedUserId,
+            categoryId,
+            null,
+            TransactionType.EXPENSE,
+            "Mercado",
+            new BigDecimal("250.00"),
+            date,
+            null);
+    when(transactionService.register(
+            eq(IDENTITY),
+            eq(categoryId),
+            isNull(),
+            eq(TransactionType.EXPENSE),
+            eq("Mercado"),
+            eq(new BigDecimal("250.00")),
+            eq(date),
+            eq(false),
+            isNull()))
+        .thenReturn(transaction);
+
+    mockMvc
+        .perform(
+            post("/api/v1/transactions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "userId": "%s",
+                      "categoryId": "%s",
+                      "type": "EXPENSE",
+                      "description": "Mercado",
+                      "amount": 250.00,
+                      "transactionDate": "2026-09-12",
+                      "isRecurring": false
+                    }
+                    """
+                        .formatted(spoofedUserId, categoryId)))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.userId").value(authenticatedUserId.toString()))
+        .andExpect(jsonPath("$.userId").value(not(spoofedUserId.toString())));
   }
 
   @Test

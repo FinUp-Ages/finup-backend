@@ -141,6 +141,14 @@ Categoria e meio de pagamento referenciados por uma transação precisam ser do
 próprio usuário — categoria padrão do sistema também vale. Referência de outro usuário responde
 `404`, e não `403`: um `403` confirmaria a existência do id para quem não deveria saber dela.
 
+A categoria também precisa ser **do mesmo tipo da transação**: categoria `EXPENSE` não classifica
+uma receita, e vice-versa. Incompatibilidade responde `422`. A disponibilidade é verificada antes da
+compatibilidade, de propósito: na ordem inversa, um `422` em categoria privada de outro usuário
+confirmaria a existência daquele id — o mesmo vazamento que o `404` acima evita.
+
+O dono da transação vem sempre da identidade autenticada. `userId` não faz parte do corpo do
+`POST`; se o cliente enviar um, ele é ignorado.
+
 **A consulta de e-mail é a exceção, de propósito.** O formulário de cadastro precisa avisar que o
 e-mail já existe antes de a pessoa ter conta e token, então `POST /api/v1/users/email-availability`
 é público e confirma se um e-mail está cadastrado. Isso permite sondar e-mails sem deixar rastro.
