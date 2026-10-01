@@ -1,8 +1,11 @@
 package br.com.finup.service;
 
+import br.com.finup.dto.TransactionListResponse;
 import br.com.finup.exception.IncompatibleTransactionCategoryException;
+import br.com.finup.exception.InvalidTransactionPeriodException;
 import br.com.finup.exception.InvalidTransactionRecurrenceException;
 import br.com.finup.exception.ResourceNotFoundException;
+import br.com.finup.mapper.TransactionMapper;
 import br.com.finup.model.RecurrenceFrequency;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
@@ -11,6 +14,7 @@ import br.com.finup.repository.TransactionRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,6 +84,30 @@ public class TransactionService {
     return transaction;
   }
 
+  @Transactional(readOnly = true)
+  public TransactionListResponse list(UUID userId, LocalDate from, LocalDate to) {
+
+    if (from.isAfter(to)) {
+      throw new InvalidTransactionPeriodException();
+    }
+
+    List<Transaction> transactions =
+        transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
+            userId, from, to);
+
+    BigDecimal balance =
+        transactions.stream()
+            .map(
+                transaction ->
+                    transaction.getType() == TransactionType.INCOME
+                        ? transaction.getAmount()
+                        : transaction.getAmount().negate())
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+    return new TransactionListResponse(
+        balance, transactions.stream().map(TransactionMapper::toResponse).toList());
+  }
+
   /**
    * Referencia de outro usuario responde 404, e nao 403: um 403 confirmaria a existencia do id para
    * quem nao deveria saber dela. Mesma decisao tomada no CRUD de categorias.
@@ -90,6 +118,7 @@ public class TransactionService {
    */
   private void requireAvailableReferences(
       UUID userId, UUID categoryId, TransactionType type, UUID paymentMethodId) {
+
     TransactionType categoryType =
         transactionRepository
             .findAvailableCategoryTypeForUser(categoryId, userId)
@@ -107,10 +136,12 @@ public class TransactionService {
   }
 
   private void validateRecurrence(boolean recurring, RecurrenceFrequency recurrenceFrequency) {
+
     if (recurring && recurrenceFrequency == null) {
       throw new InvalidTransactionRecurrenceException(
           "Transacao recorrente precisa informar recurrenceFrequency");
     }
+
     if (!recurring && recurrenceFrequency != null) {
       throw new InvalidTransactionRecurrenceException(
           "Transacao nao recorrente nao pode informar recurrenceFrequency");

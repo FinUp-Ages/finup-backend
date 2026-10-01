@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import br.com.finup.exception.IncompatibleTransactionCategoryException;
+import br.com.finup.exception.InvalidTransactionPeriodException;
 import br.com.finup.exception.InvalidTransactionRecurrenceException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.RecurrenceFrequency;
@@ -257,5 +258,88 @@ class TransactionServiceTest {
         LocalDate.of(2026, 9, 5),
         recurring,
         recurrenceFrequency);
+  }
+
+  @Test
+  @DisplayName("periodo invalido devolve erro antes de consultar o repositorio")
+  void invalidPeriodThrowsException() {
+    UUID userId = UUID.randomUUID();
+    LocalDate from = LocalDate.of(2026, 9, 30);
+    LocalDate to = LocalDate.of(2026, 9, 1);
+
+    assertThatThrownBy(() -> transactionService.list(userId, from, to))
+        .isInstanceOf(InvalidTransactionPeriodException.class);
+
+    verifyNoInteractions(transactionRepository);
+  }
+
+  @Test
+  @DisplayName("calcula saldo do periodo como entradas menos saidas")
+  void calculatesBalanceFromPeriodTransactions() {
+    UUID userId = UUID.randomUUID();
+    UUID categoryId = UUID.randomUUID();
+    LocalDate from = LocalDate.of(2026, 9, 1);
+    LocalDate to = LocalDate.of(2026, 9, 30);
+
+    Transaction income =
+        Transaction.register(
+            userId,
+            categoryId,
+            null,
+            TransactionType.INCOME,
+            "Salario",
+            new BigDecimal("3000.00"),
+            LocalDate.of(2026, 9, 5),
+            null);
+
+    Transaction expense1 =
+        Transaction.register(
+            userId,
+            categoryId,
+            null,
+            TransactionType.EXPENSE,
+            "Mercado",
+            new BigDecimal("500.00"),
+            LocalDate.of(2026, 9, 10),
+            null);
+
+    Transaction expense2 =
+        Transaction.register(
+            userId,
+            categoryId,
+            null,
+            TransactionType.EXPENSE,
+            "Internet",
+            new BigDecimal("100.00"),
+            LocalDate.of(2026, 9, 15),
+            null);
+
+    when(transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
+            userId, from, to))
+        .thenReturn(java.util.List.of(income, expense1, expense2));
+
+    var response = transactionService.list(userId, from, to);
+
+    assertThat(response.balance()).isEqualByComparingTo("2400.00");
+
+    assertThat(response.transactions()).hasSize(3);
+  }
+
+  @Test
+  @DisplayName("retorna saldo zero e lista vazia quando nao existem transacoes no periodo")
+  void emptyPeriodReturnsZeroBalanceAndEmptyList() {
+    UUID userId = UUID.randomUUID();
+    LocalDate from = LocalDate.of(2026, 9, 1);
+    LocalDate to = LocalDate.of(2026, 9, 30);
+
+    when(transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
+            userId, from, to))
+        .thenReturn(java.util.List.of());
+
+    var response = transactionService.list(userId, from, to);
+
+    assertThat(response.balance()).isEqualByComparingTo(BigDecimal.ZERO);
+
+    assertThat(response.transactions()).isEmpty();
   }
 }

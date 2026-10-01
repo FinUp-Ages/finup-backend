@@ -1,6 +1,8 @@
 package br.com.finup.repository;
 
 import br.com.finup.model.Transaction;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -38,4 +40,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
       value = "SELECT EXISTS (SELECT 1 FROM payment_methods WHERE id = :id AND user_id = :userId)",
       nativeQuery = true)
   boolean existsPaymentMethodForUser(@Param("id") UUID id, @Param("userId") UUID userId);
+
+  List<Transaction> findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
+      UUID userId, LocalDate from, LocalDate to);
 }
