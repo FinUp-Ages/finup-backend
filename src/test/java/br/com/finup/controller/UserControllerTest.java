@@ -17,15 +17,19 @@ import br.com.finup.exception.IdentityProviderUnavailableException;
 import br.com.finup.exception.MissingAuthenticatedIdentityException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.exception.UserAlreadyRegisteredException;
-import br.com.finup.model.FinancialProfile;
 import br.com.finup.model.User;
+import br.com.finup.model.UserFinancialProfile;
 import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.UserService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -157,66 +161,81 @@ class UserControllerTest {
   }
 
   @Test
-  @DisplayName("PATCH de informacoes complementares devolve 200 com o usuario atualizado")
+  @DisplayName("PATCH de informacoes complementares devolve 200 com o contrato da task")
   void validAdditionalInfoUpdateReturns200() throws Exception {
     AuthenticatedIdentity identity =
         new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
     User user =
         User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
-    user.applyAdditionalInfo(
-        LocalDate.of(1998, 4, 12), new BigDecimal("3500.00"), FinancialProfile.MODERATE);
+    UserFinancialProfile profile = UserFinancialProfile.createFor(user);
+    profile.apply("+5511999998888", "Analista", LocalDate.of(2000, 1, 31), new BigDecimal("3500"));
     when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
     when(userService.updateAdditionalInfo(
             eq(identity),
-            eq(LocalDate.of(1998, 4, 12)),
-            eq(new BigDecimal("3500.00")),
-            eq(FinancialProfile.MODERATE)))
-        .thenReturn(user);
+            eq("+5511999998888"),
+            eq("Analista"),
+            eq(LocalDate.of(2000, 1, 31)),
+            eq(new BigDecimal("3500.00"))))
+        .thenReturn(profile);
 
     mockMvc
         .perform(
             patch("/api/v1/users/me/additional-info")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    "{\"birthDate\":\"1998-04-12\",\"monthlyIncome\":3500.00,"
-                        + "\"financialProfile\":\"MODERATE\"}"))
+                    "{\"phone\":\"+5511999998888\",\"profession\":\"Analista\","
+                        + "\"birthDate\":\"2000-01-31\",\"monthlyIncome\":3500.00}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.birthDate").value("1998-04-12"))
-        .andExpect(jsonPath("$.monthlyIncome").value(3500.00))
-        .andExpect(jsonPath("$.financialProfile").value("MODERATE"));
+        .andExpect(jsonPath("$.id").value(user.getId().toString()))
+        .andExpect(jsonPath("$.name").value("Ana Souza"))
+        .andExpect(jsonPath("$.email").value("ana@exemplo.com"))
+        .andExpect(jsonPath("$.phone").value("+5511999998888"))
+        .andExpect(jsonPath("$.profession").value("Analista"))
+        .andExpect(jsonPath("$.birthDate").value("2000-01-31"))
+        .andExpect(jsonPath("$.monthlyIncome").value(3500));
   }
 
   @Test
-  @DisplayName("PATCH com data de nascimento no futuro devolve 400")
-  void invalidAdditionalInfoUpdateReturns400() throws Exception {
+  @DisplayName("PATCH com corpo vazio e valido e nao informa nenhum campo ao service")
+  void emptyBodyIsAcceptedAsPartialUpdate() throws Exception {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
+    User user =
+        User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
+    when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
+    when(userService.updateAdditionalInfo(identity, null, null, null, null))
+        .thenReturn(UserFinancialProfile.createFor(user));
+
     mockMvc
         .perform(
             patch("/api/v1/users/me/additional-info")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"birthDate\":\"2999-01-01\"}"))
-        .andExpect(status().isBadRequest());
+                .content("{}"))
+        .andExpect(status().isOk());
   }
 
-  @Test
-  @DisplayName("PATCH com perfil financeiro invalido devolve 400")
-  void invalidFinancialProfileReturns400() throws Exception {
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "{\"birthDate\":\"2999-01-01\"}",
+        "{\"birthDate\":\"31/01/2000\"}",
+        "{\"phone\":\"11999998888\"}",
+        "{\"phone\":\"+0123456\"}",
+        "{\"profession\":\"   \"}",
+        "{\"monthlyIncome\":-100}",
+        "{\"monthlyIncome\":\"abc\"}",
+        "{\"monthlyIncome\":1.234}"
+      })
+  @DisplayName("PATCH com formato invalido devolve 400 sem chegar ao service")
+  void invalidFormatReturns400(String body) throws Exception {
     mockMvc
         .perform(
             patch("/api/v1/users/me/additional-info")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"financialProfile\":\"NAO_EXISTE\"}"))
+                .content(body))
         .andExpect(status().isBadRequest());
-  }
 
-  @Test
-  @DisplayName("PATCH com renda negativa devolve 400")
-  void negativeMonthlyIncomeReturns400() throws Exception {
-    mockMvc
-        .perform(
-            patch("/api/v1/users/me/additional-info")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"monthlyIncome\":-100}"))
-        .andExpect(status().isBadRequest());
+    verifyNoInteractions(userService);
   }
 
   @Test
@@ -225,7 +244,7 @@ class UserControllerTest {
     AuthenticatedIdentity identity =
         new AuthenticatedIdentity("cognito-sub-999", "Ana Souza", "ana@exemplo.com");
     when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
-    when(userService.updateAdditionalInfo(any(), any(), any(), any()))
+    when(userService.updateAdditionalInfo(any(), any(), any(), any(), any()))
         .thenThrow(
             new ResourceNotFoundException("Usuario nao encontrado para a identidade autenticada."));
 
@@ -233,8 +252,44 @@ class UserControllerTest {
         .perform(
             patch("/api/v1/users/me/additional-info")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"financialProfile\":\"MODERATE\"}"))
+                .content("{\"profession\":\"Analista\"}"))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("GET /{id} devolve as informacoes complementares gravadas")
+  void getByIdReturnsAdditionalInfo() throws Exception {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
+    User user =
+        User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
+    UserFinancialProfile profile = UserFinancialProfile.createFor(user);
+    profile.apply("+5511999998888", "Analista", LocalDate.of(2000, 1, 31), new BigDecimal("3500"));
+    when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
+    when(userService.findByIdForAuthenticatedIdentity(identity, user.getId())).thenReturn(user);
+    when(userService.findFinancialProfile(user)).thenReturn(Optional.of(profile));
+
+    mockMvc
+        .perform(get("/api/v1/users/" + user.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(user.getId().toString()))
+        .andExpect(jsonPath("$.phone").value("+5511999998888"))
+        .andExpect(jsonPath("$.profession").value("Analista"))
+        .andExpect(jsonPath("$.birthDate").value("2000-01-31"))
+        .andExpect(jsonPath("$.monthlyIncome").value(3500));
+  }
+
+  @Test
+  @DisplayName("GET /{id} de outra pessoa devolve 404")
+  void getByIdOfAnotherUserReturns404() throws Exception {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
+    UUID otherId = UUID.randomUUID();
+    when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
+    when(userService.findByIdForAuthenticatedIdentity(identity, otherId))
+        .thenThrow(new ResourceNotFoundException("Usuario nao encontrado."));
+
+    mockMvc.perform(get("/api/v1/users/" + otherId)).andExpect(status().isNotFound());
   }
 
   @Test

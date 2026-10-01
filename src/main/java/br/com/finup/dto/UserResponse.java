@@ -17,17 +17,19 @@ import java.util.UUID;
  * sai em ingles. {@code cognitoId} nao aparece aqui de proposito: e um detalhe de integracao, nao
  * algo que o cliente precisa ler de volta.
  *
- * <p>{@code birthDate}, {@code monthlyIncome} e {@code financialProfile} vem nulos ate a Etapa 2
- * (informacoes complementares) ser preenchida.
+ * <p>{@code phone}, {@code profession}, {@code birthDate} e {@code monthlyIncome} vem de {@code
+ * user_financial_profiles} e sao nulos ate as informacoes complementares serem preenchidas. {@code
+ * financialProfile} ainda vem da tabela {@code users}.
  */
 @Schema(description = "Usuario cadastrado")
 public record UserResponse(
     @Schema(description = "Identificador gerado pelo servidor") UUID id,
     @Schema(description = "Nome completo") String name,
     @Schema(description = "E-mail, sempre em minusculas") String email,
-    @Schema(description = "Data de nascimento, se ja preenchida na Etapa 2") LocalDate birthDate,
-    @Schema(description = "Renda mensal, se ja preenchida na Etapa 2") BigDecimal monthlyIncome,
-    @Schema(description = "Perfil financeiro, se ja preenchido na Etapa 2")
-        FinancialProfile financialProfile,
+    @Schema(description = "Telefone em E.164, se ja informado") String phone,
+    @Schema(description = "Profissao, se ja informada") String profession,
+    @Schema(description = "Data de nascimento, se ja informada") LocalDate birthDate,
+    @Schema(description = "Renda mensal, se ja informada") BigDecimal monthlyIncome,
+    @Schema(description = "Perfil financeiro, se ja preenchido") FinancialProfile financialProfile,
     @Schema(description = "Instante do cadastro, em UTC") Instant createdAt,
     @Schema(description = "Instante da ultima atualizacao, em UTC") Instant updatedAt) {}
