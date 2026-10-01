@@ -11,8 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.finup.dto.TransactionListItemResponse;
 import br.com.finup.dto.TransactionListResponse;
-import br.com.finup.dto.TransactionResponse;
 import br.com.finup.exception.IncompatibleTransactionCategoryException;
 import br.com.finup.exception.InvalidTransactionRecurrenceException;
 import br.com.finup.exception.ResourceNotFoundException;
@@ -73,10 +73,9 @@ class TransactionControllerTest {
     LocalDate to = LocalDate.of(2026, 9, 30);
     LocalDate transactionDate = LocalDate.of(2026, 9, 5);
 
-    TransactionResponse transactionResponse =
-        new TransactionResponse(
+    TransactionListItemResponse transactionResponse =
+        new TransactionListItemResponse(
             transactionId,
-            userId,
             categoryId,
             null,
             TransactionType.INCOME,
@@ -84,11 +83,6 @@ class TransactionControllerTest {
             new BigDecimal("3000.00"),
             transactionDate,
             false,
-            null,
-            null,
-            null,
-            null,
-            Instant.parse("2026-09-05T10:00:00Z"),
             Instant.parse("2026-09-05T10:00:00Z"));
 
     TransactionListResponse response =
@@ -113,7 +107,9 @@ class TransactionControllerTest {
         .andExpect(jsonPath("$.transactions[0].description").value("Salario"))
         .andExpect(jsonPath("$.transactions[0].amount").value(3000.00))
         .andExpect(jsonPath("$.transactions[0].transactionDate").value("2026-09-05"))
-        .andExpect(jsonPath("$.transactions[0].isRecurring").value(false));
+        .andExpect(jsonPath("$.transactions[0].isRecurring").value(false))
+        .andExpect(jsonPath("$.transactions[0].paymentMethodId").doesNotExist())
+        .andExpect(jsonPath("$.transactions[0].createdAt").value("2026-09-05T10:00:00Z"));
   }
 
   @Test

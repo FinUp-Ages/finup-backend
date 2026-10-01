@@ -1,11 +1,11 @@
 package br.com.finup.service;
 
+import br.com.finup.dto.TransactionListItemResponse;
 import br.com.finup.dto.TransactionListResponse;
 import br.com.finup.exception.IncompatibleTransactionCategoryException;
 import br.com.finup.exception.InvalidTransactionPeriodException;
 import br.com.finup.exception.InvalidTransactionRecurrenceException;
 import br.com.finup.exception.ResourceNotFoundException;
-import br.com.finup.mapper.TransactionMapper;
 import br.com.finup.model.RecurrenceFrequency;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
@@ -105,7 +105,21 @@ public class TransactionService {
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
     return new TransactionListResponse(
-        balance, transactions.stream().map(TransactionMapper::toResponse).toList());
+        balance,
+        transactions.stream()
+            .map(
+                transaction ->
+                    new TransactionListItemResponse(
+                        transaction.getId(),
+                        transaction.getCategoryId(),
+                        transaction.getPaymentMethodId(),
+                        transaction.getType(),
+                        transaction.getDescription(),
+                        transaction.getAmount(),
+                        transaction.getTransactionDate(),
+                        transaction.isRecurring(),
+                        transaction.getCreatedAt()))
+            .toList());
   }
 
   /**
