@@ -1,40 +1,30 @@
 {
   "stage": "REVIEWING",
-  "task": "[Backend] Implementar PATCH /api/v1/users/me/additional-info",
-  "objective": "Receber os dados das Etapas 2 e 3 do cadastro (phone, profession, birthDate, monthlyIncome) e persistir em user_financial_profiles, recuperaveis por GET /api/v1/users/{id}, com PATCH parcial real.",
+  "task": "[Backend] Ajustar GET /api/v1/transactions para usar a identidade do token (sem userId na query)",
+  "objective": "Corrigir o GET entregue no #32: o dono das transacoes vem sempre do token, como no POST, sem receber userId do cliente e sem 403 por outro usuario.",
   "decisions": [
-    "Persistencia na tabela user_financial_profiles (nova entidade UserFinancialProfile, 1 por usuario, criada na primeira chamada). Colunas phone, profession, birth_date e monthly_income adicionadas via ALTER TABLE ... IF NOT EXISTS mais indice UNIQUE em user_id, em database/init/01-schema.sql",
-    "financialProfile saiu do corpo do PATCH (nao consta do contrato); users.financial_profile continua na tabela e na resposta, mas nao e mais gravado por este endpoint",
-    "GET /api/v1/users/{id} criado; so devolve o proprio usuario autenticado, id de outra pessoa da 404 (mesmo criterio do README para recursos de outros usuarios)",
-    "UserResponse ganhou phone e profession; birthDate e monthlyIncome passaram a vir do perfil. POST /users, GET /me, GET /{id} e PATCH usam o mesmo DTO",
-    "FinUp Score passou a ler a renda de user_financial_profiles (InMemoryFinUpScoreDataProvider via UserFinancialProfileRepository), para o PATCH continuar alimentando o calculo e a mensagem de dado insuficiente seguir correta",
-    "profession em branco responde 400; updatedAt da resposta e o mais recente entre users e user_financial_profiles"
+    "GET /api/v1/transactions?from&to: userId saiu da query; o usuario vem de AuthenticatedIdentityResolver.resolveCurrent(), o mesmo caminho do POST. userId enviado por engano e ignorado pelo Spring",
+    "TransactionService.list passou a receber a AuthenticatedIdentity e resolve o usuario via UserService; sem cadastro local responde 404, como o POST",
+    "Removidos o 403 por outro usuario e o isCurrentUserAdmin() (interface e Cognito): a autorizacao por grupo admins segue na tarefa 86e3f7ygt, que so deve ser puxada quando existir a primeira rota de admin",
+    "@Parameter com formato e regra de from/to no Swagger, e OpenApiIntegrationTests passa a verificar o GET e seus parametros"
   ],
   "files_in_scope": [
-    "database/init/01-schema.sql",
-    "src/main/java/br/com/finup/model/UserFinancialProfile.java",
-    "src/main/java/br/com/finup/repository/UserFinancialProfileRepository.java",
-    "src/main/java/br/com/finup/service/UserService.java",
-    "src/main/java/br/com/finup/dto/UpdateUserAdditionalInfoRequest.java",
-    "src/main/java/br/com/finup/dto/UserResponse.java",
-    "src/main/java/br/com/finup/mapper/UserMapper.java",
-    "src/main/java/br/com/finup/controller/UserController.java",
-    "src/test/java/br/com/finup/repository/UserFinancialProfileRepositoryTest.java",
-    "src/test/java/br/com/finup/service/UserServiceTest.java",
-    "src/test/java/br/com/finup/controller/UserControllerTest.java",
-    "README.md",
-    "src/main/java/br/com/finup/repository/InMemoryFinUpScoreDataProvider.java",
-    "src/test/java/br/com/finup/repository/InMemoryFinUpScoreDataProviderTest.java",
-    "src/test/java/br/com/finup/service/FinUpScoreServiceTest.java"
+    "src/main/java/br/com/finup/controller/TransactionController.java",
+    "src/main/java/br/com/finup/service/TransactionService.java",
+    "src/main/java/br/com/finup/security/AuthenticatedIdentityResolver.java",
+    "src/main/java/br/com/finup/security/CognitoAuthenticatedIdentityResolver.java",
+    "src/test/java/br/com/finup/controller/TransactionControllerTest.java",
+    "src/test/java/br/com/finup/service/TransactionServiceTest.java",
+    "src/test/java/br/com/finup/config/SecurityConfigTest.java",
+    "src/test/java/br/com/finup/OpenApiIntegrationTests.java"
   ],
   "validation": {
-    "mvn clean verify": "passed (178 testes, 0 falhas, spotless ok)",
-    "postgres real via docker compose": "validado pelo revisor no PR #31: ALTER, indice unico e seed passam; fluxo completo do PATCH/GET ok"
+    "mvn clean verify": "passed (195 testes, 0 falhas, spotless ok)"
   },
   "review": "pendente",
-  "updated_at": "2026-09-30",
+  "updated_at": "2026-10-01",
   "open_questions": [
-    "Banco local ja existente precisa de docker compose down -v (ou aplicar o ALTER e o indice a mao): os scripts de database/init so rodam na criacao do volume",
-    "Sobras para uma issue: User.applyAdditionalInfo e as colunas users.birth_date e users.monthly_income nao sao mais usados pelo codigo de producao, e financialProfile segue na resposta sem endpoint que o grave"
+    "Contrato do GET diverge do stub do #33 (startDate/endDate/type/categoryId/page/size): alinhar com o Israel e o time de App; paginacao esta na issue #34",
+    "Admin consultando outro usuario deixa de existir ate a tarefa 86e3f7ygt; a issue #35 (404 para admin com userId inexistente) e a #36 (admin no mock-auth) ficam sem objeto e podem ser fechadas"
   ]
 }

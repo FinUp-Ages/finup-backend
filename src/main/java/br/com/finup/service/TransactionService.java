@@ -85,15 +85,18 @@ public class TransactionService {
   }
 
   @Transactional(readOnly = true)
-  public TransactionListResponse list(UUID userId, LocalDate from, LocalDate to) {
+  public TransactionListResponse list(
+      AuthenticatedIdentity identity, LocalDate from, LocalDate to) {
 
     if (from.isAfter(to)) {
       throw new InvalidTransactionPeriodException();
     }
 
+    User user = userService.findByAuthenticatedIdentity(identity);
+
     List<Transaction> transactions =
         transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
-            userId, from, to);
+            user.getId(), from, to);
 
     BigDecimal balance =
         transactions.stream()

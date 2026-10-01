@@ -24,7 +24,6 @@ import br.com.finup.service.CategoryService;
 import br.com.finup.service.ConversationService;
 import br.com.finup.service.TransactionService;
 import br.com.finup.service.UserService;
-import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -107,14 +106,8 @@ class SecurityConfigTest {
   @Test
   @DisplayName("listagem de transacoes sem access token do Cognito devolve 401")
   void transactionsWithoutTokenReturn401() throws Exception {
-    UUID userId = UUID.randomUUID();
-
     mockMvc
-        .perform(
-            get("/api/v1/transactions")
-                .param("userId", userId.toString())
-                .param("from", "2026-09-01")
-                .param("to", "2026-09-30"))
+        .perform(get("/api/v1/transactions").param("from", "2026-09-01").param("to", "2026-09-30"))
         .andExpect(status().isUnauthorized())
         .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")))
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
