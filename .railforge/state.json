@@ -1,55 +1,59 @@
 {
   "stage": "COMPLETED",
-  "task": "Integrar o Amazon Bedrock (padrao da nitra-ai) e registrar transacao a partir de texto livre.",
-  "objective": "POST /api/v1/ai/assistant recebe texto (ex.: 'gastei 7 reais na pucrs'), o Bedrock Converse devolve uma acao estruturada em JSON e o backend executa a acao (hoje: REGISTER_TRANSACTION via TransactionService). Novas acoes entram por AiAction. Saida do modelo e sempre validada (categoria do usuario, valor, tipo, data). Falhas do Bedrock viram 4xx/5xx em ProblemDetail.",
-  "stage": "REVIEWING",
-  "task": "[Backend] Ajustar GET /api/v1/transactions para usar a identidade do token (sem userId na query)",
-  "objective": "Corrigir o GET entregue no #32: o dono das transacoes vem sempre do token, como no POST, sem receber userId do cliente e sem 403 por outro usuario.",
-  "decisions": [
-    "GET /api/v1/transactions?from&to: userId saiu da query; o usuario vem de AuthenticatedIdentityResolver.resolveCurrent(), o mesmo caminho do POST. userId enviado por engano e ignorado pelo Spring",
-    "TransactionService.list passou a receber a AuthenticatedIdentity e resolve o usuario via UserService; sem cadastro local responde 404, como o POST",
-    "Removidos o 403 por outro usuario e o isCurrentUserAdmin() (interface e Cognito): a autorizacao por grupo admins segue na tarefa 86e3f7ygt, que so deve ser puxada quando existir a primeira rota de admin",
-    "@Parameter com formato e regra de from/to no Swagger, e OpenApiIntegrationTests passa a verificar o GET e seus parametros"
-  ],
+  "task": "Assistente de IA: gastos de risco no feedback, Cognito no endpoint e historico de chat (corpo no S3, metadados no banco).",
+  "objective": "POST /api/v1/ai/assistant recebe texto, o Bedrock Converse devolve a acao em JSON e o backend executa via AiAction. Acoes: REGISTER_TRANSACTION ('gastei 7 reais na pucrs' vira TransactionService.register) e FINANCIAL_FEEDBACK (so leitura: saldo e gastos do mes, comparacao com o mes anterior, maiores categorias, renda e FinUp Score calculados no codigo; a IA so comenta). A saida do modelo e sempre validada antes de gravar; ao modelo vao so agregados, sem descricoes de transacoes. Falhas do Bedrock viram 4xx/5xx em ProblemDetail. Historico de chat: conversationId opcional no pedido; cada turno gravado em conversations (metadado + message_count) e em um JSON por conversa no S3; GET /api/v1/assistant/conversations/{id}/messages le o transcript. Gastos de risco (bets, bebidas alcoolicas, drogas) sempre citados no feedback como evitaveis.",
   "files_in_scope": [
     "pom.xml",
     "src/main/resources/application.yml",
     ".env.example",
+    "docker-compose.yml",
+    "postman/finup-backend.postman_collection.json",
     "src/main/java/br/com/finup/config/BedrockProperties.java",
     "src/main/java/br/com/finup/config/BedrockClientConfig.java",
+    "src/main/java/br/com/finup/config/ClockConfig.java",
     "src/main/java/br/com/finup/model/AiModel.java",
     "src/main/java/br/com/finup/service/BedrockLlmService.java",
     "src/main/java/br/com/finup/service/AiAssistantService.java",
-    "src/main/java/br/com/finup/service/AiAction*.java",
+    "src/main/java/br/com/finup/service/AiAction.java",
     "src/main/java/br/com/finup/service/RegisterTransactionAiAction.java",
-    "src/main/java/br/com/finup/dto/AiAssistant*.java",
+    "src/main/java/br/com/finup/service/FinancialFeedbackAiAction.java",
+    "src/main/java/br/com/finup/dto/AiAssistantRequest.java",
+    "src/main/java/br/com/finup/dto/AiAssistantResponse.java",
     "src/main/java/br/com/finup/controller/AiAssistantController.java",
     "src/main/java/br/com/finup/exception/AiProviderException.java",
-    "src/test/java/br/com/finup/**"
-    "src/main/java/br/com/finup/controller/TransactionController.java",
-    "src/main/java/br/com/finup/service/TransactionService.java",
-    "src/main/java/br/com/finup/security/AuthenticatedIdentityResolver.java",
-    "src/main/java/br/com/finup/security/CognitoAuthenticatedIdentityResolver.java",
-    "src/test/java/br/com/finup/controller/TransactionControllerTest.java",
-    "src/test/java/br/com/finup/service/TransactionServiceTest.java",
-    "src/test/java/br/com/finup/config/SecurityConfigTest.java",
-    "src/test/java/br/com/finup/OpenApiIntegrationTests.java"
+    "src/test/java/br/com/finup/service/BedrockLlmServiceTest.java",
+    "src/test/java/br/com/finup/service/AiAssistantServiceTest.java",
+    "src/test/java/br/com/finup/service/FinancialFeedbackAiActionTest.java",
+    "src/test/java/br/com/finup/controller/AiAssistantControllerTest.java",
+    "database/init/01-schema.sql",
+    "src/main/java/br/com/finup/service/RiskySpending.java",
+    "src/main/java/br/com/finup/service/ConversationService.java",
+    "src/main/java/br/com/finup/repository/ConversationTranscriptStore.java",
+    "src/main/java/br/com/finup/repository/S3ConversationTranscriptStore.java",
+    "src/main/java/br/com/finup/repository/InMemoryConversationTranscriptStore.java",
+    "src/main/java/br/com/finup/config/ChatHistoryConfig.java",
+    "src/main/java/br/com/finup/controller/ConversationController.java",
+    "src/main/java/br/com/finup/model/Conversation.java",
+    "src/test/java/br/com/finup/config/SecurityConfigTest.java"
   ],
   "validation": {
-    "./mvnw verify (187 testes + spotless:check)": "passed",
-    "git diff --check": "passed",
-    "chamada real ao Bedrock": "nao executada (sem credenciais)"
-    "mvn clean verify": "passed (195 testes, 0 falhas, spotless ok)"
+    "./mvnw verify (262 testes + spotless:check)": "passed",
+    "chamada real ao Bedrock/S3": "nao executada por este agente (sem credenciais/bucket)"
   },
-  "review": "diff revisado; saida do modelo validada (categoria do usuario, tipo, valor, data) antes de gravar. Merge com develop: RegisterTransactionAiAction adaptada ao novo TransactionService.register(identity, ...) e a Category.getType() em TransactionType.",
-  "review": "pendente",
-  "updated_at": "2026-10-01",
+  "review": "diff revisado. Cognito: /api/v1/ai/** e /conversations/{id}/messages exigem JWT (401 testado) e usam o AuthenticatedIdentityResolver; conversa de outro usuario responde 404. Historico e melhor-esforco: falha do S3 nao derruba a acao ja executada. Corrigido default de BEDROCK_DEFAULT_MODEL (enum, nao model id).",
   "open_questions": [
     "'aberturas' interpretado como pontos de extensao (AiAction); confirmar.",
-    "Dependencia: a categoria 'Educação' nao existe entre as padrao. O assistente casa a categoria por nome (sem acento/caixa) entre as do usuario; ate a tarefa de criacao de categorias entregar, 'gastei 7 reais na pucrs' retorna 422 (categoria nao encontrada)."
+    "Bucket S3 (privado, bloqueio de acesso publico, criptografia) e permissao s3:GetObject/PutObject precisam ser provisionados fora deste repo; sem CHAT_HISTORY_BUCKET o historico fica em memoria.",
+    "Bancos existentes precisam de: ALTER TABLE conversations ADD COLUMN message_count INTEGER NOT NULL DEFAULT 0;",
+    "Categorias de risco precisam existir como padrao (nomes sugeridos: Apostas (Bets), Bebidas alcoólicas, Drogas) — fica com a tarefa de categorias; deteccao por nome nao reconhece nomes livres.",
+    "Titulo da conversa e o recorte da primeira mensagem (estrategia definitiva segue pendente com o time).",
+    "Sem busca por texto entre conversas: o corpo so existe no S3."
   ],
-  "updated_at": "2026-09-30"
-    "Contrato do GET diverge do stub do #33 (startDate/endDate/type/categoryId/page/size): alinhar com o Israel e o time de App; paginacao esta na issue #34",
-    "Admin consultando outro usuario deixa de existir ate a tarefa 86e3f7ygt; a issue #35 (404 para admin com userId inexistente) e a #36 (admin no mock-auth) ficam sem objeto e podem ser fechadas"
+  "updated_at": "2026-10-02",
+  "decisions": [
+    "Gastos de risco (bets/apostas, bebidas alcoolicas, drogas) identificados por NOME da categoria, em uma classe unica (RiskySpending), sem coluna nova em categories (evita conflito com a tarefa de categorias); sempre citados no feedback como gasto evitavel.",
+    "Historico: Postgres guarda so metadados em conversations (titulo, datas, message_count); o corpo das mensagens fica em UM objeto JSON por conversa no S3 (conversations/{userId}/{conversationId}.json). Atualizacao e leitura+escrita do objeto sob lock de linha da conversa. Sem bucket configurado, usa store em memoria (dev/teste).",
+    "Escrita do historico e best-effort: se o S3 falhar depois de a acao ter sido executada, a resposta ao usuario nao falha (erro vai ao log).",
+    "Fora do escopo: dar memoria das conversas anteriores ao modelo; busca por texto entre conversas (inviavel com corpo so no S3); geracao de titulo por resumo do modelo (segue pendente com o time, usa recorte da primeira mensagem)."
   ]
 }

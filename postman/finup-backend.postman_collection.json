@@ -1,10 +1,75 @@
 {
   "info": {
+    "_postman_id": "5c16bd31-8117-53b8-9bbf-7c090710159f",
     "name": "FinUp Backend",
-    "description": "Collection de validação dos endpoints do finup-backend (branch apresentacao). Cobre os fluxos de sucesso e os principais cenários de erro (400/404/422) de Users, Transactions e Transaction Recurrences.",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_postman_id": "f1a4e6a0-9d3b-4e2b-9f5c-finupbackend01"
+    "description": "Collection do finup-backend (Users, Categories, Payment Methods, Transactions, FinUp Score, Conversations e Assistente de IA).\n\nAutenticacao: sem `accessToken`, usa os headers X-Mock-Cognito-* (rode a API com SPRING_PROFILES_ACTIVE=dev,mock-auth). Com `accessToken` preenchido (token do Cognito), envia Authorization: Bearer.\n\nOrdem sugerida: rodar as pastas de cima para baixo (Collection Runner). Os ids (userId, categoryId, transactionId, paymentMethodId) sao capturados automaticamente.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Identidade de cada request:",
+          "//  - com accessToken preenchido -> Authorization: Bearer (Cognito real)",
+          "//  - sem accessToken            -> headers X-Mock-Cognito-* (profile mock-auth)",
+          "const token = pm.collectionVariables.get('accessToken');",
+          "if (token) {",
+          "  pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+          "} else {",
+          "  pm.request.headers.upsert({ key: 'X-Mock-Cognito-Sub', value: pm.collectionVariables.get('mockSub') });",
+          "  pm.request.headers.upsert({ key: 'X-Mock-Cognito-Email', value: pm.collectionVariables.get('mockEmail') });",
+          "  pm.request.headers.upsert({ key: 'X-Mock-Cognito-Name', value: pm.collectionVariables.get('mockName') });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "mockSub",
+      "value": "mock-sub-postman",
+      "description": "Identidade mock (profile mock-auth)"
+    },
+    {
+      "key": "mockEmail",
+      "value": "postman@finup.local"
+    },
+    {
+      "key": "mockName",
+      "value": "Usuario Postman"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "description": "Token do Cognito. Vazio = usa os headers mock."
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "categoryId",
+      "value": ""
+    },
+    {
+      "key": "paymentMethodId",
+      "value": ""
+    },
+    {
+      "key": "transactionId",
+      "value": ""
+    },
+    {
+      "key": "conversationId",
+      "value": ""
+    }
+  ],
   "item": [
     {
       "name": "Health",
@@ -14,17 +79,38 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/actuator/health", "host": ["{{baseUrl}}"], "path": ["actuator", "health"] }
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('status UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
-                ],
-                "type": "text/javascript"
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "pm.test(\"status UP\", function () { pm.expect(pm.response.json().status).to.eql(\"UP\"); });"
+                ]
               }
             }
           ]
@@ -35,65 +121,176 @@
       "name": "Users",
       "item": [
         {
-          "name": "Cadastrar usuario (201)",
+          "name": "Disponibilidade de e-mail (publico)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/email-availability",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "email-availability"
+              ]
+            },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Apresentacao Teste\",\n  \"email\": \"apresentacao.{{$randomInt}}@finup.local\"\n}"
+              "raw": "{\n  \"email\": \"{{mockEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/users", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users"] }
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 201', () => pm.response.to.have.status(201));",
-                  "const body = pm.response.json();",
-                  "pm.test('possui id', () => pm.expect(body.id).to.be.a('string'));",
-                  "pm.collectionVariables.set('userId', body.id);"
-                ],
-                "type": "text/javascript"
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "pm.test(\"tem o campo available\", function () { pm.expect(pm.response.json()).to.have.property(\"available\"); });"
+                ]
               }
             }
           ]
         },
         {
-          "name": "Cadastrar usuario - campos invalidos (400)",
+          "name": "Disponibilidade de e-mail - invalido (400)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"\",\n  \"email\": \"invalido\"\n}" },
-            "url": { "raw": "{{baseUrl}}/api/v1/users", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users"] }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/email-availability",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "email-availability"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nao-e-email\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.request.headers.remove('Authorization');"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
-                "exec": ["pm.test('status 400', () => pm.response.to.have.status(400));"],
-                "type": "text/javascript"
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.expect([400]).to.include(pm.response.code); });"
+                ]
               }
             }
           ]
         },
         {
-          "name": "Listar usuarios (200)",
+          "name": "Criar usuario a partir da identidade (201)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "description": "Etapa 1 do cadastro: cria o usuario local a partir da identidade autenticada. Rodar de novo devolve 409 (ja cadastrado)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201 ou 409\", function () { pm.expect([201, 409]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 201) { pm.test(\"devolve id\", function () { pm.expect(pm.response.json().id).to.be.a(\"string\"); }); pm.collectionVariables.set(\"userId\", pm.response.json().id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar usuario logado (200)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/users", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            }
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('e uma lista', () => pm.expect(pm.response.json()).to.be.an('array'));"
-                ],
-                "type": "text/javascript"
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "pm.collectionVariables.set(\"userId\", pm.response.json().id);"
+                ]
               }
             }
           ]
@@ -105,37 +302,391 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users", "{{userId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}"
+              ]
             }
           },
           "event": [
             {
               "listen": "test",
               "script": {
-                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"],
-                "type": "text/javascript"
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
               }
             }
           ]
         },
         {
-          "name": "Buscar usuario inexistente (404)",
+          "name": "Buscar usuario de outro id (404)",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/00000000-0000-0000-0000-000000000000",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users", "00000000-0000-0000-0000-000000000000"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "00000000-0000-0000-0000-000000000000"
+              ]
             }
           },
           "event": [
             {
               "listen": "test",
               "script": {
-                "exec": ["pm.test('status 404', () => pm.response.to.have.status(404));"],
-                "type": "text/javascript"
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.expect([404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Atualizar informacoes complementares (200)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/additional-info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "additional-info"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+5551999998888\",\n  \"profession\": \"Analista de sistemas\",\n  \"birthDate\": \"2000-01-31\",\n  \"monthlyIncome\": 3500.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Atualizar informacoes - telefone invalido (400)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/additional-info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "additional-info"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"51999998888\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.expect([400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "Criar categoria Educacao (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ]
+            },
+            "description": "A categoria 'Educação' e a usada pelo exemplo do assistente de IA ('gastei 7 reais na pucrs').",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Educação\",\n  \"type\": \"EXPENSE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.expect([201]).to.include(pm.response.code); });",
+                  "pm.collectionVariables.set(\"categoryId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar categoria - nome em branco (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \" \",\n  \"type\": \"EXPENSE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.expect([400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar categorias disponiveis (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "pm.test(\"e uma lista\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Atualizar categoria (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories/{{categoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "{{categoryId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Educação\",\n  \"type\": \"EXPENSE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Atualizar categoria inexistente (404)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"X\",\n  \"type\": \"EXPENSE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.expect([404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Payment Methods",
+      "item": [
+        {
+          "name": "Listar meios de pagamento (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payment-methods",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payment-methods"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "const list = pm.response.json(); if (list.length) { pm.collectionVariables.set(\"paymentMethodId\", list[0].id); }"
+                ]
               }
             }
           ]
@@ -146,141 +697,245 @@
       "name": "Transactions",
       "item": [
         {
-          "name": "Registrar transacao (201)",
+          "name": "Registrar despesa (201)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"userId\": \"{{seedUserId}}\",\n  \"categoryId\": \"{{seedCategoryAlimentacaoId}}\",\n  \"paymentMethodId\": \"{{seedPaymentMethodId}}\",\n  \"type\": \"EXPENSE\",\n  \"description\": \"Apresentacao - Restaurante\",\n  \"amount\": 89.90,\n  \"transactionDate\": \"2026-09-18\",\n  \"isRecurring\": false\n}"
-            },
-            "url": { "raw": "{{baseUrl}}/api/v1/transactions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "transactions"] }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('status 201', () => pm.response.to.have.status(201));",
-                  "const body = pm.response.json();",
-                  "pm.collectionVariables.set('transactionId', body.id);"
-                ],
-                "type": "text/javascript"
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
               }
-            }
-          ]
-        },
-        {
-          "name": "Registrar transacao - usuario inexistente (404)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"userId\": \"00000000-0000-0000-0000-000000000000\",\n  \"categoryId\": \"{{seedCategoryAlimentacaoId}}\",\n  \"type\": \"EXPENSE\",\n  \"amount\": 10.00,\n  \"transactionDate\": \"2026-09-18\",\n  \"isRecurring\": false\n}"
-            },
-            "url": { "raw": "{{baseUrl}}/api/v1/transactions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "transactions"] }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": ["pm.test('status 404', () => pm.response.to.have.status(404));"],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Registrar transacao - campos invalidos (400)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{}" },
-            "url": { "raw": "{{baseUrl}}/api/v1/transactions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "transactions"] }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": ["pm.test('status 400', () => pm.response.to.have.status(400));"],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "Transaction Recurrences",
-      "item": [
-        {
-          "name": "Cadastrar recorrencia (201)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"userId\": \"{{seedUserId}}\",\n  \"categoryId\": \"{{seedCategoryMoradiaId}}\",\n  \"paymentMethodId\": \"{{seedPaymentMethodId}}\",\n  \"type\": \"EXPENSE\",\n  \"description\": \"Apresentacao - Conta de luz\",\n  \"amount\": 250.00,\n  \"frequency\": \"MONTHLY\",\n  \"dayOfMonth\": 5,\n  \"startDate\": \"2026-01-05\"\n}"
-            },
+            ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/transaction-recurrences",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "transaction-recurrences"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('status 201', () => pm.response.to.have.status(201));",
-                  "const body = pm.response.json();",
-                  "pm.test('possui nextOccurrenceDate', () => pm.expect(body.nextOccurrenceDate).to.be.a('string'));",
-                  "pm.collectionVariables.set('recurrenceId', body.id);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Cadastrar recorrencia - endDate antes de startDate (422)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ]
+            },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"userId\": \"{{seedUserId}}\",\n  \"categoryId\": \"{{seedCategoryMoradiaId}}\",\n  \"type\": \"EXPENSE\",\n  \"amount\": 100.00,\n  \"frequency\": \"MONTHLY\",\n  \"dayOfMonth\": 5,\n  \"startDate\": \"2026-09-05\",\n  \"endDate\": \"2026-01-01\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/transaction-recurrences",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "transaction-recurrences"]
+              "raw": "{\n  \"categoryId\": \"{{categoryId}}\",\n  \"type\": \"EXPENSE\",\n  \"description\": \"Mensalidade\",\n  \"amount\": 320.0,\n  \"transactionDate\": \"2026-09-12\",\n  \"isRecurring\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "event": [
             {
               "listen": "test",
               "script": {
-                "exec": ["pm.test('status 422', () => pm.response.to.have.status(422));"],
-                "type": "text/javascript"
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.expect([201]).to.include(pm.response.code); });",
+                  "pm.collectionVariables.set(\"transactionId\", pm.response.json().id);"
+                ]
               }
             }
           ]
         },
         {
-          "name": "Listar recorrencias devidas em data (200)",
+          "name": "Registrar despesa recorrente mensal (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"{{categoryId}}\",\n  \"type\": \"EXPENSE\",\n  \"description\": \"Curso\",\n  \"amount\": 150.0,\n  \"transactionDate\": \"2026-09-05\",\n  \"isRecurring\": true,\n  \"recurrenceFrequency\": \"MONTHLY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.expect([201]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar - recorrente sem frequencia (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"{{categoryId}}\",\n  \"type\": \"EXPENSE\",\n  \"amount\": 10.0,\n  \"transactionDate\": \"2026-09-05\",\n  \"isRecurring\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.expect([422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar - categoria inexistente (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"00000000-0000-0000-0000-000000000000\",\n  \"type\": \"EXPENSE\",\n  \"amount\": 10.0,\n  \"transactionDate\": \"2026-09-05\",\n  \"isRecurring\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.expect([404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar - valor negativo (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"{{categoryId}}\",\n  \"type\": \"EXPENSE\",\n  \"amount\": -5,\n  \"transactionDate\": \"2026-09-05\",\n  \"isRecurring\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.expect([400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar transacoes e saldo do periodo (200)",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/transaction-recurrences/due?userId={{seedUserId}}&date=2026-10-05",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "transaction-recurrences", "due"],
+              "raw": "{{baseUrl}}/api/v1/transactions?from=2026-09-01&to=2026-09-30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ],
               "query": [
-                { "key": "userId", "value": "{{seedUserId}}" },
-                { "key": "date", "value": "2026-10-05" }
+                {
+                  "key": "from",
+                  "value": "2026-09-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-09-30"
+                }
               ]
             }
           },
@@ -288,64 +943,719 @@
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('e uma lista', () => pm.expect(pm.response.json()).to.be.an('array'));"
-                ],
-                "type": "text/javascript"
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "pm.test(\"tem saldo e transacoes\", function () { const b = pm.response.json(); pm.expect(b).to.have.property(\"balance\"); pm.expect(b.transactions).to.be.an(\"array\"); });"
+                ]
               }
             }
           ]
         },
         {
-          "name": "Listar recorrencias devidas - sem date, usa hoje (200)",
+          "name": "Listar - periodo invalido, to antes de from (400)",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/transaction-recurrences/due?userId={{seedUserId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "transaction-recurrences", "due"],
-              "query": [{ "key": "userId", "value": "{{seedUserId}}" }]
+              "raw": "{{baseUrl}}/api/v1/transactions?from=2026-09-30&to=2026-09-01",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-09-30"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-09-01"
+                }
+              ]
             }
           },
           "event": [
             {
               "listen": "test",
               "script": {
-                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"],
-                "type": "text/javascript"
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.expect([400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "FinUp Score",
+      "item": [
+        {
+          "name": "Recalcular FinUp Score (200)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/finup-score/recalculate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "finup-score",
+                "recalculate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Assistant - Conversations",
+      "item": [
+        {
+          "name": "Listar conversas do usuario (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "conversations"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "pm.test(\"e uma lista\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AI - Assistente (Bedrock)",
+      "item": [
+        {
+          "name": "Registrar despesa por texto - 'gastei 7 reais na pucrs' (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/assistant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "assistant"
+              ]
+            },
+            "description": "O corpo manda conversationId={{conversationId}}: vazio abre uma conversa nova (e o id e guardado), preenchido continua a mesma. Para abrir outra conversa, limpe a variavel conversationId da collection. Requer credenciais AWS/Bedrock configuradas no backend e a categoria 'Educação' (rode 'Criar categoria Educacao' antes). Sem a categoria, responde 422.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"gastei 7 reais na pucrs\",\n  \"conversationId\": \"{{conversationId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "pm.test(\"registrou a transacao\", function () { const b = pm.response.json(); pm.expect(b.action).to.eql(\"REGISTER_TRANSACTION\"); pm.expect(b.transaction.type).to.eql(\"EXPENSE\"); pm.expect(Number(b.transaction.amount)).to.eql(7); });",
+                  "pm.test(\"devolve o id da conversa (historico)\", function () { pm.expect(pm.response.json().conversationId).to.be.a(\"string\"); }); const cid = pm.response.json().conversationId; if (cid) { pm.collectionVariables.set(\"conversationId\", cid); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Escolhendo o modelo (ANTHROPIC) (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/assistant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "assistant"
+              ]
+            },
+            "description": "Receita: 422 se nao existir categoria de INCOME compativel (ex.: 'Salário').",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"recebi 1500 reais de salario\",\n  \"model\": \"ANTHROPIC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200 ou 422\", function () { pm.expect([200, 422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Feedback - 'posso gastar 200 num jantar?' (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/assistant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "assistant"
+              ]
+            },
+            "description": "Acao FINANCIAL_FEEDBACK (so leitura): os numeros do mes sao calculados no backend; a IA so comenta. Sem transacoes, responde direto pedindo para registrar movimentacoes.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"posso gastar 200 reais num jantar?\",\n  \"conversationId\": \"{{conversationId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "pm.test(\"devolveu feedback, sem criar transacao\", function () { const b = pm.response.json(); pm.expect(b.action).to.eql(\"FINANCIAL_FEEDBACK\"); pm.expect(b.message).to.be.a(\"string\").and.not.empty; pm.expect(b).to.not.have.property(\"transaction\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Feedback - 'onde eu gasto mais?' (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/assistant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "assistant"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"onde eu gasto mais?\",\n  \"conversationId\": \"{{conversationId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Feedback - 'estou bem? alguma dica?' (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/assistant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "assistant"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"estou bem financeiramente? me da uma dica\",\n  \"conversationId\": \"{{conversationId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Continuar a mesma conversa (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/assistant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "assistant"
+              ]
+            },
+            "description": "Usa o conversationId devolvido na primeira request: o turno entra na mesma conversa.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"qual meu saldo?\",\n  \"conversationId\": \"{{conversationId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "pm.test(\"mesma conversa\", function () { pm.expect(pm.response.json().conversationId).to.eql(pm.collectionVariables.get(\"conversationId\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Conversa de outro usuario / inexistente (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/assistant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "assistant"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"oi\",\n  \"conversationId\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.expect([404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Texto fora do escopo (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/assistant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "assistant"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"qual a capital da Franca?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 422\", function () { pm.expect([422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mensagem em branco (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/assistant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "assistant"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \" \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.expect([400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Modelo inexistente (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/assistant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "assistant"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"oi\",\n  \"model\": \"FOO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.expect([400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Assistant - Historico (rodar depois do assistente)",
+      "item": [
+        {
+          "name": "Listar conversas (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "conversations"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "pm.test(\"tem a conversa criada pelo assistente\", function () { const id = pm.collectionVariables.get(\"conversationId\"); if (id) { pm.expect(pm.response.json().map(c => c.id)).to.include(id); } });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mensagens de uma conversa (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/conversations/{{conversationId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "conversations",
+                "{{conversationId}}",
+                "messages"
+              ]
+            },
+            "description": "Le o transcript no S3 (ou em memoria, se o backend estiver sem bucket)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "pm.test(\"mensagens em ordem, com USER e ASSISTANT\", function () { const m = pm.response.json(); pm.expect(m.length).to.be.at.least(2); pm.expect(m[0].role).to.eql(\"USER\"); pm.expect(m[1].role).to.eql(\"ASSISTANT\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mensagens de conversa inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/conversations/00000000-0000-0000-0000-000000000000/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assistant",
+                "conversations",
+                "00000000-0000-0000-0000-000000000000",
+                "messages"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.expect([404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Categories - limpeza",
+      "item": [
+        {
+          "name": "Excluir categoria sem uso (204 ou 409 se tiver transacoes)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories/{{categoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "{{categoryId}}"
+              ]
+            },
+            "description": "Rode por ultimo: a categoria criada acima tem transacoes, entao o esperado e 409. Serve para validar a regra."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204 ou 409\", function () { pm.expect([204, 409]).to.include(pm.response.code); });"
+                ]
               }
             }
           ]
         }
       ]
     }
-  ],
-  "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080" },
-    {
-      "key": "seedUserId",
-      "value": "e02caf9a-a786-469d-bec5-7cdfbc0c22e2",
-      "description": "Usuario 'teste@finup.local' semeado em database/init/03-test-data.sql"
-    },
-    {
-      "key": "seedCategoryAlimentacaoId",
-      "value": "f6779887-b740-4d8c-a674-fe8416810dc5",
-      "description": "Categoria default 'Alimentação' semeada em database/init/02-required-data.sql"
-    },
-    {
-      "key": "seedCategoryMoradiaId",
-      "value": "9850a854-3bee-4019-babb-8be26a2114d9",
-      "description": "Categoria default 'Moradia' semeada em database/init/02-required-data.sql"
-    },
-    {
-      "key": "seedPaymentMethodId",
-      "value": "cce8a119-a5dd-49c0-9260-9a994eef75ed",
-      "description": "Meio de pagamento 'Cartão Teste' semeado em database/init/03-test-data.sql"
-    },
-    { "key": "userId", "value": "" },
-    { "key": "transactionId", "value": "" },
-    { "key": "recurrenceId", "value": "" }
   ]
 }

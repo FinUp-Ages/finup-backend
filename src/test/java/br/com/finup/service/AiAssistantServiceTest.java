@@ -15,6 +15,7 @@ import br.com.finup.dto.AiAssistantRequest;
 import br.com.finup.dto.AiAssistantResponse;
 import br.com.finup.exception.AiProviderException;
 import br.com.finup.exception.BusinessException;
+import br.com.finup.exception.ConversationStorageException;
 import br.com.finup.model.Category;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
@@ -52,6 +53,7 @@ class AiAssistantServiceTest {
   @Mock private UserService userService;
   @Mock private CategoryRepository categoryRepository;
   @Mock private TransactionService transactionService;
+  @Mock private ConversationService conversationService;
 
   private final UUID userId = UUID.randomUUID();
   private final User user = mock(User.class);
@@ -73,11 +75,14 @@ class AiAssistantServiceTest {
     org.mockito.Mockito.lenient().when(education.getId()).thenReturn(educationId);
     org.mockito.Mockito.lenient().when(user.getId()).thenReturn(userId);
     when(userService.findByAuthenticatedIdentity(IDENTITY)).thenReturn(user);
-    when(categoryRepository.findByUserOrIsDefaultTrue(user)).thenReturn(List.of(education, salary));
+    org.mockito.Mockito.lenient()
+        .when(categoryRepository.findByUserOrIsDefaultTrue(user))
+        .thenReturn(List.of(education, salary));
     Clock clock = Clock.fixed(Instant.parse("2026-09-30T15:00:00Z"), ZoneId.of("UTC"));
     service =
         new AiAssistantService(
             llmService,
+            conversationService,
             userService,
             categoryRepository,
             new ObjectMapper(),
@@ -90,7 +95,7 @@ class AiAssistantServiceTest {
   }
 
   private AiAssistantResponse ask(String message) {
-    return service.handle(IDENTITY, new AiAssistantRequest(message, null));
+    return service.handle(IDENTITY, new AiAssistantRequest(message, null, null));
   }
 
   @Test
@@ -130,6 +135,76 @@ class AiAssistantServiceTest {
     assertThat(response.action()).isEqualTo("REGISTER_TRANSACTION");
     assertThat(response.transaction().amount()).isEqualByComparingTo("7.00");
     assertThat(response.message()).contains("Despesa").contains("7.00").contains("Educação");
+  }
+
+  @Test
+  @DisplayName("grava o turno no historico e devolve o id da conversa")
+  void recordsTurnAndReturnsConversationId() {
+    UUID conversationId = UUID.randomUUID();
+    modelReplies(
+        "{\"action\":\"REGISTER_TRANSACTION\",\"type\":\"EXPENSE\",\"amount\":7,\"category\":\"Educação\"}");
+    when(transactionService.register(
+            any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any()))
+        .thenAnswer(
+            i ->
+                Transaction.register(
+                    userId,
+                    i.getArgument(1),
+                    null,
+                    i.getArgument(3),
+                    i.getArgument(4),
+                    i.getArgument(5),
+                    i.getArgument(6),
+                    null));
+    when(conversationService.recordTurn(
+            eq(user), isNull(), eq("gastei 7"), eq("REGISTER_TRANSACTION"), any()))
+        .thenReturn(conversationId);
+
+    AiAssistantResponse response = ask("gastei 7");
+
+    assertThat(response.conversationId()).isEqualTo(conversationId);
+  }
+
+  @Test
+  @DisplayName("falha ao gravar o historico nao derruba a resposta ja executada")
+  void historyFailureDoesNotFailTheResponse() {
+    UUID conversationId = UUID.randomUUID();
+    modelReplies(
+        "{\"action\":\"REGISTER_TRANSACTION\",\"type\":\"EXPENSE\",\"amount\":7,\"category\":\"Educação\"}");
+    when(transactionService.register(
+            any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any()))
+        .thenAnswer(
+            i ->
+                Transaction.register(
+                    userId,
+                    i.getArgument(1),
+                    null,
+                    i.getArgument(3),
+                    i.getArgument(4),
+                    i.getArgument(5),
+                    i.getArgument(6),
+                    null));
+    when(conversationService.recordTurn(any(), any(), any(), any(), any()))
+        .thenThrow(new ConversationStorageException(new RuntimeException("s3 fora do ar")));
+
+    AiAssistantResponse response =
+        service.handle(IDENTITY, new AiAssistantRequest("gastei 7", null, conversationId));
+
+    assertThat(response.action()).isEqualTo("REGISTER_TRANSACTION");
+    assertThat(response.transaction()).isNotNull();
+    assertThat(response.conversationId()).isEqualTo(conversationId);
+  }
+
+  @Test
+  @DisplayName("conversa de outro usuario falha cedo (404), sem chamar o modelo")
+  void foreignConversationFailsBeforeCallingTheModel() {
+    UUID foreign = UUID.randomUUID();
+    when(conversationService.requireOwned(user, foreign))
+        .thenThrow(new br.com.finup.exception.ResourceNotFoundException("Conversa", foreign));
+
+    assertThatThrownBy(() -> service.handle(IDENTITY, new AiAssistantRequest("oi", null, foreign)))
+        .isInstanceOf(br.com.finup.exception.ResourceNotFoundException.class);
+    org.mockito.Mockito.verifyNoInteractions(llmService);
   }
 
   @Test

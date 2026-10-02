@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -17,16 +18,19 @@ public class BedrockClientConfig {
 
   @Bean
   public BedrockRuntimeClient bedrockRuntimeClient(BedrockProperties properties) {
-    var builder = BedrockRuntimeClient.builder().region(Region.of(properties.region()));
+    return BedrockRuntimeClient.builder()
+        .region(Region.of(properties.region()))
+        .credentialsProvider(credentialsProvider(properties))
+        .build();
+  }
 
+  /** Chaves explicitas quando configuradas, senao a cadeia padrao. Compartilhado com o S3. */
+  public static AwsCredentialsProvider credentialsProvider(BedrockProperties properties) {
     if (StringUtils.hasText(properties.accessKeyId())
         && StringUtils.hasText(properties.secretAccessKey())) {
-      builder.credentialsProvider(
-          StaticCredentialsProvider.create(
-              AwsBasicCredentials.create(properties.accessKeyId(), properties.secretAccessKey())));
-    } else {
-      builder.credentialsProvider(DefaultCredentialsProvider.create());
+      return StaticCredentialsProvider.create(
+          AwsBasicCredentials.create(properties.accessKeyId(), properties.secretAccessKey()));
     }
-    return builder.build();
+    return DefaultCredentialsProvider.create();
   }
 }

@@ -63,6 +63,43 @@ class ConversationRepositoryTest {
         .containsExactly("Mais recente", "Mais antiga");
   }
 
+  @Test
+  @DisplayName("findByIdAndUser so devolve a conversa do dono; a variante com lock tambem")
+  void findByIdAndUserRespectsOwnership() {
+    User owner =
+        userRepository.saveAndFlush(
+            User.createFromCognitoIdentity("own-sub", "Ana Souza", "own@example.com"));
+    User other =
+        userRepository.saveAndFlush(
+            User.createFromCognitoIdentity("oth-sub", "Carlos", "oth@example.com"));
+    Conversation saved =
+        conversationRepository.saveAndFlush(Conversation.startForUser(owner, "Minha"));
+
+    assertThat(conversationRepository.findByIdAndUser(saved.getId(), owner)).isPresent();
+    assertThat(conversationRepository.findByIdAndUser(saved.getId(), other)).isEmpty();
+    assertThat(conversationRepository.findByIdAndUserForUpdate(saved.getId(), owner)).isPresent();
+    assertThat(conversationRepository.findByIdAndUserForUpdate(saved.getId(), other)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("message_count comeca em zero, inclusive em linha inserida sem a coluna, e persiste")
+  void messageCountDefaultsToZeroAndPersists() {
+    User user =
+        userRepository.saveAndFlush(
+            User.createFromCognitoIdentity("count-sub", "Ana Souza", "count@example.com"));
+    insertConversation(user.getId(), "Inserida por SQL", Instant.now());
+    Conversation viaSql = conversationRepository.findByUserOrderByUpdatedAtDesc(user).get(0);
+    assertThat(viaSql.getMessageCount()).isZero();
+
+    viaSql.recordMessages(2);
+    conversationRepository.saveAndFlush(viaSql);
+
+    assertThat(conversationRepository.findById(viaSql.getId()))
+        .get()
+        .extracting(Conversation::getMessageCount)
+        .isEqualTo(2);
+  }
+
   private void insertConversation(java.util.UUID userId, String title, Instant updatedAt) {
     jdbcTemplate.update(
         "INSERT INTO conversations (id, user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",

@@ -56,6 +56,11 @@
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>bedrockruntime</artifactId>
     </dependency>
+    <!-- Corpo das conversas do assistente (historico de chat) -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+    </dependency>
 
     <!-- Contrato OpenAPI: /v3/api-docs e /swagger-ui.html -->
     <dependency>

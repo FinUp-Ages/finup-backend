@@ -16,6 +16,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -40,6 +41,7 @@ public class AiAssistantService {
   private static final String UNKNOWN = "UNKNOWN";
 
   private final BedrockLlmService llmService;
+  private final ConversationService conversationService;
   private final UserService userService;
   private final CategoryRepository categoryRepository;
   private final ObjectMapper objectMapper;
@@ -48,12 +50,14 @@ public class AiAssistantService {
 
   public AiAssistantService(
       BedrockLlmService llmService,
+      ConversationService conversationService,
       UserService userService,
       CategoryRepository categoryRepository,
       ObjectMapper objectMapper,
       Clock clock,
       List<AiAction> actions) {
     this.llmService = llmService;
+    this.conversationService = conversationService;
     this.userService = userService;
     this.categoryRepository = categoryRepository;
     this.objectMapper = objectMapper;
@@ -63,6 +67,9 @@ public class AiAssistantService {
 
   public AiAssistantResponse handle(AuthenticatedIdentity identity, AiAssistantRequest request) {
     User user = userService.findByAuthenticatedIdentity(identity);
+    if (request.conversationId() != null) {
+      conversationService.requireOwned(user, request.conversationId());
+    }
     List<Category> categories = categoryRepository.findByUserOrIsDefaultTrue(user);
     LocalDate today = LocalDate.now(clock);
 
@@ -81,13 +88,32 @@ public class AiAssistantService {
 
     AiAction.Result result =
         action.execute(
-            new AiAction.Context(identity, categories, request.message(), today), payload);
+            new AiAction.Context(
+                identity, user, categories, request.message(), today, request.model()),
+            payload);
     log.info("Assistente executou acao: userId={}, action={}", user.getId(), actionName);
 
+    UUID conversationId = recordHistory(user, request, actionName, result.message());
     return new AiAssistantResponse(
         actionName,
         result.message(),
-        result.transaction() == null ? null : TransactionMapper.toResponse(result.transaction()));
+        result.transaction() == null ? null : TransactionMapper.toResponse(result.transaction()),
+        conversationId);
+  }
+
+  /**
+   * Gravar o historico e melhor-esforco: a acao ja foi executada (uma transacao pode ter sido
+   * criada), entao uma falha no S3 nao pode virar erro para o usuario. Fica no log.
+   */
+  private UUID recordHistory(
+      User user, AiAssistantRequest request, String actionName, String assistantText) {
+    try {
+      return conversationService.recordTurn(
+          user, request.conversationId(), request.message(), actionName, assistantText);
+    } catch (RuntimeException e) {
+      log.error("Falha ao gravar o historico da conversa: userId={}", user.getId(), e);
+      return request.conversationId();
+    }
   }
 
   private String buildSystemPrompt(LocalDate today, List<Category> categories) {

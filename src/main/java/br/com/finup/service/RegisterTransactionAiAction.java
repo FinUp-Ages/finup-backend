@@ -43,7 +43,7 @@ public class RegisterTransactionAiAction implements AiAction {
   @Override
   public String promptInstructions() {
     return """
-        %s: o usuario relata um gasto (gastei, paguei, comprei) ou um ganho (recebi, ganhei).
+        %s: o usuario relata um gasto (gastei, paguei, comprei) ou um ganho (recebi, ganhei) que JA ACONTECEU. Perguntas como "posso gastar?" nao sao registro.
         Formato: {"action":"%s","type":"EXPENSE|INCOME","amount":<numero positivo>,\
         "category":"<nome exato de uma categoria da lista com o mesmo tipo, ou null se nenhuma servir>",\
         "description":"<resumo de ate 100 caracteres>","date":"<YYYY-MM-DD, ou null se nao informada>"}"""

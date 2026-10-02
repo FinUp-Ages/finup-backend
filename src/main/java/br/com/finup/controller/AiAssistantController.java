@@ -5,9 +5,6 @@ import br.com.finup.dto.AiAssistantResponse;
 import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.AiAssistantService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -19,6 +16,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+// TODO Criar métodos de pagamentos
+//
 
 /**
  * Assistente de IA: recebe uma frase do usuario autenticado e executa a acao correspondente. A
@@ -44,23 +44,6 @@ public class AiAssistantController {
       summary = "Interpreta um texto livre e executa a acao (ex.: registrar uma transacao)",
       description =
           "Exemplo: \"gastei 7 reais na pucrs\" registra uma despesa de 7,00 em Educação.")
-  @Parameters({
-    @Parameter(
-        name = "X-Mock-Cognito-Sub",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "Identificador (sub) da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Email",
-        in = ParameterIn.HEADER,
-        required = true,
-        description = "E-mail da identidade autenticada — mock do Cognito real."),
-    @Parameter(
-        name = "X-Mock-Cognito-Name",
-        in = ParameterIn.HEADER,
-        required = false,
-        description = "Nome da identidade autenticada — mock do Cognito real. Opcional.")
-  })
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Acao executada"),
     @ApiResponse(

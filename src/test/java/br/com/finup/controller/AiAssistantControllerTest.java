@@ -35,6 +35,9 @@ class AiAssistantControllerTest {
   private static final AuthenticatedIdentity IDENTITY =
       new AuthenticatedIdentity("mock-sub", "Ana Souza", "ana@exemplo.com");
 
+  private static final java.util.UUID CONVERSATION_ID =
+      java.util.UUID.fromString("11111111-1111-1111-1111-111111111111");
+
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private AiAssistantService aiAssistantService;
@@ -49,10 +52,14 @@ class AiAssistantControllerTest {
   @DisplayName("POST valido devolve 200 com a acao executada")
   void validRequestReturns200() throws Exception {
     when(aiAssistantService.handle(
-            eq(IDENTITY), eq(new AiAssistantRequest("gastei 7 reais na pucrs", AiModel.ANTHROPIC))))
+            eq(IDENTITY),
+            eq(new AiAssistantRequest("gastei 7 reais na pucrs", AiModel.ANTHROPIC, null))))
         .thenReturn(
             new AiAssistantResponse(
-                "REGISTER_TRANSACTION", "Despesa de R$ 7.00 registrada em Educação.", null));
+                "REGISTER_TRANSACTION",
+                "Despesa de R$ 7.00 registrada em Educação.",
+                null,
+                CONVERSATION_ID));
 
     mockMvc
         .perform(
@@ -61,7 +68,23 @@ class AiAssistantControllerTest {
                 .content("{\"message\":\"gastei 7 reais na pucrs\",\"model\":\"ANTHROPIC\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.action").value("REGISTER_TRANSACTION"))
-        .andExpect(jsonPath("$.message").value("Despesa de R$ 7.00 registrada em Educação."));
+        .andExpect(jsonPath("$.message").value("Despesa de R$ 7.00 registrada em Educação."))
+        .andExpect(jsonPath("$.conversationId").value(CONVERSATION_ID.toString()));
+  }
+
+  @Test
+  @DisplayName("conversationId vazio (variavel do Postman ainda sem valor) vale como conversa nova")
+  void blankConversationIdIsTreatedAsNewConversation() throws Exception {
+    when(aiAssistantService.handle(eq(IDENTITY), eq(new AiAssistantRequest("oi", null, null))))
+        .thenReturn(new AiAssistantResponse("FINANCIAL_FEEDBACK", "ola", null, CONVERSATION_ID));
+
+    mockMvc
+        .perform(
+            post("/api/v1/ai/assistant")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"message\":\"oi\",\"conversationId\":\"\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.conversationId").value(CONVERSATION_ID.toString()));
   }
 
   @Test
