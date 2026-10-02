@@ -32,7 +32,12 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
   private static final String[] PUBLIC_PATHS = {
-    "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/actuator/health", "/error"
+    "/v3/api-docs/**",
+    "/swagger-ui/**",
+    "/swagger-ui.html",
+    "/actuator/health",
+    "/error",
+    "/docs/**"
   };
 
   /** Consulta de e-mail do cadastro: publica so no POST, porque a pessoa ainda nao tem token. */

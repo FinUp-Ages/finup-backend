@@ -61,11 +61,14 @@ finup:
       region: ${CHAT_HISTORY_REGION:}
       prefix: conversations
 
-springdoc:
-  api-docs:
-    path: /v3/api-docs
-  swagger-ui:
-    path: /swagger-ui.html
+scalar:
+  enabled: true
+  url: /v3/api-docs
+  path: /docs
+  page-title: Finup Backend API
+  theme: kepler
+#  theme: blue_planet
+  dark-mode: true
 
 management:
   endpoints:
@@ -87,3 +90,19 @@ spring:
 logging:
   level:
     br.com.finup: ${LOG_LEVEL:DEBUG}
+
+---
+# A documentacao publica fica disponivel apenas fora de producao.
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+scalar:
+  enabled: false

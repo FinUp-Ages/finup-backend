@@ -1,5 +1,6 @@
 package br.com.finup.config;
 
+import com.scalar.maven.webmvc.ScalarWebMvcAutoConfiguration;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
@@ -9,6 +10,7 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 
 /**
@@ -20,6 +22,7 @@ import org.springframework.core.env.Environment;
  * X-Mock-Cognito-*}. Vale para todos os endpoints, entao nenhum controller repete isso.
  */
 @Configuration
+@Import(ScalarWebMvcAutoConfiguration.class)
 public class OpenApiConfig {
 
   private static final String BEARER_AUTH = "bearerAuth";
