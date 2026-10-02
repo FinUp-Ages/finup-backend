@@ -68,6 +68,12 @@
       <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
       <version>${springdoc.version}</version>
     </dependency>
+    <!-- Contrato Scalar docs: /v3/api-docs -->
+    <dependency>
+      <groupId>com.scalar.maven</groupId>
+      <artifactId>scalar-webmvc</artifactId>
+      <version>0.6.74</version>
+    </dependency>
 
       <dependency>
         <groupId>org.springframework.boot</groupId>
@@ -105,6 +111,11 @@
       <groupId>com.h2database</groupId>
       <artifactId>h2</artifactId>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-devtools</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
   </dependencies>

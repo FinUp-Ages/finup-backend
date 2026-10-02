@@ -67,6 +67,12 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+scalar:
+  enabled: true
+  url: /v3/api-docs
+  page-title: Finup Backend API
+  theme: moon
+---
 management:
   endpoints:
     web:
