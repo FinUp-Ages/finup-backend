@@ -2,6 +2,15 @@
   "stage": "COMPLETED",
   "task": "Integrar o Amazon Bedrock (padrao da nitra-ai) e registrar transacao a partir de texto livre.",
   "objective": "POST /api/v1/ai/assistant recebe texto (ex.: 'gastei 7 reais na pucrs'), o Bedrock Converse devolve uma acao estruturada em JSON e o backend executa a acao (hoje: REGISTER_TRANSACTION via TransactionService). Novas acoes entram por AiAction. Saida do modelo e sempre validada (categoria do usuario, valor, tipo, data). Falhas do Bedrock viram 4xx/5xx em ProblemDetail.",
+  "stage": "REVIEWING",
+  "task": "[Backend] Ajustar GET /api/v1/transactions para usar a identidade do token (sem userId na query)",
+  "objective": "Corrigir o GET entregue no #32: o dono das transacoes vem sempre do token, como no POST, sem receber userId do cliente e sem 403 por outro usuario.",
+  "decisions": [
+    "GET /api/v1/transactions?from&to: userId saiu da query; o usuario vem de AuthenticatedIdentityResolver.resolveCurrent(), o mesmo caminho do POST. userId enviado por engano e ignorado pelo Spring",
+    "TransactionService.list passou a receber a AuthenticatedIdentity e resolve o usuario via UserService; sem cadastro local responde 404, como o POST",
+    "Removidos o 403 por outro usuario e o isCurrentUserAdmin() (interface e Cognito): a autorizacao por grupo admins segue na tarefa 86e3f7ygt, que so deve ser puxada quando existir a primeira rota de admin",
+    "@Parameter com formato e regra de from/to no Swagger, e OpenApiIntegrationTests passa a verificar o GET e seus parametros"
+  ],
   "files_in_scope": [
     "pom.xml",
     "src/main/resources/application.yml",
@@ -17,16 +26,30 @@
     "src/main/java/br/com/finup/controller/AiAssistantController.java",
     "src/main/java/br/com/finup/exception/AiProviderException.java",
     "src/test/java/br/com/finup/**"
+    "src/main/java/br/com/finup/controller/TransactionController.java",
+    "src/main/java/br/com/finup/service/TransactionService.java",
+    "src/main/java/br/com/finup/security/AuthenticatedIdentityResolver.java",
+    "src/main/java/br/com/finup/security/CognitoAuthenticatedIdentityResolver.java",
+    "src/test/java/br/com/finup/controller/TransactionControllerTest.java",
+    "src/test/java/br/com/finup/service/TransactionServiceTest.java",
+    "src/test/java/br/com/finup/config/SecurityConfigTest.java",
+    "src/test/java/br/com/finup/OpenApiIntegrationTests.java"
   ],
   "validation": {
     "./mvnw verify (187 testes + spotless:check)": "passed",
     "git diff --check": "passed",
     "chamada real ao Bedrock": "nao executada (sem credenciais)"
+    "mvn clean verify": "passed (195 testes, 0 falhas, spotless ok)"
   },
   "review": "diff revisado; saida do modelo validada (categoria do usuario, tipo, valor, data) antes de gravar. Merge com develop: RegisterTransactionAiAction adaptada ao novo TransactionService.register(identity, ...) e a Category.getType() em TransactionType.",
+  "review": "pendente",
+  "updated_at": "2026-10-01",
   "open_questions": [
     "'aberturas' interpretado como pontos de extensao (AiAction); confirmar.",
     "Dependencia: a categoria 'Educação' nao existe entre as padrao. O assistente casa a categoria por nome (sem acento/caixa) entre as do usuario; ate a tarefa de criacao de categorias entregar, 'gastei 7 reais na pucrs' retorna 422 (categoria nao encontrada)."
   ],
   "updated_at": "2026-09-30"
+    "Contrato do GET diverge do stub do #33 (startDate/endDate/type/categoryId/page/size): alinhar com o Israel e o time de App; paginacao esta na issue #34",
+    "Admin consultando outro usuario deixa de existir ate a tarefa 86e3f7ygt; a issue #35 (404 para admin com userId inexistente) e a #36 (admin no mock-auth) ficam sem objeto e podem ser fechadas"
+  ]
 }

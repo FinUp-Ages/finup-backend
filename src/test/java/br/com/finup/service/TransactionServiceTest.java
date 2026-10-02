@@ -8,6 +8,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import br.com.finup.exception.IncompatibleTransactionCategoryException;
+import br.com.finup.exception.InvalidTransactionPeriodException;
 import br.com.finup.exception.InvalidTransactionRecurrenceException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.RecurrenceFrequency;
@@ -18,6 +20,7 @@ import br.com.finup.repository.TransactionRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,8 +53,8 @@ class TransactionServiceTest {
     AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
-    when(transactionRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
-        .thenReturn(true);
+    when(transactionRepository.findAvailableCategoryTypeForUser(categoryId, user.getId()))
+        .thenReturn(Optional.of("INCOME"));
     when(transactionRepository.save(any(Transaction.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -86,8 +89,8 @@ class TransactionServiceTest {
     UUID categoryId = UUID.randomUUID();
     UUID paymentMethodId = UUID.randomUUID();
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
-    when(transactionRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
-        .thenReturn(true);
+    when(transactionRepository.findAvailableCategoryTypeForUser(categoryId, user.getId()))
+        .thenReturn(Optional.of("EXPENSE"));
     when(transactionRepository.existsPaymentMethodForUser(paymentMethodId, user.getId()))
         .thenReturn(true);
     when(transactionRepository.save(any(Transaction.class)))
@@ -128,8 +131,8 @@ class TransactionServiceTest {
     AuthenticatedIdentity identity = identity(user);
     UUID categoryId = UUID.randomUUID();
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
-    when(transactionRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
-        .thenReturn(false);
+    when(transactionRepository.findAvailableCategoryTypeForUser(categoryId, user.getId()))
+        .thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> register(identity, categoryId, null))
         .isInstanceOf(ResourceNotFoundException.class)
@@ -145,14 +148,68 @@ class TransactionServiceTest {
     UUID categoryId = UUID.randomUUID();
     UUID paymentMethodId = UUID.randomUUID();
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
-    when(transactionRepository.existsCategoryAvailableForUser(categoryId, user.getId()))
-        .thenReturn(true);
+    when(transactionRepository.findAvailableCategoryTypeForUser(categoryId, user.getId()))
+        .thenReturn(Optional.of("EXPENSE"));
     when(transactionRepository.existsPaymentMethodForUser(paymentMethodId, user.getId()))
         .thenReturn(false);
 
     assertThatThrownBy(() -> register(identity, categoryId, paymentMethodId))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("Meio de pagamento");
+    verify(transactionRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("recusa transacao quando o tipo da categoria difere do tipo da transacao")
+  void rejectsCategoryWithIncompatibleType() {
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
+    UUID categoryId = UUID.randomUUID();
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
+    when(transactionRepository.findAvailableCategoryTypeForUser(categoryId, user.getId()))
+        .thenReturn(Optional.of("INCOME"));
+
+    assertThatThrownBy(() -> register(identity, categoryId, null))
+        .isInstanceOf(IncompatibleTransactionCategoryException.class)
+        .hasMessageContaining("INCOME")
+        .hasMessageContaining("EXPENSE");
+    verify(transactionRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("nao consulta o meio de pagamento quando a categoria e incompativel")
+  void skipsPaymentMethodWhenCategoryIsIncompatible() {
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
+    UUID categoryId = UUID.randomUUID();
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
+    when(transactionRepository.findAvailableCategoryTypeForUser(categoryId, user.getId()))
+        .thenReturn(Optional.of("INCOME"));
+
+    assertThatThrownBy(() -> register(identity, categoryId, UUID.randomUUID()))
+        .isInstanceOf(IncompatibleTransactionCategoryException.class);
+    verify(transactionRepository, never()).existsPaymentMethodForUser(any(), any());
+  }
+
+  /**
+   * Categoria indisponivel e tipo incompativel ao mesmo tempo tem que responder 404, e nao 422: um
+   * 422 aqui confirmaria a existencia do id da categoria privada de outro usuario.
+   */
+  @Test
+  @DisplayName("categoria indisponivel responde 404 mesmo quando o tipo tambem seria incompativel")
+  void prefersNotFoundOverIncompatibleTypeForUnavailableCategory() {
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
+    UUID otherUsersIncomeCategoryId = UUID.randomUUID();
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
+    when(transactionRepository.findAvailableCategoryTypeForUser(
+            otherUsersIncomeCategoryId, user.getId()))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> register(identity, otherUsersIncomeCategoryId, null))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .isNotInstanceOf(IncompatibleTransactionCategoryException.class)
+        .hasMessageContaining("Categoria");
     verify(transactionRepository, never()).save(any());
   }
 
@@ -201,5 +258,96 @@ class TransactionServiceTest {
         LocalDate.of(2026, 9, 5),
         recurring,
         recurrenceFrequency);
+  }
+
+  @Test
+  @DisplayName("periodo invalido devolve erro antes de consultar o repositorio")
+  void invalidPeriodThrowsException() {
+    AuthenticatedIdentity identity = identity(mockUser());
+    LocalDate from = LocalDate.of(2026, 9, 30);
+    LocalDate to = LocalDate.of(2026, 9, 1);
+
+    assertThatThrownBy(() -> transactionService.list(identity, from, to))
+        .isInstanceOf(InvalidTransactionPeriodException.class);
+
+    verifyNoInteractions(transactionRepository, userService);
+  }
+
+  @Test
+  @DisplayName("calcula saldo do periodo como entradas menos saidas")
+  void calculatesBalanceFromPeriodTransactions() {
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
+    UUID userId = user.getId();
+    UUID categoryId = UUID.randomUUID();
+    LocalDate from = LocalDate.of(2026, 9, 1);
+    LocalDate to = LocalDate.of(2026, 9, 30);
+
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
+
+    Transaction income =
+        Transaction.register(
+            userId,
+            categoryId,
+            null,
+            TransactionType.INCOME,
+            "Salario",
+            new BigDecimal("3000.00"),
+            LocalDate.of(2026, 9, 5),
+            null);
+
+    Transaction expense1 =
+        Transaction.register(
+            userId,
+            categoryId,
+            null,
+            TransactionType.EXPENSE,
+            "Mercado",
+            new BigDecimal("500.00"),
+            LocalDate.of(2026, 9, 10),
+            null);
+
+    Transaction expense2 =
+        Transaction.register(
+            userId,
+            categoryId,
+            null,
+            TransactionType.EXPENSE,
+            "Internet",
+            new BigDecimal("100.00"),
+            LocalDate.of(2026, 9, 15),
+            null);
+
+    when(transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
+            userId, from, to))
+        .thenReturn(java.util.List.of(income, expense1, expense2));
+
+    var response = transactionService.list(identity, from, to);
+
+    assertThat(response.balance()).isEqualByComparingTo("2400.00");
+
+    assertThat(response.transactions()).hasSize(3);
+  }
+
+  @Test
+  @DisplayName("retorna saldo zero e lista vazia quando nao existem transacoes no periodo")
+  void emptyPeriodReturnsZeroBalanceAndEmptyList() {
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
+    UUID userId = user.getId();
+    LocalDate from = LocalDate.of(2026, 9, 1);
+    LocalDate to = LocalDate.of(2026, 9, 30);
+
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
+
+    when(transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
+            userId, from, to))
+        .thenReturn(java.util.List.of());
+
+    var response = transactionService.list(identity, from, to);
+
+    assertThat(response.balance()).isEqualByComparingTo(BigDecimal.ZERO);
+
+    assertThat(response.transactions()).isEmpty();
   }
 }

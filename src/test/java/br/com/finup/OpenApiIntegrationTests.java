@@ -53,6 +53,10 @@ class OpenApiIntegrationTests {
         .andExpect(jsonPath("$.security[0].bearerAuth").exists())
         .andExpect(jsonPath("$.paths['/api/v1/users']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/transactions'].post").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/transactions'].get").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/transactions'].get.parameters[*].name")
+                .value(org.hamcrest.Matchers.containsInAnyOrder("from", "to")))
         .andExpect(jsonPath("$.paths['/api/v1/categories'].get").exists())
         .andExpect(jsonPath("$.paths['/api/v1/assistant/conversations'].get").exists())
         .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type").value("http"))

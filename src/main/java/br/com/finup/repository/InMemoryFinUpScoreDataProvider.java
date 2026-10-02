@@ -4,6 +4,7 @@ import br.com.finup.model.FinUpScoreInputs;
 import br.com.finup.model.IncomeExpenseRelation;
 import br.com.finup.model.SpendingHabit;
 import br.com.finup.model.User;
+import br.com.finup.model.UserFinancialProfile;
 import java.math.BigDecimal;
 import java.util.Map;
 import org.springframework.stereotype.Repository;
@@ -36,6 +37,13 @@ public class InMemoryFinUpScoreDataProvider implements FinUpScoreDataProvider {
 
   /** E-mail do usuario de demonstracao que reproduz o Exemplo D (score 106) do documento. */
   public static final String DEMO_STRUGGLING_EMAIL = "exemplo.d.dificuldade@finup.local";
+
+  private final UserFinancialProfileRepository userFinancialProfileRepository;
+
+  public InMemoryFinUpScoreDataProvider(
+      UserFinancialProfileRepository userFinancialProfileRepository) {
+    this.userFinancialProfileRepository = userFinancialProfileRepository;
+  }
 
   private final Map<String, FinUpScoreInputs> fixturesByEmail =
       Map.of(
@@ -79,15 +87,12 @@ public class InMemoryFinUpScoreDataProvider implements FinUpScoreDataProvider {
     if (fixture != null) {
       return fixture;
     }
+    BigDecimal monthlyIncome =
+        userFinancialProfileRepository
+            .findByUserId(user.getId())
+            .map(UserFinancialProfile::getMonthlyIncome)
+            .orElse(null);
     return new FinUpScoreInputs(
-        user.getMonthlyIncome(),
-        null,
-        null,
-        null,
-        BigDecimal.ZERO,
-        false,
-        BigDecimal.ZERO,
-        null,
-        null);
+        monthlyIncome, null, null, null, BigDecimal.ZERO, false, BigDecimal.ZERO, null, null);
   }
 }

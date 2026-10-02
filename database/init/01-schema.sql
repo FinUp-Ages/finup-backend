@@ -28,6 +28,18 @@ CREATE TABLE IF NOT EXISTS user_financial_profiles (
   CONSTRAINT fk_user_financial_profiles_user FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
+-- Informações complementares do cadastro (Etapas 2 e 3), gravadas por
+-- PATCH /api/v1/users/me/additional-info; um perfil por usuário.
+-- Estes scripts só rodam quando o volume do Postgres é criado: quem já tem o volume precisa
+-- recriá-lo (docker compose down -v) ou aplicar este ALTER e o índice abaixo à mão.
+ALTER TABLE user_financial_profiles
+ADD COLUMN IF NOT EXISTS phone VARCHAR(20),
+ADD COLUMN IF NOT EXISTS profession VARCHAR(255),
+ADD COLUMN IF NOT EXISTS birth_date DATE,
+ADD COLUMN IF NOT EXISTS monthly_income DECIMAL(12, 2);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_financial_profiles_user ON user_financial_profiles (user_id);
+
 CREATE TABLE IF NOT EXISTS user_investment_interests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_financial_profile_id UUID NOT NULL,

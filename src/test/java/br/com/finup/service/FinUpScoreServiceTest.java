@@ -42,10 +42,9 @@ class FinUpScoreServiceTest {
   void persistsScoreWhenComputed() {
     User user =
         User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
-    user.applyAdditionalInfo(null, new BigDecimal("5000"), null);
     FinUpScoreInputs inputs =
         new FinUpScoreInputs(
-            user.getMonthlyIncome(),
+            new BigDecimal("5000"),
             null,
             null,
             null,

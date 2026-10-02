@@ -1,14 +1,20 @@
 package br.com.finup.controller;
 
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.finup.dto.TransactionListItemResponse;
+import br.com.finup.dto.TransactionListResponse;
+import br.com.finup.exception.IncompatibleTransactionCategoryException;
+import br.com.finup.exception.InvalidTransactionPeriodException;
 import br.com.finup.exception.InvalidTransactionRecurrenceException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.RecurrenceFrequency;
@@ -18,7 +24,9 @@ import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.TransactionService;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,6 +55,112 @@ class TransactionControllerTest {
   @BeforeEach
   void mockIdentity() {
     when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(IDENTITY);
+  }
+
+  @Test
+  @DisplayName("GET das proprias transacoes devolve 200 com saldo e historico")
+  void ownTransactionsReturn200() throws Exception {
+    UUID transactionId = UUID.randomUUID();
+    UUID categoryId = UUID.randomUUID();
+
+    LocalDate from = LocalDate.of(2026, 9, 1);
+    LocalDate to = LocalDate.of(2026, 9, 30);
+    LocalDate transactionDate = LocalDate.of(2026, 9, 5);
+
+    TransactionListItemResponse transactionResponse =
+        new TransactionListItemResponse(
+            transactionId,
+            categoryId,
+            null,
+            TransactionType.INCOME,
+            "Salario",
+            new BigDecimal("3000.00"),
+            transactionDate,
+            false,
+            Instant.parse("2026-09-05T10:00:00Z"));
+
+    TransactionListResponse response =
+        new TransactionListResponse(new BigDecimal("3000.00"), List.of(transactionResponse));
+
+    when(transactionService.list(IDENTITY, from, to)).thenReturn(response);
+
+    mockMvc
+        .perform(
+            get("/api/v1/transactions").param("from", from.toString()).param("to", to.toString()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.balance").value(3000.00))
+        .andExpect(jsonPath("$.transactions.length()").value(1))
+        .andExpect(jsonPath("$.transactions[0].id").value(transactionId.toString()))
+        .andExpect(jsonPath("$.transactions[0].categoryId").value(categoryId.toString()))
+        .andExpect(jsonPath("$.transactions[0].type").value("INCOME"))
+        .andExpect(jsonPath("$.transactions[0].description").value("Salario"))
+        .andExpect(jsonPath("$.transactions[0].amount").value(3000.00))
+        .andExpect(jsonPath("$.transactions[0].transactionDate").value("2026-09-05"))
+        .andExpect(jsonPath("$.transactions[0].isRecurring").value(false))
+        .andExpect(jsonPath("$.transactions[0].paymentMethodId").doesNotExist())
+        .andExpect(jsonPath("$.transactions[0].createdAt").value("2026-09-05T10:00:00Z"));
+  }
+
+  @Test
+  @DisplayName("GET ignora userId na query: o dono vem sempre da identidade autenticada")
+  void listIgnoresUserIdQueryParam() throws Exception {
+    LocalDate from = LocalDate.of(2026, 9, 1);
+    LocalDate to = LocalDate.of(2026, 9, 30);
+
+    when(transactionService.list(IDENTITY, from, to))
+        .thenReturn(new TransactionListResponse(BigDecimal.ZERO, List.of()));
+
+    mockMvc
+        .perform(
+            get("/api/v1/transactions")
+                .param("userId", UUID.randomUUID().toString())
+                .param("from", from.toString())
+                .param("to", to.toString()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.balance").value(0))
+        .andExpect(jsonPath("$.transactions.length()").value(0));
+  }
+
+  @Test
+  @DisplayName("GET sem from ou to devolve 400")
+  void listWithoutPeriodReturns400() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/transactions").param("from", "2026-09-01"))
+        .andExpect(status().isBadRequest());
+
+    verifyNoInteractions(transactionService);
+  }
+
+  @Test
+  @DisplayName("GET com periodo invalido devolve 400")
+  void listWithInvalidPeriodReturns400() throws Exception {
+    LocalDate from = LocalDate.of(2026, 9, 30);
+    LocalDate to = LocalDate.of(2026, 9, 1);
+
+    when(transactionService.list(IDENTITY, from, to))
+        .thenThrow(new InvalidTransactionPeriodException());
+
+    mockMvc
+        .perform(
+            get("/api/v1/transactions").param("from", from.toString()).param("to", to.toString()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400));
+  }
+
+  @Test
+  @DisplayName("GET de usuario autenticado sem cadastro local devolve 404")
+  void listWithoutLocalUserReturns404() throws Exception {
+    LocalDate from = LocalDate.of(2026, 9, 1);
+    LocalDate to = LocalDate.of(2026, 9, 30);
+
+    when(transactionService.list(IDENTITY, from, to))
+        .thenThrow(new ResourceNotFoundException("Usuario nao encontrado"));
+
+    mockMvc
+        .perform(
+            get("/api/v1/transactions").param("from", from.toString()).param("to", to.toString()))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.status").value(404));
   }
 
   @Test
@@ -217,6 +331,103 @@ class TransactionControllerTest {
                         .formatted(UUID.randomUUID())))
         .andExpect(status().isBadRequest());
     verifyNoInteractions(transactionService);
+  }
+
+  @Test
+  @DisplayName("categoria com tipo incompativel devolve 422 no formato RFC 7807, nunca 201")
+  void incompatibleCategoryTypeReturns422() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+    when(transactionService.register(
+            eq(IDENTITY),
+            eq(categoryId),
+            isNull(),
+            eq(TransactionType.EXPENSE),
+            isNull(),
+            eq(new BigDecimal("10.00")),
+            eq(LocalDate.of(2026, 9, 12)),
+            eq(false),
+            isNull()))
+        .thenThrow(
+            new IncompatibleTransactionCategoryException(
+                TransactionType.INCOME, TransactionType.EXPENSE));
+
+    mockMvc
+        .perform(
+            post("/api/v1/transactions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "categoryId": "%s",
+                      "type": "EXPENSE",
+                      "amount": 10.00,
+                      "transactionDate": "2026-09-12",
+                      "isRecurring": false
+                    }
+                    """
+                        .formatted(categoryId)))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(status().is(not(201)))
+        .andExpect(jsonPath("$.status").value(422))
+        .andExpect(
+            jsonPath("$.detail")
+                .value("Categoria do tipo INCOME nao pode ser usada em transacao do tipo EXPENSE"))
+        .andExpect(jsonPath("$.traceId").exists());
+  }
+
+  /**
+   * Regressao do contrato de identidade: {@code userId} nao faz parte do corpo, entao um {@code
+   * userId} enviado pelo cliente e ignorado e a transacao sai no nome de quem esta autenticado.
+   */
+  @Test
+  @DisplayName("userId enviado no corpo e ignorado: a transacao fica com o usuario autenticado")
+  void userIdInBodyIsIgnored() throws Exception {
+    UUID authenticatedUserId = UUID.randomUUID();
+    UUID spoofedUserId = UUID.randomUUID();
+    UUID categoryId = UUID.randomUUID();
+    LocalDate date = LocalDate.of(2026, 9, 12);
+    Transaction transaction =
+        Transaction.register(
+            authenticatedUserId,
+            categoryId,
+            null,
+            TransactionType.EXPENSE,
+            "Mercado",
+            new BigDecimal("250.00"),
+            date,
+            null);
+    when(transactionService.register(
+            eq(IDENTITY),
+            eq(categoryId),
+            isNull(),
+            eq(TransactionType.EXPENSE),
+            eq("Mercado"),
+            eq(new BigDecimal("250.00")),
+            eq(date),
+            eq(false),
+            isNull()))
+        .thenReturn(transaction);
+
+    mockMvc
+        .perform(
+            post("/api/v1/transactions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "userId": "%s",
+                      "categoryId": "%s",
+                      "type": "EXPENSE",
+                      "description": "Mercado",
+                      "amount": 250.00,
+                      "transactionDate": "2026-09-12",
+                      "isRecurring": false
+                    }
+                    """
+                        .formatted(spoofedUserId, categoryId)))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.userId").value(authenticatedUserId.toString()))
+        .andExpect(jsonPath("$.userId").value(not(spoofedUserId.toString())));
   }
 
   @Test

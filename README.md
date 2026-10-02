@@ -129,7 +129,8 @@ consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o b
 | `POST /api/v1/users/email-availability` | **público, sem token.** Diz se um e-mail já está cadastrado (`{"available": true\|false}`). Usado pelo formulário de cadastro |
 | `POST /api/v1/users` | cria o registro local da identidade autenticada. Corpo vazio |
 | `GET /api/v1/users/me` | devolve o usuário da identidade autenticada |
-| `PATCH /api/v1/users/me/additional-info` | grava as informações complementares (Etapa 2 do cadastro) |
+| `GET /api/v1/users/{id}` | devolve o próprio usuário (outro id dá `404`) |
+| `PATCH /api/v1/users/me/additional-info` | grava as informações complementares (Etapas 2 e 3 do cadastro) |
 | `POST /api/v1/users/me/finup-score/recalculate` | recalcula e persiste o FinUp Score |
 | `GET /api/v1/categories` | categorias do usuário **e** as padrão do sistema |
 | `POST /api/v1/categories` | cria categoria do usuário |
@@ -140,6 +141,14 @@ consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o b
 Categoria e meio de pagamento referenciados por uma transação precisam ser do
 próprio usuário — categoria padrão do sistema também vale. Referência de outro usuário responde
 `404`, e não `403`: um `403` confirmaria a existência do id para quem não deveria saber dela.
+
+A categoria também precisa ser **do mesmo tipo da transação**: categoria `EXPENSE` não classifica
+uma receita, e vice-versa. Incompatibilidade responde `422`. A disponibilidade é verificada antes da
+compatibilidade, de propósito: na ordem inversa, um `422` em categoria privada de outro usuário
+confirmaria a existência daquele id — o mesmo vazamento que o `404` acima evita.
+
+O dono da transação vem sempre da identidade autenticada. `userId` não faz parte do corpo do
+`POST`; se o cliente enviar um, ele é ignorado.
 
 **A consulta de e-mail é a exceção, de propósito.** O formulário de cadastro precisa avisar que o
 e-mail já existe antes de a pessoa ter conta e token, então `POST /api/v1/users/email-availability`
