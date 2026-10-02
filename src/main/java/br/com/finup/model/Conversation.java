@@ -11,6 +11,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.UuidGenerator;
 
 /**
@@ -38,6 +39,11 @@ public class Conversation {
   @Column(length = 255)
   private String title;
 
+  /** Quantas mensagens o transcript no S3 tem. O texto das mensagens nao fica no banco. */
+  @ColumnDefault("0")
+  @Column(name = "message_count", nullable = false)
+  private int messageCount;
+
   @Column(name = "created_at", updatable = false, nullable = false)
   private Instant createdAt;
 
@@ -58,6 +64,11 @@ public class Conversation {
     return new Conversation(user, title);
   }
 
+  /** Registra mensagens acrescentadas ao transcript; atualiza a data da conversa. */
+  public void recordMessages(int added) {
+    this.messageCount += added;
+  }
+
   @PreUpdate
   void markAsUpdated() {
     this.updatedAt = Instant.now();
@@ -69,6 +80,10 @@ public class Conversation {
 
   public User getUser() {
     return user;
+  }
+
+  public int getMessageCount() {
+    return messageCount;
   }
 
   public String getTitle() {

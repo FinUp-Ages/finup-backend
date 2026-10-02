@@ -12,14 +12,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.finup.controller.AiAssistantController;
 import br.com.finup.controller.CategoryController;
 import br.com.finup.controller.ConversationController;
 import br.com.finup.controller.TransactionController;
 import br.com.finup.controller.UserController;
+import br.com.finup.dto.AiAssistantRequest;
+import br.com.finup.dto.AiAssistantResponse;
 import br.com.finup.model.User;
 import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.security.ProblemDetailAuthenticationEntryPoint;
+import br.com.finup.service.AiAssistantService;
 import br.com.finup.service.CategoryService;
 import br.com.finup.service.ConversationService;
 import br.com.finup.service.TransactionService;
@@ -50,7 +54,8 @@ import org.springframework.test.web.servlet.MockMvc;
   UserController.class,
   CategoryController.class,
   ConversationController.class,
-  TransactionController.class
+  TransactionController.class,
+  AiAssistantController.class
 })
 @Import({SecurityConfig.class, CognitoConfig.class, ProblemDetailAuthenticationEntryPoint.class})
 @ActiveProfiles("test")
@@ -73,6 +78,8 @@ class SecurityConfigTest {
   @MockitoBean private AuthenticatedIdentityResolver authenticatedIdentityResolver;
 
   @MockitoBean private TransactionService transactionService;
+
+  @MockitoBean private AiAssistantService aiAssistantService;
 
   @Test
   @DisplayName("sem token devolve 401 em RFC 7807, sem chegar ao controller")
@@ -124,6 +131,53 @@ class SecurityConfigTest {
         .andExpect(status().isUnauthorized())
         .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")))
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.status").value(401));
+
+    verifyNoInteractions(authenticatedIdentityResolver, conversationService);
+  }
+
+  @Test
+  @DisplayName("assistente de IA sem access token do Cognito devolve 401, sem chamar o Bedrock")
+  void aiAssistantWithoutTokenReturns401() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/ai/assistant")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"message\":\"gastei 7 reais na pucrs\"}"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.status").value(401));
+
+    verifyNoInteractions(authenticatedIdentityResolver, aiAssistantService);
+  }
+
+  @Test
+  @DisplayName("assistente de IA com token valido usa a identidade do token")
+  void aiAssistantWithValidTokenReachesController() throws Exception {
+    AuthenticatedIdentity identity = new AuthenticatedIdentity("cognito-sub-123", null, null);
+    when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
+    when(aiAssistantService.handle(identity, new AiAssistantRequest("qual meu saldo?", null, null)))
+        .thenReturn(
+            new AiAssistantResponse(
+                "FINANCIAL_FEEDBACK", "Seu saldo do mes e positivo.", null, null));
+
+    mockMvc
+        .perform(
+            post("/api/v1/ai/assistant")
+                .with(jwt().jwt(token -> token.subject("cognito-sub-123")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"message\":\"qual meu saldo?\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.action").value("FINANCIAL_FEEDBACK"));
+  }
+
+  @Test
+  @DisplayName("mensagens de uma conversa sem access token do Cognito devolve 401")
+  void conversationMessagesWithoutTokenReturn401() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/assistant/conversations/{id}/messages", java.util.UUID.randomUUID()))
+        .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.status").value(401));
 
     verifyNoInteractions(authenticatedIdentityResolver, conversationService);
