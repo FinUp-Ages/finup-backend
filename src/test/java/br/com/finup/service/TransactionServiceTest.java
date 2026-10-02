@@ -263,23 +263,27 @@ class TransactionServiceTest {
   @Test
   @DisplayName("periodo invalido devolve erro antes de consultar o repositorio")
   void invalidPeriodThrowsException() {
-    UUID userId = UUID.randomUUID();
+    AuthenticatedIdentity identity = identity(mockUser());
     LocalDate from = LocalDate.of(2026, 9, 30);
     LocalDate to = LocalDate.of(2026, 9, 1);
 
-    assertThatThrownBy(() -> transactionService.list(userId, from, to))
+    assertThatThrownBy(() -> transactionService.list(identity, from, to))
         .isInstanceOf(InvalidTransactionPeriodException.class);
 
-    verifyNoInteractions(transactionRepository);
+    verifyNoInteractions(transactionRepository, userService);
   }
 
   @Test
   @DisplayName("calcula saldo do periodo como entradas menos saidas")
   void calculatesBalanceFromPeriodTransactions() {
-    UUID userId = UUID.randomUUID();
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
+    UUID userId = user.getId();
     UUID categoryId = UUID.randomUUID();
     LocalDate from = LocalDate.of(2026, 9, 1);
     LocalDate to = LocalDate.of(2026, 9, 30);
+
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
 
     Transaction income =
         Transaction.register(
@@ -318,7 +322,7 @@ class TransactionServiceTest {
             userId, from, to))
         .thenReturn(java.util.List.of(income, expense1, expense2));
 
-    var response = transactionService.list(userId, from, to);
+    var response = transactionService.list(identity, from, to);
 
     assertThat(response.balance()).isEqualByComparingTo("2400.00");
 
@@ -328,15 +332,19 @@ class TransactionServiceTest {
   @Test
   @DisplayName("retorna saldo zero e lista vazia quando nao existem transacoes no periodo")
   void emptyPeriodReturnsZeroBalanceAndEmptyList() {
-    UUID userId = UUID.randomUUID();
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
+    UUID userId = user.getId();
     LocalDate from = LocalDate.of(2026, 9, 1);
     LocalDate to = LocalDate.of(2026, 9, 30);
+
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
 
     when(transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
             userId, from, to))
         .thenReturn(java.util.List.of());
 
-    var response = transactionService.list(userId, from, to);
+    var response = transactionService.list(identity, from, to);
 
     assertThat(response.balance()).isEqualByComparingTo(BigDecimal.ZERO);
 

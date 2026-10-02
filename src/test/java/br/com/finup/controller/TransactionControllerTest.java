@@ -14,16 +14,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import br.com.finup.dto.TransactionListItemResponse;
 import br.com.finup.dto.TransactionListResponse;
 import br.com.finup.exception.IncompatibleTransactionCategoryException;
+import br.com.finup.exception.InvalidTransactionPeriodException;
 import br.com.finup.exception.InvalidTransactionRecurrenceException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.RecurrenceFrequency;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
-import br.com.finup.model.User;
 import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.TransactionService;
-import br.com.finup.service.UserService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -53,8 +52,6 @@ class TransactionControllerTest {
 
   @MockitoBean private AuthenticatedIdentityResolver authenticatedIdentityResolver;
 
-  @MockitoBean private UserService userService;
-
   @BeforeEach
   void mockIdentity() {
     when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(IDENTITY);
@@ -63,9 +60,6 @@ class TransactionControllerTest {
   @Test
   @DisplayName("GET das proprias transacoes devolve 200 com saldo e historico")
   void ownTransactionsReturn200() throws Exception {
-    User user = User.createFromCognitoIdentity("mock-sub", "Ana Souza", "ana@exemplo.com");
-
-    UUID userId = user.getId();
     UUID transactionId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
 
@@ -88,16 +82,11 @@ class TransactionControllerTest {
     TransactionListResponse response =
         new TransactionListResponse(new BigDecimal("3000.00"), List.of(transactionResponse));
 
-    when(userService.findByAuthenticatedIdentity(IDENTITY)).thenReturn(user);
-
-    when(transactionService.list(userId, from, to)).thenReturn(response);
+    when(transactionService.list(IDENTITY, from, to)).thenReturn(response);
 
     mockMvc
         .perform(
-            get("/api/v1/transactions")
-                .param("userId", userId.toString())
-                .param("from", from.toString())
-                .param("to", to.toString()))
+            get("/api/v1/transactions").param("from", from.toString()).param("to", to.toString()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.balance").value(3000.00))
         .andExpect(jsonPath("$.transactions.length()").value(1))
@@ -113,58 +102,65 @@ class TransactionControllerTest {
   }
 
   @Test
-  @DisplayName("GET de outro usuario sem permissao devolve 403")
-  void otherUserTransactionsReturn403() throws Exception {
-    User authenticatedUser =
-        User.createFromCognitoIdentity("mock-sub", "Ana Souza", "ana@exemplo.com");
-
-    UUID otherUserId = UUID.randomUUID();
+  @DisplayName("GET ignora userId na query: o dono vem sempre da identidade autenticada")
+  void listIgnoresUserIdQueryParam() throws Exception {
     LocalDate from = LocalDate.of(2026, 9, 1);
     LocalDate to = LocalDate.of(2026, 9, 30);
 
-    when(userService.findByAuthenticatedIdentity(IDENTITY)).thenReturn(authenticatedUser);
-
-    when(authenticatedIdentityResolver.isCurrentUserAdmin()).thenReturn(false);
+    when(transactionService.list(IDENTITY, from, to))
+        .thenReturn(new TransactionListResponse(BigDecimal.ZERO, List.of()));
 
     mockMvc
         .perform(
             get("/api/v1/transactions")
-                .param("userId", otherUserId.toString())
-                .param("from", from.toString())
-                .param("to", to.toString()))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.status").value(403))
-        .andExpect(
-            jsonPath("$.detail").value("Nao e permitido consultar transacoes de outro usuario."));
-  }
-
-  @Test
-  @DisplayName("GET de outro usuario por admin devolve 200")
-  void adminCanAccessOtherUserTransactions() throws Exception {
-    User authenticatedUser =
-        User.createFromCognitoIdentity("mock-sub", "Ana Souza", "ana@exemplo.com");
-
-    UUID otherUserId = UUID.randomUUID();
-    LocalDate from = LocalDate.of(2026, 9, 1);
-    LocalDate to = LocalDate.of(2026, 9, 30);
-
-    TransactionListResponse response = new TransactionListResponse(BigDecimal.ZERO, List.of());
-
-    when(userService.findByAuthenticatedIdentity(IDENTITY)).thenReturn(authenticatedUser);
-
-    when(authenticatedIdentityResolver.isCurrentUserAdmin()).thenReturn(true);
-
-    when(transactionService.list(otherUserId, from, to)).thenReturn(response);
-
-    mockMvc
-        .perform(
-            get("/api/v1/transactions")
-                .param("userId", otherUserId.toString())
+                .param("userId", UUID.randomUUID().toString())
                 .param("from", from.toString())
                 .param("to", to.toString()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.balance").value(0))
         .andExpect(jsonPath("$.transactions.length()").value(0));
+  }
+
+  @Test
+  @DisplayName("GET sem from ou to devolve 400")
+  void listWithoutPeriodReturns400() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/transactions").param("from", "2026-09-01"))
+        .andExpect(status().isBadRequest());
+
+    verifyNoInteractions(transactionService);
+  }
+
+  @Test
+  @DisplayName("GET com periodo invalido devolve 400")
+  void listWithInvalidPeriodReturns400() throws Exception {
+    LocalDate from = LocalDate.of(2026, 9, 30);
+    LocalDate to = LocalDate.of(2026, 9, 1);
+
+    when(transactionService.list(IDENTITY, from, to))
+        .thenThrow(new InvalidTransactionPeriodException());
+
+    mockMvc
+        .perform(
+            get("/api/v1/transactions").param("from", from.toString()).param("to", to.toString()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400));
+  }
+
+  @Test
+  @DisplayName("GET de usuario autenticado sem cadastro local devolve 404")
+  void listWithoutLocalUserReturns404() throws Exception {
+    LocalDate from = LocalDate.of(2026, 9, 1);
+    LocalDate to = LocalDate.of(2026, 9, 30);
+
+    when(transactionService.list(IDENTITY, from, to))
+        .thenThrow(new ResourceNotFoundException("Usuario nao encontrado"));
+
+    mockMvc
+        .perform(
+            get("/api/v1/transactions").param("from", from.toString()).param("to", to.toString()))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.status").value(404));
   }
 
   @Test

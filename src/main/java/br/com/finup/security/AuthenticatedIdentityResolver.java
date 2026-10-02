@@ -24,8 +24,4 @@ public interface AuthenticatedIdentityResolver {
    * chamada a AWS por requisicao: use so onde esses atributos sao necessarios, como no cadastro.
    */
   AuthenticatedIdentity resolveCurrentWithAttributes();
-
-  default boolean isCurrentUserAdmin() {
-    return false;
-  }
 }
