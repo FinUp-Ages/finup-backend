@@ -1,7 +1,7 @@
 {
   "stage": "COMPLETED",
-  "task": "Assistente de IA: gastos de risco no feedback, Cognito no endpoint e historico de chat (corpo no S3, metadados no banco).",
-  "objective": "POST /api/v1/ai/assistant recebe texto, o Bedrock Converse devolve a acao em JSON e o backend executa via AiAction. Acoes: REGISTER_TRANSACTION ('gastei 7 reais na pucrs' vira TransactionService.register) e FINANCIAL_FEEDBACK (so leitura: saldo e gastos do mes, comparacao com o mes anterior, maiores categorias, renda e FinUp Score calculados no codigo; a IA so comenta). A saida do modelo e sempre validada antes de gravar; ao modelo vao so agregados, sem descricoes de transacoes. Falhas do Bedrock viram 4xx/5xx em ProblemDetail. Historico de chat: conversationId opcional no pedido; cada turno gravado em conversations (metadado + message_count) e em um JSON por conversa no S3; GET /api/v1/assistant/conversations/{id}/messages le o transcript. Gastos de risco (bets, bebidas alcoolicas, drogas) sempre citados no feedback como evitaveis.",
+  "task": "Disponibilizar Scalar fora de prod e desativar a documentacao em prod.",
+  "objective": "Substituir a interface Swagger pela referencia Scalar, manter o contrato OpenAPI fora de prod e garantir que /v3/api-docs, /swagger-ui.html e /docs retornem 404 no perfil prod.",
   "files_in_scope": [
     "pom.xml",
     "src/main/resources/application.yml",
@@ -37,10 +37,10 @@
     "src/test/java/br/com/finup/config/SecurityConfigTest.java"
   ],
   "validation": {
-    "./mvnw verify (262 testes + spotless:check)": "passed",
-    "chamada real ao Bedrock/S3": "nao executada por este agente (sem credenciais/bucket)"
+    "OpenApiIntegrationTests,ProdDocumentationIntegrationTests": "passed",
+    "spotless:check": "passed"
   },
-  "review": "diff revisado. Cognito: /api/v1/ai/** e /conversations/{id}/messages exigem JWT (401 testado) e usam o AuthenticatedIdentityResolver; conversa de outro usuario responde 404. Historico e melhor-esforco: falha do S3 nao derruba a acao ja executada. Corrigido default de BEDROCK_DEFAULT_MODEL (enum, nao model id).",
+  "review": "Scalar mapeado em /docs com URL relativa para /v3/api-docs; springdoc e Scalar desabilitados no perfil prod; rotas /docs/** liberadas fora de prod.",
   "open_questions": [
     "'aberturas' interpretado como pontos de extensao (AiAction); confirmar.",
     "Bucket S3 (privado, bloqueio de acesso publico, criptografia) e permissao s3:GetObject/PutObject precisam ser provisionados fora deste repo; sem CHAT_HISTORY_BUCKET o historico fica em memoria.",

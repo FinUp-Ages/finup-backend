@@ -104,18 +104,20 @@ Isso normalmente não é necessário para o app mobile nativo (Android/iOS) — 
 requisições feitas por um navegador. É relevante apenas testando pela versão web do Expo
 (`npm run web`, no repositório `finup-mobile`), que roda dentro de um navegador.
 
-## Swagger / OpenAPI
+## Scalar / OpenAPI
 
-Com a aplicação em execução, a documentação da API fica disponível nestas URLs:
+Com a aplicação em execução fora do perfil `prod`, a referência da API fica disponível no Scalar:
 
 | O quê | URL |
 |---|---|
-| Swagger UI | http://localhost:8080/swagger-ui.html |
+| Scalar API Reference | http://localhost:8080/docs |
 | Contrato OpenAPI | http://localhost:8080/v3/api-docs |
 
-O Swagger UI lê o contrato OpenAPI gerado automaticamente pelo `springdoc` a partir dos
+O Scalar lê o contrato OpenAPI gerado automaticamente pelo `springdoc` a partir dos
 controllers e DTOs da aplicação. Os metadados gerais da API ficam centralizados em
 `config/OpenApiConfig.java`.
+
+> A documentação interativa e o contrato JSON ficam desabilitados no perfil `prod`.
 
 ### Endpoints disponíveis hoje
 
@@ -185,7 +187,7 @@ public record TransactionResponse(
 ```
 
 Evite anotar tudo: nomes claros e DTOs tipados já produzem boa parte do contrato. Depois de criar
-ou alterar um endpoint, confira o resultado no Swagger UI e rode `./mvnw clean verify`.
+ou alterar um endpoint, confira o resultado no Scalar e rode `./mvnw clean verify`.
 
 ## Como validar antes de abrir um PR
 

@@ -1,11 +1,9 @@
 package br.com.finup;
 
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -73,11 +71,8 @@ class OpenApiIntegrationTests {
   }
 
   @Test
-  @DisplayName("Swagger UI redireciona para a interface")
-  void redirectsSwaggerUiToItsInterface() throws Exception {
-    mockMvc
-        .perform(get("/swagger-ui.html"))
-        .andExpect(status().is3xxRedirection())
-        .andExpect(header().string("Location", containsString("/swagger-ui/index.html")));
+  @DisplayName("Scalar disponibiliza a referencia da API")
+  void scalarReferenceIsAvailable() throws Exception {
+    mockMvc.perform(get("/docs")).andExpect(status().isOk());
   }
 }
