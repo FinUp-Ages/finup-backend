@@ -200,7 +200,9 @@ class AiAssistantServiceTest {
   void foreignConversationFailsBeforeCallingTheModel() {
     UUID foreign = UUID.randomUUID();
     when(conversationService.requireOwned(user, foreign))
-        .thenThrow(new br.com.finup.exception.ResourceNotFoundException("Conversa", foreign));
+        .thenThrow(
+            new br.com.finup.exception.ResourceNotFoundException(
+                "Conversa nao encontrada: " + foreign));
 
     assertThatThrownBy(() -> service.handle(IDENTITY, new AiAssistantRequest("oi", null, foreign)))
         .isInstanceOf(br.com.finup.exception.ResourceNotFoundException.class);

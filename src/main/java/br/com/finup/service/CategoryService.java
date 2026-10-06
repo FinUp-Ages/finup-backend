@@ -92,7 +92,8 @@ public class CategoryService {
   private Category findByIdOrThrow(UUID categoryId) {
     return categoryRepository
         .findById(categoryId)
-        .orElseThrow(() -> new ResourceNotFoundException("Category", categoryId));
+        .orElseThrow(
+            () -> new ResourceNotFoundException("Categoria nao encontrada: " + categoryId));
   }
 
   /**
@@ -105,7 +106,7 @@ public class CategoryService {
   private void ensureOwnedByUser(User user, Category category) {
     User owner = category.getUser();
     if (owner == null || !owner.getId().equals(user.getId())) {
-      throw new ResourceNotFoundException("Category", category.getId());
+      throw new ResourceNotFoundException("Categoria nao encontrada: " + category.getId());
     }
   }
 }

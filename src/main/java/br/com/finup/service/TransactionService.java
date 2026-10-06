@@ -140,7 +140,8 @@ public class TransactionService {
         transactionRepository
             .findAvailableCategoryTypeForUser(categoryId, userId)
             .map(TransactionType::valueOf)
-            .orElseThrow(() -> new ResourceNotFoundException("Categoria", categoryId));
+            .orElseThrow(
+                () -> new ResourceNotFoundException("Categoria nao encontrada: " + categoryId));
 
     if (categoryType != type) {
       throw new IncompatibleTransactionCategoryException(categoryType, type);
@@ -148,7 +149,7 @@ public class TransactionService {
 
     if (paymentMethodId != null
         && !transactionRepository.existsPaymentMethodForUser(paymentMethodId, userId)) {
-      throw new ResourceNotFoundException("Meio de pagamento", paymentMethodId);
+      throw new ResourceNotFoundException("Meio de pagamento nao encontrado: " + paymentMethodId);
     }
   }
 

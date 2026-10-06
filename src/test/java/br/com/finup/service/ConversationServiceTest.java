@@ -132,7 +132,8 @@ class ConversationServiceTest {
         .thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> conversationService.recordTurn(user, foreign, "oi", "X", "ola"))
-        .isInstanceOf(ResourceNotFoundException.class);
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Conversa nao encontrada: " + foreign);
     assertThat(transcriptStore.read(user.getId(), foreign)).isEmpty();
     verify(conversationRepository, never()).save(any(Conversation.class));
   }
@@ -168,7 +169,8 @@ class ConversationServiceTest {
     when(conversationRepository.findByIdAndUser(foreign, user)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> conversationService.findMessages(IDENTITY, foreign))
-        .isInstanceOf(ResourceNotFoundException.class);
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Conversa nao encontrada: " + foreign);
   }
 
   @Test

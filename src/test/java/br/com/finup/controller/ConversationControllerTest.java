@@ -123,8 +123,12 @@ class ConversationControllerTest {
   void shouldReturn404ForForeignConversation() throws Exception {
     UUID id = UUID.randomUUID();
     when(conversationService.findMessages(any(AuthenticatedIdentity.class), eq(id)))
-        .thenThrow(new br.com.finup.exception.ResourceNotFoundException("Conversa", id));
+        .thenThrow(
+            new br.com.finup.exception.ResourceNotFoundException("Conversa nao encontrada: " + id));
 
-    mockMvc.perform(get(URL + "/" + id + "/messages")).andExpect(status().isNotFound());
+    mockMvc
+        .perform(get(URL + "/" + id + "/messages"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.detail").value("Conversa nao encontrada: " + id));
   }
 }
