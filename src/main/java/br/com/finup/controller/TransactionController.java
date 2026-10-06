@@ -62,7 +62,8 @@ public class TransactionController {
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
     @ApiResponse(
         responseCode = "404",
-        description = "Usuario, categoria ou meio de pagamento inexistente",
+        description =
+            "Usuario inexistente; categoria ou meio de pagamento inexistente ou de outro usuario",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
     @ApiResponse(
         responseCode = "422",

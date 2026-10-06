@@ -114,6 +114,25 @@ class CategoryControllerTest {
   }
 
   @Test
+  @DisplayName("PUT de categoria de outro usuario devolve 404 sem dados da categoria")
+  void updateForeignCategoryReturns404() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+
+    when(categoryService.update(eq(IDENTITY), eq(categoryId), any()))
+        .thenThrow(new ResourceNotFoundException("Category", categoryId));
+
+    mockMvc
+        .perform(
+            put("/api/v1/categories/{id}", categoryId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Outro nome\",\"type\":\"EXPENSE\"}"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.name").doesNotExist())
+        .andExpect(jsonPath("$.isDefault").doesNotExist());
+  }
+
+  @Test
   @DisplayName("GET devolve 200 com lista de categorias")
   void findAvailableReturns200() throws Exception {
     List<CategoryListResponse> response =
@@ -157,6 +176,23 @@ class CategoryControllerTest {
         .delete(eq(IDENTITY), eq(categoryId));
 
     mockMvc.perform(delete("/api/v1/categories/{id}", categoryId)).andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("DELETE de categoria de outro usuario devolve 404 sem dados da categoria")
+  void deleteForeignCategoryReturns404() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+
+    doThrow(new ResourceNotFoundException("Category", categoryId))
+        .when(categoryService)
+        .delete(eq(IDENTITY), eq(categoryId));
+
+    mockMvc
+        .perform(delete("/api/v1/categories/{id}", categoryId))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.name").doesNotExist())
+        .andExpect(jsonPath("$.isDefault").doesNotExist());
   }
 
   @Test

@@ -73,6 +73,25 @@ class OpenApiIntegrationTests {
   }
 
   @Test
+  @DisplayName("Swagger documenta 404 para recursos de outro usuario nas rotas afetadas")
+  void documentsNotFoundForForeignResources() throws Exception {
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/api/v1/users/{id}'].get.responses['404']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/transactions'].post.responses['404']").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/transactions'].post.responses['404'].description")
+                .value(containsString("outro usuario")))
+        .andExpect(jsonPath("$.paths['/api/v1/categories/{id}'].put.responses['404']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/categories/{id}'].delete.responses['404']").exists())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/v1/assistant/conversations/{id}/messages'].get.responses['404']")
+                .exists());
+  }
+
+  @Test
   @DisplayName("Swagger UI redireciona para a interface")
   void redirectsSwaggerUiToItsInterface() throws Exception {
     mockMvc
