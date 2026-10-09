@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
@@ -24,6 +25,9 @@ import java.util.UUID;
 @Entity
 @Table(name = "users")
 public class User {
+
+  private static final Duration LAST_SEEN_THROTTLE = Duration.ofHours(1);
+  private static final Duration ACTIVE_WINDOW = Duration.ofDays(7);
 
   @Id private UUID id;
 
@@ -54,6 +58,9 @@ public class User {
 
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
+
+  @Column(name = "last_seen_at")
+  private Instant lastSeenAt;
 
   protected User() {}
 
@@ -104,6 +111,27 @@ public class User {
    */
   public void updateFinUpScore(int newFinUpScore) {
     this.finUpScore = newFinUpScore;
+  }
+
+  /**
+   * Registra o acesso corrente em {@code lastSeenAt}, no maximo uma vez por hora — chamadas mais
+   * frequentes de {@code GET /api/v1/users/me} nao geram escrita nova. Devolve se houve mudanca,
+   * para quem chama decidir se precisa persistir.
+   */
+  public boolean touchLastSeen(Instant now) {
+    if (lastSeenAt != null && Duration.between(lastSeenAt, now).compareTo(LAST_SEEN_THROTTLE) < 0) {
+      return false;
+    }
+    lastSeenAt = now;
+    return true;
+  }
+
+  /**
+   * Status derivado de {@code lastSeenAt}: ACTIVE se o ultimo acesso registrado foi nos ultimos 7
+   * dias. Quem nunca chamou {@code GET /api/v1/users/me} (lastSeenAt nulo) conta como inativo.
+   */
+  public boolean isActive(Instant now) {
+    return lastSeenAt != null && Duration.between(lastSeenAt, now).compareTo(ACTIVE_WINDOW) <= 0;
   }
 
   @PreUpdate
@@ -157,6 +185,10 @@ public class User {
 
   public Instant getUpdatedAt() {
     return updatedAt;
+  }
+
+  public Instant getLastSeenAt() {
+    return lastSeenAt;
   }
 
   /** Identidade de entidade e o id — dois usuarios com o mesmo id sao o mesmo usuario. */

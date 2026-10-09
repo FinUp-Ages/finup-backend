@@ -200,7 +200,7 @@ class SecurityConfigTest {
     AuthenticatedIdentity identity = new AuthenticatedIdentity("cognito-sub-123", null, null);
     User user = User.createFromCognitoIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
     when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
-    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
+    when(userService.recordAccess(identity)).thenReturn(user);
 
     mockMvc
         .perform(get("/api/v1/users/me").with(jwt().jwt(token -> token.subject("cognito-sub-123"))))

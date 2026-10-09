@@ -10,6 +10,7 @@ import br.com.finup.repository.UserFinancialProfileRepository;
 import br.com.finup.repository.UserRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,12 +37,15 @@ public class UserService {
 
   private final UserRepository userRepository;
   private final UserFinancialProfileRepository userFinancialProfileRepository;
+  private final Clock clock;
 
   public UserService(
       UserRepository userRepository,
-      UserFinancialProfileRepository userFinancialProfileRepository) {
+      UserFinancialProfileRepository userFinancialProfileRepository,
+      Clock clock) {
     this.userRepository = userRepository;
     this.userFinancialProfileRepository = userFinancialProfileRepository;
+    this.clock = clock;
   }
 
   /**
@@ -137,6 +141,22 @@ public class UserService {
    */
   public User findByAuthenticatedIdentity(AuthenticatedIdentity identity) {
     return findByIdentityOrThrow(identity);
+  }
+
+  /**
+   * Busca o usuario pela identidade autenticada e registra o acesso em {@code lastSeenAt} — e o
+   * service que o {@code GET /api/v1/users/me} chama. {@link User#touchLastSeen} limita a escrita a
+   * no maximo uma vez por hora, entao so persiste de novo quando o throttle deixa passar.
+   *
+   * @throws ResourceNotFoundException se essa identidade ainda nao tiver usuario local
+   */
+  @Transactional
+  public User recordAccess(AuthenticatedIdentity identity) {
+    User user = findByIdentityOrThrow(identity);
+    if (user.touchLastSeen(clock.instant())) {
+      userRepository.save(user);
+    }
+    return user;
   }
 
   /**

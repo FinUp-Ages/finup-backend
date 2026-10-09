@@ -17,6 +17,8 @@ import br.com.finup.repository.UserFinancialProfileRepository;
 import br.com.finup.repository.UserRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,6 +43,8 @@ class UserServiceTest {
   @Mock private UserRepository userRepository;
 
   @Mock private UserFinancialProfileRepository userFinancialProfileRepository;
+
+  @Mock private Clock clock;
 
   @InjectMocks private UserService userService;
 
@@ -268,5 +272,52 @@ class UserServiceTest {
     when(userRepository.existsByEmail("ana@exemplo.com")).thenReturn(true);
 
     assertThat(userService.isEmailAvailable("  Ana@Exemplo.COM ")).isFalse();
+  }
+
+  @Test
+  @DisplayName("recordAccess grava o primeiro acesso e persiste o usuario")
+  void recordAccessPersistsOnFirstAccess() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
+    User existing =
+        User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
+    Instant now = Instant.parse("2026-10-09T12:00:00Z");
+    when(userRepository.findByCognitoId("cognito-sub-123")).thenReturn(Optional.of(existing));
+    when(clock.instant()).thenReturn(now);
+
+    User result = userService.recordAccess(identity);
+
+    assertThat(result.getLastSeenAt()).isEqualTo(now);
+    verify(userRepository).save(existing);
+  }
+
+  @Test
+  @DisplayName("recordAccess dentro de uma hora do ultimo registro nao grava de novo")
+  void recordAccessWithinThrottleWindowDoesNotPersistAgain() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
+    User existing =
+        User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
+    Instant firstAccess = Instant.parse("2026-10-09T12:00:00Z");
+    existing.touchLastSeen(firstAccess);
+    when(userRepository.findByCognitoId("cognito-sub-123")).thenReturn(Optional.of(existing));
+    when(clock.instant()).thenReturn(firstAccess.plusSeconds(1800));
+
+    userService.recordAccess(identity);
+
+    verify(userRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("recordAccess com identidade sem usuario local lanca ResourceNotFoundException")
+  void recordAccessThrowsWhenIdentityHasNoLocalUser() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-999", "Ana Souza", "ana@exemplo.com");
+    when(userRepository.findByCognitoId("cognito-sub-999")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> userService.recordAccess(identity))
+        .isInstanceOf(ResourceNotFoundException.class);
+
+    verify(userRepository, never()).save(any());
   }
 }
