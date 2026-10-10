@@ -11,7 +11,6 @@ public final class TransactionMapper {
   public static TransactionResponse toResponse(Transaction transaction) {
     return new TransactionResponse(
         transaction.getId(),
-        transaction.getUserId(),
         transaction.getCategoryId(),
         transaction.getPaymentMethodId(),
         transaction.getType(),

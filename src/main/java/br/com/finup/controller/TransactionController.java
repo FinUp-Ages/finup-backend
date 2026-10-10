@@ -35,7 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/transactions")
-@Tag(name = "Transactions", description = "Cadastro de transacoes financeiras")
+@Tag(name = "Transactions", description = "Cadastro e consulta de transacoes financeiras")
 public class TransactionController {
 
   private final TransactionService transactionService;
