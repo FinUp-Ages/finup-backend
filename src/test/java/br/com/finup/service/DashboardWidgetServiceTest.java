@@ -60,7 +60,8 @@ class DashboardWidgetServiceTest {
   }
 
   @Test
-  @DisplayName("PUT apaga a configuracao anterior antes de gravar a nova, ordenada por position")
+  @DisplayName(
+      "PUT trava o usuario, apaga a configuracao anterior e grava a nova, ordenada por position")
   void replaceDeletesThenSavesSortedByPosition() {
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
     when(repository.saveAll(anyList())).thenAnswer(i -> i.getArgument(0));
@@ -73,6 +74,7 @@ class DashboardWidgetServiceTest {
     DashboardWidgetsResponse response = service.replace(identity, request);
 
     InOrder order = inOrder(repository);
+    order.verify(repository).lockUserById(user.getId());
     order.verify(repository).deleteAllByUser(user);
     order.verify(repository).saveAll(anyList());
     assertThat(response.widgets())
@@ -106,6 +108,22 @@ class DashboardWidgetServiceTest {
     assertThatThrownBy(() -> service.replace(identity, request))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("NEW_CLIENTS");
+    verify(repository, never()).deleteAllByUser(user);
+  }
+
+  @Test
+  @DisplayName("PUT com posicao repetida e rejeitado sem tocar no banco")
+  void replaceWithDuplicatePositionIsRejected() {
+    DashboardWidgetsRequest request =
+        new DashboardWidgetsRequest(
+            List.of(
+                new DashboardWidgetItem("NEW_CLIENTS", true, 0),
+                new DashboardWidgetItem("REVENUE", true, 0)));
+
+    assertThatThrownBy(() -> service.replace(identity, request))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("Posicao repetida");
+    verify(repository, never()).lockUserById(user.getId());
     verify(repository, never()).deleteAllByUser(user);
   }
 }

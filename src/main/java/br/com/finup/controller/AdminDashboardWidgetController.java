@@ -77,7 +77,7 @@ public class AdminDashboardWidgetController {
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
     @ApiResponse(
         responseCode = "422",
-        description = "Widget repetido na lista",
+        description = "Widget ou posição repetidos na lista",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   })
   public ResponseEntity<DashboardWidgetsResponse> replace(

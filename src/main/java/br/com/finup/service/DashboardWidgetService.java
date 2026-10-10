@@ -36,13 +36,18 @@ public class DashboardWidgetService {
         repository.findByUserOrderByPositionAscWidgetIdAsc(user));
   }
 
-  /** Troca a configuração inteira do usuário pela enviada. Lista vazia limpa a configuração. */
+  /**
+   * Troca a configuração inteira do usuário pela enviada. Lista vazia limpa a configuração. Widgets
+   * e posições não podem se repetir. Trava o usuário antes de apagar, para que dois PUTs
+   * simultâneos não se atropelem.
+   */
   @Transactional
   public DashboardWidgetsResponse replace(
       AuthenticatedIdentity identity, DashboardWidgetsRequest request) {
-    requireUniqueIds(request.widgets());
+    requireUniqueIdsAndPositions(request.widgets());
     User user = userService.findByAuthenticatedIdentity(identity);
 
+    repository.lockUserById(user.getId());
     repository.deleteAllByUser(user);
     List<DashboardWidgetSetting> saved =
         repository.saveAll(
@@ -58,11 +63,15 @@ public class DashboardWidgetService {
             .toList());
   }
 
-  private static void requireUniqueIds(List<DashboardWidgetItem> widgets) {
-    Set<String> seen = new HashSet<>();
+  private static void requireUniqueIdsAndPositions(List<DashboardWidgetItem> widgets) {
+    Set<String> ids = new HashSet<>();
+    Set<Integer> positions = new HashSet<>();
     for (DashboardWidgetItem widget : widgets) {
-      if (!seen.add(widget.id().strip())) {
+      if (!ids.add(widget.id().strip())) {
         throw new BusinessException("Widget repetido: " + widget.id().strip());
+      }
+      if (!positions.add(widget.position())) {
+        throw new BusinessException("Posicao repetida: " + widget.position());
       }
     }
   }
