@@ -1,59 +1,36 @@
 {
-  "stage": "COMPLETED",
-  "task": "Assistente de IA: gastos de risco no feedback, Cognito no endpoint e historico de chat (corpo no S3, metadados no banco).",
-  "objective": "POST /api/v1/ai/assistant recebe texto, o Bedrock Converse devolve a acao em JSON e o backend executa via AiAction. Acoes: REGISTER_TRANSACTION ('gastei 7 reais na pucrs' vira TransactionService.register) e FINANCIAL_FEEDBACK (so leitura: saldo e gastos do mes, comparacao com o mes anterior, maiores categorias, renda e FinUp Score calculados no codigo; a IA so comenta). A saida do modelo e sempre validada antes de gravar; ao modelo vao so agregados, sem descricoes de transacoes. Falhas do Bedrock viram 4xx/5xx em ProblemDetail. Historico de chat: conversationId opcional no pedido; cada turno gravado em conversations (metadado + message_count) e em um JSON por conversa no S3; GET /api/v1/assistant/conversations/{id}/messages le o transcript. Gastos de risco (bets, bebidas alcoolicas, drogas) sempre citados no feedback como evitaveis.",
+  "stage": "REVIEWING",
+  "task": "[Backend] Widgets do dashboard: GET e PUT /api/v1/admin/dashboard/widgets (contrato C5)",
+  "objective": "Persistir a configuracao de widgets do dashboard por admin. GET devolve {widgets:[{id,enabled,position}]} (lista vazia se nao ha configuracao); PUT substitui a lista inteira do usuario autenticado.",
+  "decisions": [
+    "Persistencia na tabela dashboard_widget_settings (1 linha por usuario e widget, UNIQUE em user_id + widget_id), em database/init/01-schema.sql",
+    "PUT substitui tudo: apaga a configuracao do usuario com delete JPQL imediato (deleteAllByUser) e grava a nova; um delete derivado deixaria o Hibernate rodar os INSERTs antes dos DELETEs e violaria a unicidade",
+    "Identidade vem do AuthenticatedIdentityResolver; o cliente nunca envia userId, entao um admin nao altera a configuracao de outro",
+    "Sem checagem de perfil admin: o projeto ainda nao tem roles, entao qualquer usuario autenticado acessa /admin/**",
+    "Validacao: id obrigatorio (max 100), enabled obrigatorio, position >= 0, max 50 widgets, id repetido responde 422"
+  ],
   "files_in_scope": [
-    "pom.xml",
-    "src/main/resources/application.yml",
-    ".env.example",
-    "docker-compose.yml",
-    "postman/finup-backend.postman_collection.json",
-    "src/main/java/br/com/finup/config/BedrockProperties.java",
-    "src/main/java/br/com/finup/config/BedrockClientConfig.java",
-    "src/main/java/br/com/finup/config/ClockConfig.java",
-    "src/main/java/br/com/finup/model/AiModel.java",
-    "src/main/java/br/com/finup/service/BedrockLlmService.java",
-    "src/main/java/br/com/finup/service/AiAssistantService.java",
-    "src/main/java/br/com/finup/service/AiAction.java",
-    "src/main/java/br/com/finup/service/RegisterTransactionAiAction.java",
-    "src/main/java/br/com/finup/service/FinancialFeedbackAiAction.java",
-    "src/main/java/br/com/finup/dto/AiAssistantRequest.java",
-    "src/main/java/br/com/finup/dto/AiAssistantResponse.java",
-    "src/main/java/br/com/finup/controller/AiAssistantController.java",
-    "src/main/java/br/com/finup/exception/AiProviderException.java",
-    "src/test/java/br/com/finup/service/BedrockLlmServiceTest.java",
-    "src/test/java/br/com/finup/service/AiAssistantServiceTest.java",
-    "src/test/java/br/com/finup/service/FinancialFeedbackAiActionTest.java",
-    "src/test/java/br/com/finup/controller/AiAssistantControllerTest.java",
     "database/init/01-schema.sql",
-    "src/main/java/br/com/finup/service/RiskySpending.java",
-    "src/main/java/br/com/finup/service/ConversationService.java",
-    "src/main/java/br/com/finup/repository/ConversationTranscriptStore.java",
-    "src/main/java/br/com/finup/repository/S3ConversationTranscriptStore.java",
-    "src/main/java/br/com/finup/repository/InMemoryConversationTranscriptStore.java",
-    "src/main/java/br/com/finup/config/ChatHistoryConfig.java",
-    "src/main/java/br/com/finup/controller/ConversationController.java",
-    "src/main/java/br/com/finup/model/Conversation.java",
-    "src/test/java/br/com/finup/config/SecurityConfigTest.java"
+    "src/main/java/br/com/finup/model/DashboardWidgetSetting.java",
+    "src/main/java/br/com/finup/repository/DashboardWidgetSettingRepository.java",
+    "src/main/java/br/com/finup/dto/DashboardWidgetItem.java",
+    "src/main/java/br/com/finup/dto/DashboardWidgetsRequest.java",
+    "src/main/java/br/com/finup/dto/DashboardWidgetsResponse.java",
+    "src/main/java/br/com/finup/mapper/DashboardWidgetMapper.java",
+    "src/main/java/br/com/finup/service/DashboardWidgetService.java",
+    "src/main/java/br/com/finup/controller/AdminDashboardWidgetController.java",
+    "src/test/java/br/com/finup/service/DashboardWidgetServiceTest.java",
+    "src/test/java/br/com/finup/controller/AdminDashboardWidgetControllerTest.java"
   ],
   "validation": {
-    "./mvnw verify (262 testes + spotless:check)": "passed",
-    "chamada real ao Bedrock/S3": "nao executada por este agente (sem credenciais/bucket)"
+    "mvn clean verify": "passed (275 testes, 0 falhas, spotless ok)",
+    "postman (mock-auth, postgres real via docker compose)": "PUT 200 e GET 200 com {widgets:[{id:NEW_CLIENTS,enabled:true,position:0}]}; 400 (campos), 422 (id repetido) e 401 (sem identidade) conferidos",
+    "swagger": "GET e PUT aparecem em Admin Dashboard com 200/400/401/404/422"
   },
-  "review": "diff revisado. Cognito: /api/v1/ai/** e /conversations/{id}/messages exigem JWT (401 testado) e usam o AuthenticatedIdentityResolver; conversa de outro usuario responde 404. Historico e melhor-esforco: falha do S3 nao derruba a acao ja executada. Corrigido default de BEDROCK_DEFAULT_MODEL (enum, nao model id).",
+  "review": "pendente",
+  "updated_at": "2026-10-09",
   "open_questions": [
-    "'aberturas' interpretado como pontos de extensao (AiAction); confirmar.",
-    "Bucket S3 (privado, bloqueio de acesso publico, criptografia) e permissao s3:GetObject/PutObject precisam ser provisionados fora deste repo; sem CHAT_HISTORY_BUCKET o historico fica em memoria.",
-    "Bancos existentes precisam de: ALTER TABLE conversations ADD COLUMN message_count INTEGER NOT NULL DEFAULT 0;",
-    "Categorias de risco precisam existir como padrao (nomes sugeridos: Apostas (Bets), Bebidas alcoólicas, Drogas) — fica com a tarefa de categorias; deteccao por nome nao reconhece nomes livres.",
-    "Titulo da conversa e o recorte da primeira mensagem (estrategia definitiva segue pendente com o time).",
-    "Sem busca por texto entre conversas: o corpo so existe no S3."
-  ],
-  "updated_at": "2026-10-02",
-  "decisions": [
-    "Gastos de risco (bets/apostas, bebidas alcoolicas, drogas) identificados por NOME da categoria, em uma classe unica (RiskySpending), sem coluna nova em categories (evita conflito com a tarefa de categorias); sempre citados no feedback como gasto evitavel.",
-    "Historico: Postgres guarda so metadados em conversations (titulo, datas, message_count); o corpo das mensagens fica em UM objeto JSON por conversa no S3 (conversations/{userId}/{conversationId}.json). Atualizacao e leitura+escrita do objeto sob lock de linha da conversa. Sem bucket configurado, usa store em memoria (dev/teste).",
-    "Escrita do historico e best-effort: se o S3 falhar depois de a acao ter sido executada, a resposta ao usuario nao falha (erro vai ao log).",
-    "Fora do escopo: dar memoria das conversas anteriores ao modelo; busca por texto entre conversas (inviavel com corpo so no S3); geracao de titulo por resumo do modelo (segue pendente com o time, usa recorte da primeira mensagem)."
+    "Falta checagem de perfil admin (nao ha roles hoje): vale uma issue de follow-up para restringir /api/v1/admin/**",
+    "Banco local ja existente precisa de docker compose down -v (ou criar a tabela dashboard_widget_settings a mao): os scripts de database/init so rodam na criacao do volume"
   ]
 }
