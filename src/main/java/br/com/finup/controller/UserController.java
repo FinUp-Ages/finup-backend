@@ -5,6 +5,8 @@ import br.com.finup.dto.EmailAvailabilityResponse;
 import br.com.finup.dto.UpdateUserAdditionalInfoRequest;
 import br.com.finup.dto.UserResponse;
 import br.com.finup.mapper.UserMapper;
+import br.com.finup.model.User;
+import br.com.finup.model.UserFinancialProfile;
 import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.UserService;
@@ -17,10 +19,12 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.util.UUID;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -121,15 +125,39 @@ public class UserController {
   })
   public UserResponse me() {
     AuthenticatedIdentity identity = authenticatedIdentityResolver.resolveCurrent();
-    return UserMapper.toResponse(userService.findByAuthenticatedIdentity(identity));
+    User user = userService.findByAuthenticatedIdentity(identity);
+    return UserMapper.toResponse(user, userService.findFinancialProfile(user).orElse(null));
+  }
+
+  @GetMapping("/{id}")
+  @Operation(
+      summary = "Busca um usuario pelo id",
+      description =
+          "So devolve o proprio usuario autenticado. Id de outra pessoa responde 404, e nao 403,"
+              + " para nao confirmar a existencia do id.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Usuario encontrado"),
+    @ApiResponse(
+        responseCode = "401",
+        description = "Identidade autenticada ausente ou incompleta",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "Usuario inexistente ou de outra pessoa",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  })
+  public UserResponse findById(@PathVariable UUID id) {
+    AuthenticatedIdentity identity = authenticatedIdentityResolver.resolveCurrent();
+    User user = userService.findByIdForAuthenticatedIdentity(identity, id);
+    return UserMapper.toResponse(user, userService.findFinancialProfile(user).orElse(null));
   }
 
   @PatchMapping("/me/additional-info")
   @Operation(
       summary = "Cadastra ou atualiza as informacoes complementares do usuario autenticado",
       description =
-          "Etapa 2 do cadastro. So funciona depois da Etapa 1 (POST /api/v1/users). Cada campo do"
-              + " corpo e opcional: so o que vier preenchido e atualizado.")
+          "Etapas 2 e 3 do cadastro. So funciona depois da Etapa 1 (POST /api/v1/users). Cada campo"
+              + " do corpo e opcional: so o que vier preenchido e atualizado.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Informacoes atualizadas"),
     @ApiResponse(
@@ -148,8 +176,13 @@ public class UserController {
   public UserResponse updateAdditionalInfo(
       @Valid @RequestBody UpdateUserAdditionalInfoRequest request) {
     AuthenticatedIdentity identity = authenticatedIdentityResolver.resolveCurrent();
-    return UserMapper.toResponse(
+    UserFinancialProfile profile =
         userService.updateAdditionalInfo(
-            identity, request.birthDate(), request.monthlyIncome(), request.financialProfile()));
+            identity,
+            request.phone(),
+            request.profession(),
+            request.birthDate(),
+            request.monthlyIncome());
+    return UserMapper.toResponse(profile.getUser(), profile);
   }
 }

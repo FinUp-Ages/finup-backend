@@ -1,11 +1,10 @@
 package br.com.finup.controller;
 
 import br.com.finup.dto.CreateTransactionRequest;
-import br.com.finup.dto.TransactionPageResponse;
+import br.com.finup.dto.TransactionListResponse;
 import br.com.finup.dto.TransactionResponse;
 import br.com.finup.mapper.TransactionMapper;
 import br.com.finup.model.Transaction;
-import br.com.finup.model.TransactionType;
 import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.TransactionService;
@@ -17,12 +16,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import java.net.URI;
 import java.time.LocalDate;
-import java.util.UUID;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,10 +26,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Camada HTTP do cadastro de transacoes financeiras.
+ * Camada HTTP das transacoes financeiras.
  *
  * <p>Nenhum endpoint recebe userId do cliente — a identidade vem sempre do {@link
  * AuthenticatedIdentityResolver}.
@@ -54,63 +48,13 @@ public class TransactionController {
     this.authenticatedIdentityResolver = authenticatedIdentityResolver;
   }
 
-  @GetMapping
-  @Operation(
-      summary = "Lista as transacoes do usuario autenticado",
-      description =
-          "Paginada, da mais recente para a mais antiga. Inclui as transacoes avulsas, as que abrem"
-              + " uma serie recorrente e as ocorrencias geradas das series (recurrenceOriginId"
-              + " aponta para a original). Todos os filtros sao opcionais e combinados com E.")
-  @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Pagina retornada com sucesso"),
-    @ApiResponse(
-        responseCode = "400",
-        description = "Filtro invalido (ex.: startDate depois de endDate, size acima de 100)",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "Identidade autenticada ausente ou incompleta",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-    @ApiResponse(
-        responseCode = "404",
-        description = "Usuario ainda nao criado (Etapa 1 nao foi feita)",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-    @ApiResponse(
-        responseCode = "501",
-        description = "Contrato publicado, ainda nao implementado",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  })
-  public TransactionPageResponse list(
-      @Parameter(description = "Inicio do periodo, inclusive (yyyy-MM-dd)")
-          @RequestParam(required = false)
-          LocalDate startDate,
-      @Parameter(description = "Fim do periodo, inclusive (yyyy-MM-dd)")
-          @RequestParam(required = false)
-          LocalDate endDate,
-      @Parameter(description = "Filtra por tipo da transacao") @RequestParam(required = false)
-          TransactionType type,
-      @Parameter(description = "Filtra por categoria") @RequestParam(required = false)
-          UUID categoryId,
-      @Parameter(description = "Pagina, a partir de 0") @RequestParam(defaultValue = "0") @Min(0)
-          int page,
-      @Parameter(description = "Itens por pagina, de 1 a 100")
-          @RequestParam(defaultValue = "20")
-          @Min(1)
-          @Max(100)
-          int size) {
-    throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED);
-  }
-
   @PostMapping
   @Operation(summary = "Registra uma transacao financeira para o usuario autenticado")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Transacao cadastrada"),
     @ApiResponse(
         responseCode = "400",
-        description =
-            "Campos invalidos: categoryId, type, amount (maior que zero, ate 10 inteiros e 2"
-                + " decimais), transactionDate e isRecurring sao obrigatorios; description aceita"
-                + " ate 255 caracteres; recurrenceFrequency e obrigatoria quando isRecurring e true",
+        description = "Campos invalidos",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
     @ApiResponse(
         responseCode = "401",
@@ -144,5 +88,35 @@ public class TransactionController {
     TransactionResponse response = TransactionMapper.toResponse(transaction);
     URI location = URI.create("/api/v1/transactions/%s".formatted(response.id()));
     return ResponseEntity.created(location).body(response);
+  }
+
+  @GetMapping
+  @Operation(summary = "Lista transacoes e saldo do usuario autenticado no periodo informado")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Transacoes encontradas"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Periodo invalido",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "Identidade autenticada ausente ou incompleta",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "Usuario autenticado sem cadastro local",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  })
+  public ResponseEntity<TransactionListResponse> list(
+      @Parameter(description = "Inicio do periodo, inclusive (yyyy-MM-dd)", example = "2026-09-01")
+          @RequestParam
+          LocalDate from,
+      @Parameter(
+              description = "Fim do periodo, inclusive (yyyy-MM-dd); deve ser >= from",
+              example = "2026-09-30")
+          @RequestParam
+          LocalDate to) {
+    AuthenticatedIdentity identity = authenticatedIdentityResolver.resolveCurrent();
+    return ResponseEntity.ok(transactionService.list(identity, from, to));
   }
 }

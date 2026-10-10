@@ -7,6 +7,8 @@ spring:
   # spring.mvc.problemdetails.enabled nao aparece aqui de proposito: ele registra o handler
   # RFC 7807 padrao do Boot, que recua quando existe um ResponseEntityExceptionHandler proprio.
   # O nosso ApiExceptionHandler estende essa classe, entao ja cobre 404 de rota, 405 e afins.
+  jackson:
+    default-property-inclusion: non_null
 
   config:
     import: optional:file:.env[.properties]
@@ -37,6 +39,27 @@ finup:
   cors:
     # Lista separada por virgula. Em producao, aponte para o dominio real do painel.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
+  ai:
+    bedrock:
+      # Credenciais: se vazias, o SDK usa a cadeia padrao da AWS (perfil, role da instancia etc.).
+      region: ${AWS_REGION:us-east-2}
+      access-key-id: ${AWS_ACCESS_KEY_ID:}
+      secret-access-key: ${AWS_SECRET_ACCESS_KEY:}
+      # Extrair campos de uma frase curta nao exige o modelo maior; troque por ANTHROPIC se precisar.
+      default-model: ${BEDROCK_DEFAULT_MODEL:AMAZON_LITE}
+      max-tokens: 512
+      model-ids:
+        ANTHROPIC: ${BEDROCK_ANTHROPIC_ID:us.anthropic.claude-opus-4-6-v1}
+        GPT: ${BEDROCK_GPT_ID:openai.gpt-oss-120b-1:0}
+        AMAZON_LITE: ${BEDROCK_AMAZON_ID:us.amazon.nova-2-lite-v1:0}
+        MAGISTRAL: ${BEDROCK_MAGISTRAL_ID:mistral.magistral-small-2509}
+    chat-history:
+      # Corpo das conversas do assistente (um JSON por conversa). Bucket vazio = memoria, so para
+      # desenvolvimento: o historico some ao reiniciar. O bucket deve ser privado e criptografado.
+      bucket: ${CHAT_HISTORY_BUCKET:}
+      region: ${CHAT_HISTORY_REGION:}
+      prefix: conversations
 
 springdoc:
   api-docs:

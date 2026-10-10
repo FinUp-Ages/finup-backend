@@ -40,6 +40,16 @@ services:
       # duas e sem mock-auth, o container reinicia em loop: veja `docker compose logs app`.
       COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-}
       COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-}
+
+      # Amazon Bedrock (assistente de IA). Sem credenciais o SDK cai na cadeia padrao da AWS, que
+      # dentro do container nao tem perfil nem role: o assistente responde 502. Preencha no .env.
+      AWS_REGION: ${AWS_REGION:-us-east-2}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      BEDROCK_DEFAULT_MODEL: ${BEDROCK_DEFAULT_MODEL:-AMAZON_LITE}
+      # Historico de chat: vazio = memoria (some ao reiniciar). Em ambiente real, aponte o bucket S3.
+      CHAT_HISTORY_BUCKET: ${CHAT_HISTORY_BUCKET:-}
+      CHAT_HISTORY_REGION: ${CHAT_HISTORY_REGION:-}
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}

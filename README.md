@@ -129,14 +129,13 @@ consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o b
 | `POST /api/v1/users/email-availability` | **público, sem token.** Diz se um e-mail já está cadastrado (`{"available": true\|false}`). Usado pelo formulário de cadastro |
 | `POST /api/v1/users` | cria o registro local da identidade autenticada. Corpo vazio |
 | `GET /api/v1/users/me` | devolve o usuário da identidade autenticada |
-| `PATCH /api/v1/users/me/additional-info` | grava as informações complementares (Etapa 2 do cadastro) |
+| `GET /api/v1/users/{id}` | devolve o próprio usuário (outro id dá `404`) |
+| `PATCH /api/v1/users/me/additional-info` | grava as informações complementares (Etapas 2 e 3 do cadastro) |
 | `POST /api/v1/users/me/finup-score/recalculate` | recalcula e persiste o FinUp Score |
 | `GET /api/v1/categories` | categorias do usuário **e** as padrão do sistema |
 | `POST /api/v1/categories` | cria categoria do usuário |
 | `PUT /api/v1/categories/{id}` | edita categoria do usuário. Padrão do sistema devolve `403` |
 | `DELETE /api/v1/categories/{id}` | remove categoria do usuário. Em uso devolve `409` |
-| `GET /api/v1/transactions` | lista transações, paginada, com filtros opcionais (`startDate`, `endDate`, `type`, `categoryId`, `page`, `size`); inclui as séries recorrentes e suas ocorrências geradas. **Contrato publicado, responde `501`** |
-| `POST /api/v1/assistant/messages` | envia mensagem ao assistente financeiro. **Contrato publicado, responde `501`** |
 | `POST /api/v1/transactions` | registra uma transação, avulsa ou abrindo uma série recorrente |
 
 Categoria e meio de pagamento referenciados por uma transação precisam ser do
@@ -147,9 +146,6 @@ A categoria também precisa ser **do mesmo tipo da transação**: categoria `EXP
 uma receita, e vice-versa. Incompatibilidade responde `422`. A disponibilidade é verificada antes da
 compatibilidade, de propósito: na ordem inversa, um `422` em categoria privada de outro usuário
 confirmaria a existência daquele id — o mesmo vazamento que o `404` acima evita.
-
-Rotas marcadas com `501` já têm path, request, response e erros definitivos; os exemplos de resposta
-para mock do App estão em `postman/finup-backend.postman_collection.json`.
 
 O dono da transação vem sempre da identidade autenticada. `userId` não faz parte do corpo do
 `POST`; se o cliente enviar um, ele é ignorado.

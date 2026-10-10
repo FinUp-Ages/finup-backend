@@ -15,4 +15,5 @@ public record ConversationResponse(
                     + "de um texto de fallback para esse caso.",
             nullable = true)
         String title,
-    @Schema(description = "Data da última atualização da conversa") Instant updatedAt) {}
+    @Schema(description = "Data da última atualização da conversa") Instant updatedAt,
+    @Schema(description = "Quantidade de mensagens da conversa") int messageCount) {}

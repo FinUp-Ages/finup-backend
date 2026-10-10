@@ -1,11 +1,15 @@
 package br.com.finup.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import br.com.finup.model.FinUpScoreResult;
 import br.com.finup.model.User;
+import br.com.finup.model.UserFinancialProfile;
 import br.com.finup.service.FinUpScoreCalculator;
 import java.math.BigDecimal;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -16,7 +20,10 @@ import org.junit.jupiter.api.Test;
  */
 class InMemoryFinUpScoreDataProviderTest {
 
-  private final InMemoryFinUpScoreDataProvider provider = new InMemoryFinUpScoreDataProvider();
+  private final UserFinancialProfileRepository profileRepository =
+      mock(UserFinancialProfileRepository.class);
+  private final InMemoryFinUpScoreDataProvider provider =
+      new InMemoryFinUpScoreDataProvider(profileRepository);
   private final FinUpScoreCalculator calculator = new FinUpScoreCalculator();
 
   @Test
@@ -49,9 +56,22 @@ class InMemoryFinUpScoreDataProviderTest {
     assertThat(result).isInstanceOf(FinUpScoreResult.InsufficientData.class);
   }
 
+  @Test
+  @DisplayName("usuario sem fixture usa a renda gravada em user_financial_profiles")
+  void unknownUserUsesIncomeFromFinancialProfile() {
+    User user = User.createFromCognitoIdentity("mock-sub-novo", "Usuario Novo", "novo@exemplo.com");
+    UserFinancialProfile profile = UserFinancialProfile.createFor(user);
+    profile.apply(null, null, null, new BigDecimal("3500.50"));
+    when(profileRepository.findByUserId(user.getId())).thenReturn(Optional.of(profile));
+
+    assertThat(provider.loadInputs(user).monthlyIncome()).isEqualByComparingTo("3500.50");
+  }
+
   private int scoreFor(String email, String monthlyIncome) {
     User user = User.createFromCognitoIdentity("mock-sub-" + email, "Usuario Demo", email);
-    user.applyAdditionalInfo(null, new BigDecimal(monthlyIncome), null);
+    UserFinancialProfile profile = UserFinancialProfile.createFor(user);
+    profile.apply(null, null, null, new BigDecimal(monthlyIncome));
+    when(profileRepository.findByUserId(user.getId())).thenReturn(Optional.of(profile));
     FinUpScoreResult result = calculator.calculate(provider.loadInputs(user));
     assertThat(result).isInstanceOf(FinUpScoreResult.Computed.class);
     return ((FinUpScoreResult.Computed) result).score();

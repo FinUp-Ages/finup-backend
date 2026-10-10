@@ -53,8 +53,19 @@ class OpenApiIntegrationTests {
         .andExpect(jsonPath("$.security[0].bearerAuth").exists())
         .andExpect(jsonPath("$.paths['/api/v1/users']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/transactions'].post").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/transactions'].get").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/transactions'].get.parameters[*].name")
+                .value(org.hamcrest.Matchers.containsInAnyOrder("from", "to")))
         .andExpect(jsonPath("$.paths['/api/v1/categories'].get").exists())
         .andExpect(jsonPath("$.paths['/api/v1/assistant/conversations'].get").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/assistant/conversations/{id}/messages'].get").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/ai/assistant'].post").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/ai/assistant'].post.parameters").doesNotExist())
+        .andExpect(jsonPath("$.paths['/api/v1/assistant/messages']").doesNotExist())
+        .andExpect(
+            jsonPath("$.components.schemas.TransactionResponse.properties.userId").doesNotExist())
         .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type").value("http"))
         .andExpect(jsonPath("$.components.schemas.CategoryListResponse.properties.id").exists())
         .andExpect(jsonPath("$.components.schemas.CategoryListResponse.properties.name").exists())
@@ -62,21 +73,6 @@ class OpenApiIntegrationTests {
         .andExpect(
             jsonPath("$.components.schemas.CategoryListResponse.properties.isDefault")
                 .doesNotExist());
-  }
-
-  @Test
-  @DisplayName("contrato OpenAPI publica as rotas do contrato REST")
-  void exposesPendingRoutes() throws Exception {
-    mockMvc
-        .perform(get("/v3/api-docs"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.paths['/api/v1/users/me/additional-info'].patch").exists())
-        .andExpect(jsonPath("$.paths['/api/v1/categories'].get").exists())
-        .andExpect(jsonPath("$.paths['/api/v1/payment-methods'].get").exists())
-        .andExpect(jsonPath("$.paths['/api/v1/transactions'].get").exists())
-        .andExpect(jsonPath("$.paths['/api/v1/transactions'].post").exists())
-        .andExpect(jsonPath("$.paths['/api/v1/assistant/messages'].post").exists())
-        .andExpect(jsonPath("$.paths['/api/v1/transactions'].get.parameters").isArray());
   }
 
   @Test
