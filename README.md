@@ -137,6 +137,11 @@ consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o b
 | `PUT /api/v1/categories/{id}` | edita categoria do usuário. Padrão do sistema devolve `403` |
 | `DELETE /api/v1/categories/{id}` | remove categoria do usuário. Em uso devolve `409` |
 | `POST /api/v1/transactions` | registra uma transação, avulsa ou abrindo uma série recorrente |
+| `GET /api/v1/transactions?from=yyyy-MM-dd&to=yyyy-MM-dd` | lista as transações e o saldo do usuário no período informado |
+| `GET /api/v1/payment-methods` | lista os meios de pagamento ativos do usuário |
+| `POST /api/v1/ai/assistant` | interpreta um texto livre e executa a ação financeira correspondente |
+| `GET /api/v1/assistant/conversations` | lista o histórico de conversas do usuário, ordenado pela atualização mais recente |
+| `GET /api/v1/assistant/conversations/{id}/messages` | lista as mensagens de uma conversa do usuário em ordem cronológica |
 
 Categoria e meio de pagamento referenciados por uma transação precisam ser do
 próprio usuário — categoria padrão do sistema também vale. Referência de outro usuário responde
