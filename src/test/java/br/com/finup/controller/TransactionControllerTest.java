@@ -466,4 +466,82 @@ class TransactionControllerTest {
         .andExpect(jsonPath("$.detail").value("Categoria nao encontrado: " + categoryId))
         .andExpect(jsonPath("$.traceId").exists());
   }
+
+  @Test
+  @DisplayName("POST com categoria de outro usuario devolve 404 sem dados da categoria")
+  void foreignCategoryReturns404() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+    LocalDate date = LocalDate.of(2026, 9, 12);
+    when(transactionService.register(
+            eq(IDENTITY),
+            eq(categoryId),
+            isNull(),
+            eq(TransactionType.EXPENSE),
+            isNull(),
+            eq(new BigDecimal("10.00")),
+            eq(date),
+            eq(false),
+            isNull()))
+        .thenThrow(new ResourceNotFoundException("Categoria", categoryId));
+
+    mockMvc
+        .perform(
+            post("/api/v1/transactions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "categoryId": "%s",
+                      "type": "EXPENSE",
+                      "amount": 10.00,
+                      "transactionDate": "2026-09-12",
+                      "isRecurring": false
+                    }
+                    """
+                        .formatted(categoryId)))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.categoryId").doesNotExist())
+        .andExpect(jsonPath("$.userId").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("POST com meio de pagamento de outro usuario devolve 404 sem dados do recurso")
+  void foreignPaymentMethodReturns404() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+    UUID paymentMethodId = UUID.randomUUID();
+    LocalDate date = LocalDate.of(2026, 9, 12);
+    when(transactionService.register(
+            eq(IDENTITY),
+            eq(categoryId),
+            eq(paymentMethodId),
+            eq(TransactionType.EXPENSE),
+            isNull(),
+            eq(new BigDecimal("10.00")),
+            eq(date),
+            eq(false),
+            isNull()))
+        .thenThrow(new ResourceNotFoundException("Meio de pagamento", paymentMethodId));
+
+    mockMvc
+        .perform(
+            post("/api/v1/transactions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "categoryId": "%s",
+                      "paymentMethodId": "%s",
+                      "type": "EXPENSE",
+                      "amount": 10.00,
+                      "transactionDate": "2026-09-12",
+                      "isRecurring": false
+                    }
+                    """
+                        .formatted(categoryId, paymentMethodId)))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.paymentMethodId").doesNotExist())
+        .andExpect(jsonPath("$.userId").doesNotExist());
+  }
 }
