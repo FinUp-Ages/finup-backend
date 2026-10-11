@@ -129,6 +129,9 @@ class ConversationControllerTest {
     mockMvc
         .perform(get(URL + "/" + id + "/messages"))
         .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.role").doesNotExist())
+        .andExpect(jsonPath("$.text").doesNotExist())
         .andExpect(jsonPath("$.detail").value("Conversa nao encontrada: " + id));
   }
 }

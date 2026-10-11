@@ -63,6 +63,9 @@ class OpenApiIntegrationTests {
             jsonPath("$.paths['/api/v1/assistant/conversations/{id}/messages'].get").exists())
         .andExpect(jsonPath("$.paths['/api/v1/ai/assistant'].post").exists())
         .andExpect(jsonPath("$.paths['/api/v1/ai/assistant'].post.parameters").doesNotExist())
+        .andExpect(jsonPath("$.paths['/api/v1/assistant/messages']").doesNotExist())
+        .andExpect(
+            jsonPath("$.components.schemas.TransactionResponse.properties.userId").doesNotExist())
         .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type").value("http"))
         .andExpect(jsonPath("$.components.schemas.CategoryListResponse.properties.id").exists())
         .andExpect(jsonPath("$.components.schemas.CategoryListResponse.properties.name").exists())
@@ -70,6 +73,25 @@ class OpenApiIntegrationTests {
         .andExpect(
             jsonPath("$.components.schemas.CategoryListResponse.properties.isDefault")
                 .doesNotExist());
+  }
+
+  @Test
+  @DisplayName("Swagger documenta 404 para recursos de outro usuario nas rotas afetadas")
+  void documentsNotFoundForForeignResources() throws Exception {
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/api/v1/users/{id}'].get.responses['404']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/transactions'].post.responses['404']").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/transactions'].post.responses['404'].description")
+                .value(containsString("outro usuario")))
+        .andExpect(jsonPath("$.paths['/api/v1/categories/{id}'].put.responses['404']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/categories/{id}'].delete.responses['404']").exists())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/v1/assistant/conversations/{id}/messages'].get.responses['404']")
+                .exists());
   }
 
   @Test

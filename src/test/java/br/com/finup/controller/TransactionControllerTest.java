@@ -211,7 +211,7 @@ class TransactionControllerTest {
         .andExpect(status().isCreated())
         .andExpect(header().string("Location", "/api/v1/transactions/" + transaction.getId()))
         .andExpect(jsonPath("$.id").value(transaction.getId().toString()))
-        .andExpect(jsonPath("$.userId").value(userId.toString()))
+        .andExpect(jsonPath("$.userId").doesNotExist())
         .andExpect(jsonPath("$.categoryId").value(categoryId.toString()))
         .andExpect(jsonPath("$.paymentMethodId").doesNotExist())
         .andExpect(jsonPath("$.type").value("INCOME"))
@@ -426,8 +426,7 @@ class TransactionControllerTest {
                     """
                         .formatted(spoofedUserId, categoryId)))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.userId").value(authenticatedUserId.toString()))
-        .andExpect(jsonPath("$.userId").value(not(spoofedUserId.toString())));
+        .andExpect(jsonPath("$.userId").doesNotExist());
   }
 
   @Test
@@ -466,5 +465,84 @@ class TransactionControllerTest {
         .andExpect(jsonPath("$.status").value(404))
         .andExpect(jsonPath("$.detail").value("Categoria nao encontrada: " + categoryId))
         .andExpect(jsonPath("$.traceId").exists());
+  }
+
+  @Test
+  @DisplayName("POST com categoria de outro usuario devolve 404 sem dados da categoria")
+  void foreignCategoryReturns404() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+    LocalDate date = LocalDate.of(2026, 9, 12);
+    when(transactionService.register(
+            eq(IDENTITY),
+            eq(categoryId),
+            isNull(),
+            eq(TransactionType.EXPENSE),
+            isNull(),
+            eq(new BigDecimal("10.00")),
+            eq(date),
+            eq(false),
+            isNull()))
+        .thenThrow(new ResourceNotFoundException("Categoria nao encontrada: " + categoryId));
+
+    mockMvc
+        .perform(
+            post("/api/v1/transactions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "categoryId": "%s",
+                      "type": "EXPENSE",
+                      "amount": 10.00,
+                      "transactionDate": "2026-09-12",
+                      "isRecurring": false
+                    }
+                    """
+                        .formatted(categoryId)))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.categoryId").doesNotExist())
+        .andExpect(jsonPath("$.userId").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("POST com meio de pagamento de outro usuario devolve 404 sem dados do recurso")
+  void foreignPaymentMethodReturns404() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+    UUID paymentMethodId = UUID.randomUUID();
+    LocalDate date = LocalDate.of(2026, 9, 12);
+    when(transactionService.register(
+            eq(IDENTITY),
+            eq(categoryId),
+            eq(paymentMethodId),
+            eq(TransactionType.EXPENSE),
+            isNull(),
+            eq(new BigDecimal("10.00")),
+            eq(date),
+            eq(false),
+            isNull()))
+        .thenThrow(
+            new ResourceNotFoundException("Meio de pagamento nao encontrado: " + paymentMethodId));
+
+    mockMvc
+        .perform(
+            post("/api/v1/transactions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "categoryId": "%s",
+                      "paymentMethodId": "%s",
+                      "type": "EXPENSE",
+                      "amount": 10.00,
+                      "transactionDate": "2026-09-12",
+                      "isRecurring": false
+                    }
+                    """
+                        .formatted(categoryId, paymentMethodId)))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.paymentMethodId").doesNotExist())
+        .andExpect(jsonPath("$.userId").doesNotExist());
   }
 }
