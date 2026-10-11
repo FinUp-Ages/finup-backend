@@ -38,9 +38,10 @@
   ],
   "validation": {
     "OpenApiIntegrationTests,ProdDocumentationIntegrationTests": "passed",
-    "spotless:check": "passed"
+    "spotless:check": "passed",
+    "./mvnw clean verify": "passed"
   },
-  "review": "Scalar mapeado em /docs com URL relativa para /v3/api-docs; springdoc e Scalar desabilitados no perfil prod; rotas /docs/** liberadas fora de prod.",
+  "review": "State do merge reconciliado com a develop; devtools removido; OpenApiIntegrationTests preserva o contrato da develop e o Scalar continua em /docs fora de prod.",
   "open_questions": [
     "'aberturas' interpretado como pontos de extensao (AiAction); confirmar.",
     "Bucket S3 (privado, bloqueio de acesso publico, criptografia) e permissao s3:GetObject/PutObject precisam ser provisionados fora deste repo; sem CHAT_HISTORY_BUCKET o historico fica em memoria.",
@@ -49,7 +50,7 @@
     "Titulo da conversa e o recorte da primeira mensagem (estrategia definitiva segue pendente com o time).",
     "Sem busca por texto entre conversas: o corpo so existe no S3."
   ],
-  "updated_at": "2026-10-02",
+  "updated_at": "2026-10-11",
   "decisions": [
     "Gastos de risco (bets/apostas, bebidas alcoolicas, drogas) identificados por NOME da categoria, em uma classe unica (RiskySpending), sem coluna nova em categories (evita conflito com a tarefa de categorias); sempre citados no feedback como gasto evitavel.",
     "Historico: Postgres guarda so metadados em conversations (titulo, datas, message_count); o corpo das mensagens fica em UM objeto JSON por conversa no S3 (conversations/{userId}/{conversationId}.json). Atualizacao e leitura+escrita do objeto sob lock de linha da conversa. Sem bucket configurado, usa store em memoria (dev/teste).",

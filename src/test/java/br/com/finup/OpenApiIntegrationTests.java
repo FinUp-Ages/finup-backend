@@ -1,11 +1,9 @@
 package br.com.finup;
 
-import static org.hamcrest.Matchers.startsWith;
-import static org.springframework.http.MediaType.APPLICATION_JSON;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.*;
+import static org.springframework.http.MediaType.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -68,6 +66,34 @@ class OpenApiIntegrationTests {
         .andExpect(
             jsonPath("$.components.schemas.CategoryListResponse.properties.isDefault")
                 .doesNotExist());
+  }
+
+  @Test
+  @DisplayName("Swagger documenta 404 para recursos de outro usuario nas rotas afetadas")
+  void documentsNotFoundForForeignResources() throws Exception {
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/api/v1/users/{id}'].get.responses['404']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/transactions'].post.responses['404']").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/transactions'].post.responses['404'].description")
+                .value(containsString("inexistente")))
+        .andExpect(jsonPath("$.paths['/api/v1/categories/{id}'].put.responses['404']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/categories/{id}'].delete.responses['404']").exists())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/v1/assistant/conversations/{id}/messages'].get.responses['404']")
+                .exists());
+  }
+
+  @Test
+  @DisplayName("Swagger UI redireciona para a interface")
+  void redirectsSwaggerUiToItsInterface() throws Exception {
+    mockMvc
+        .perform(get("/swagger-ui.html"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(header().string("Location", containsString("/swagger-ui/index.html")));
   }
 
   @Test
