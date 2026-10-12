@@ -27,6 +27,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class CategoryServiceTest {
@@ -105,6 +106,23 @@ class CategoryServiceTest {
   }
 
   @Test
+  @DisplayName("categoria inexistente tem mensagem 404 em portugues")
+  void updateUnknownCategoryUsesPortugueseMessage() {
+    User user = mockUser();
+    AuthenticatedIdentity identity = identity(user);
+    UUID categoryId = UUID.randomUUID();
+    CategoryRequest request = new CategoryRequest("Outro nome", TransactionType.EXPENSE);
+
+    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
+    when(categoryRepository.findById(categoryId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> categoryService.update(identity, categoryId, request))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Categoria nao encontrada: " + categoryId);
+    verify(categoryRepository, never()).save(any());
+  }
+
+  @Test
   @DisplayName("nao permite editar categoria padrao")
   void updateThrowsWhenCategoryIsDefault() {
     User user = mockUser();
@@ -130,13 +148,16 @@ class CategoryServiceTest {
         User.createFromCognitoIdentity("cognito-sub-carlos", "Carlos", "carlos@exemplo.com");
     AuthenticatedIdentity identity = identity(other);
     Category category = mockCategory(owner);
+    UUID categoryId = UUID.randomUUID();
+    ReflectionTestUtils.setField(category, "id", categoryId);
     CategoryRequest request = new CategoryRequest("Outro nome", TransactionType.EXPENSE);
 
     when(categoryRepository.findById(any())).thenReturn(Optional.of(category));
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(other);
 
-    assertThatThrownBy(() -> categoryService.update(identity, UUID.randomUUID(), request))
-        .isInstanceOf(ResourceNotFoundException.class);
+    assertThatThrownBy(() -> categoryService.update(identity, categoryId, request))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Categoria nao encontrada: " + categoryId);
 
     verify(categoryRepository, never()).save(any());
   }
@@ -188,12 +209,15 @@ class CategoryServiceTest {
         User.createFromCognitoIdentity("cognito-sub-carlos", "Carlos", "carlos@exemplo.com");
     AuthenticatedIdentity identity = identity(other);
     Category category = mockCategory(owner);
+    UUID categoryId = UUID.randomUUID();
+    ReflectionTestUtils.setField(category, "id", categoryId);
 
     when(categoryRepository.findById(any())).thenReturn(Optional.of(category));
     when(userService.findByAuthenticatedIdentity(identity)).thenReturn(other);
 
-    assertThatThrownBy(() -> categoryService.delete(identity, UUID.randomUUID()))
-        .isInstanceOf(ResourceNotFoundException.class);
+    assertThatThrownBy(() -> categoryService.delete(identity, categoryId))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Categoria nao encontrada: " + categoryId);
 
     verify(categoryRepository, never()).deleteById(any());
   }

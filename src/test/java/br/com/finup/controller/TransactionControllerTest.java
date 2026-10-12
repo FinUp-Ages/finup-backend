@@ -444,7 +444,7 @@ class TransactionControllerTest {
             eq(date),
             eq(false),
             isNull()))
-        .thenThrow(new ResourceNotFoundException("Categoria", categoryId));
+        .thenThrow(new ResourceNotFoundException("Categoria nao encontrada: " + categoryId));
 
     mockMvc
         .perform(
@@ -463,7 +463,7 @@ class TransactionControllerTest {
                         .formatted(categoryId)))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.status").value(404))
-        .andExpect(jsonPath("$.detail").value("Categoria nao encontrado: " + categoryId))
+        .andExpect(jsonPath("$.detail").value("Categoria nao encontrada: " + categoryId))
         .andExpect(jsonPath("$.traceId").exists());
   }
 
@@ -482,7 +482,7 @@ class TransactionControllerTest {
             eq(date),
             eq(false),
             isNull()))
-        .thenThrow(new ResourceNotFoundException("Categoria", categoryId));
+        .thenThrow(new ResourceNotFoundException("Categoria nao encontrada: " + categoryId));
 
     mockMvc
         .perform(
@@ -521,7 +521,8 @@ class TransactionControllerTest {
             eq(date),
             eq(false),
             isNull()))
-        .thenThrow(new ResourceNotFoundException("Meio de pagamento", paymentMethodId));
+        .thenThrow(
+            new ResourceNotFoundException("Meio de pagamento nao encontrado: " + paymentMethodId));
 
     mockMvc
         .perform(

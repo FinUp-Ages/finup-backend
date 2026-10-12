@@ -73,7 +73,8 @@ public class ConversationService {
   public Conversation requireOwned(User user, UUID conversationId) {
     return conversationRepository
         .findByIdAndUser(conversationId, user)
-        .orElseThrow(() -> new ResourceNotFoundException("Conversa", conversationId));
+        .orElseThrow(
+            () -> new ResourceNotFoundException("Conversa nao encontrada: " + conversationId));
   }
 
   /**
@@ -91,7 +92,10 @@ public class ConversationService {
             ? conversationRepository.save(Conversation.startForUser(user, titleFrom(userText)))
             : conversationRepository
                 .findByIdAndUserForUpdate(conversationId, user)
-                .orElseThrow(() -> new ResourceNotFoundException("Conversa", conversationId));
+                .orElseThrow(
+                    () ->
+                        new ResourceNotFoundException(
+                            "Conversa nao encontrada: " + conversationId));
 
     List<ChatMessage> messages = new ArrayList<>();
     if (conversation.getMessageCount() > 0) {
