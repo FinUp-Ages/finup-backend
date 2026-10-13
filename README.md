@@ -142,6 +142,11 @@ consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o b
 | `POST /api/v1/ai/assistant` | interpreta um texto livre e executa a ação financeira correspondente |
 | `GET /api/v1/assistant/conversations` | lista o histórico de conversas do usuário, ordenado pela atualização mais recente |
 | `GET /api/v1/assistant/conversations/{id}/messages` | lista as mensagens de uma conversa do usuário em ordem cronológica |
+| `GET /api/v1/admin/me` | **só grupo `admin`.** Devolve o administrador autenticado: `{"id", "name", "email", "role": "ADMIN"}` |
+
+Tudo sob `/api/v1/admin/**` — o `GET /api/v1/admin/me` e os widgets do dashboard — exige que o
+usuário esteja no grupo `admin` do Cognito. Token válido de quem não está no grupo responde `403`.
+Veja [Painel administrativo](#painel-administrativo-grupo-admin-e-app-client-próprio).
 
 Categoria e meio de pagamento referenciados por uma transação precisam ser do
 próprio usuário — categoria padrão do sistema também vale. Referência de outro usuário responde
@@ -368,7 +373,8 @@ contrato acompanha o código.
 
 A API valida o **access token** do AWS Cognito (Spring Security OAuth2 Resource Server). O token
 precisa ser assinado pelo User Pool configurado, estar dentro da validade, ter `token_use=access` e
-`client_id` igual ao App Client configurado. O ID token é recusado, mesmo sendo do mesmo pool.
+`client_id` igual a um dos App Clients configurados — o do app (`COGNITO_CLIENT_ID`) ou o do painel
+(`COGNITO_ADMIN_CLIENT_ID`). O ID token é recusado, mesmo sendo do mesmo pool.
 
 O access token só traz o `sub`. E-mail e nome, necessários só no cadastro (`POST /api/v1/users`),
 o backend busca na API `GetUser` do Cognito usando o próprio token do usuário — sem credencial da
@@ -376,11 +382,13 @@ AWS. As demais rotas usam só o `sub`, sem chamada de rede.
 
 | Classe | Papel |
 |---|---|
-| `config/SecurityConfig.java` | o que exige token e o que é público (Swagger, `/actuator/health`) |
+| `config/SecurityConfig.java` | o que exige token, o que é público (Swagger, `/actuator/health`) e o que exige o papel `ADMIN` |
 | `config/CognitoConfig.java` | valida assinatura, issuer, `token_use` e `client_id` |
 | `security/CognitoAuthenticatedIdentityResolver.java` | monta a identidade a partir do token |
 | `security/CognitoUserAttributesClient.java` | chama o `GetUser` do Cognito |
+| `security/CognitoGroupsAuthoritiesConverter.java` | transforma o claim `cognito:groups` nos papéis da API (`security/Role.java`) |
 | `security/ProblemDetailAuthenticationEntryPoint.java` | 401 em RFC 7807, no mesmo formato do resto da API |
+| `security/ProblemDetailAccessDeniedHandler.java` | 403 em RFC 7807, quando o token é válido mas falta o papel |
 
 ### O que pegar no console da AWS
 
@@ -404,6 +412,62 @@ Como o pool do FinUp foi criado (e nada disso muda depois de criado):
   ter formato de e-mail** (`Username cannot be of email format`). O login pelo e-mail só funciona
   depois que o e-mail for confirmado pelo código;
 - **`birthdate` é atributo obrigatório** no cadastro do Cognito, no formato `AAAA-MM-DD`.
+
+### Painel administrativo: grupo `admin` e App Client próprio
+
+O painel web usa o **mesmo User Pool** do app, com duas diferenças: os administradores ficam no
+grupo `admin`, e o painel tem um App Client só dele.
+
+| Regra | Onde |
+|---|---|
+| `/api/v1/admin/**` exige o papel `ADMIN` | `config/SecurityConfig.java` |
+| grupo `admin` do Cognito → papel `ADMIN` | `security/CognitoGroupsAuthoritiesConverter.java`, a partir do claim `cognito:groups` do access token |
+| sem token ou token inválido → `401`; token válido sem o grupo → `403` | os dois em `application/problem+json` |
+
+O que decide o acesso é o **grupo do usuário**, não o App Client: o `client_id` só diz por qual
+aplicação a pessoa entrou. O scope `aws.cognito.signin.user.admin`, que vem em todo access token do
+Cognito, também **não** é o grupo `admin` — ele só autoriza o usuário a ler os próprios atributos.
+
+O repositório não tem infraestrutura como código do Cognito. O grupo e o App Client são criados à
+mão, uma vez por ambiente, em **Cognito → Grupos de usuários → (o pool do FinUp)**:
+
+1. **Grupos → Criar grupo**, com o nome exatamente `admin` (minúsculas: o Cognito diferencia
+   `admin` de `Admin` e de `admins`). Não precisa de função do IAM.
+2. **Clientes da aplicação → Criar cliente da aplicação**, do tipo aplicação de página única (SPA),
+   **sem segredo do cliente**. Fluxos de autenticação: `ALLOW_USER_SRP_AUTH` e
+   `ALLOW_REFRESH_TOKEN_AUTH`. Se o painel usar a página de login hospedada, cadastre a URL do
+   painel como URL de retorno e habilite o scope `aws.cognito.signin.user.admin`, senão o
+   `POST /api/v1/users` do passo 5 responde `401`.
+3. **Usuários → (o usuário) → Adicionar usuário ao grupo → `admin`**, para cada administrador.
+4. No ambiente da API, preencha `COGNITO_ADMIN_CLIENT_ID` com o ID do cliente criado no passo 2 e
+   inclua a origem do painel em `CORS_ALLOWED_ORIGINS`.
+5. No primeiro acesso, o painel chama `POST /api/v1/users` para criar o registro local do
+   administrador. Sem ele, `GET /api/v1/admin/me` responde `404`: o `id` devolvido é o do usuário
+   local, o mesmo de `GET /api/v1/users/me`.
+
+O mesmo pela AWS CLI, para quem tem credencial com permissão no pool:
+
+```bash
+aws cognito-idp create-group --user-pool-id <pool id> --group-name admin \
+  --description "Administradores do painel FinUp"
+
+aws cognito-idp create-user-pool-client --user-pool-id <pool id> --client-name finup-painel \
+  --no-generate-secret --explicit-auth-flows ALLOW_USER_SRP_AUTH ALLOW_REFRESH_TOKEN_AUTH
+
+aws cognito-idp admin-add-user-to-group --user-pool-id <pool id> \
+  --username <username> --group-name admin
+```
+
+Dois comportamentos do Cognito que valem saber:
+
+- O grupo entra no token **na hora do login**. Quem acabou de ser adicionado ao grupo precisa
+  entrar de novo (ou renovar o token) para o `403` virar `200`.
+- Pelo mesmo motivo, **tirar alguém do grupo não derruba o acesso na hora**: o access token já
+  emitido continua valendo até expirar (1 hora, por padrão). Para cortar antes, revogue as sessões
+  do usuário no console.
+
+Com o profile `mock-auth` não há grupo: as rotas de admin ficam abertas a qualquer identidade
+simulada. É só para desenvolvimento, e esse profile não sobe em produção.
 
 ### Rodar a API contra o Cognito
 
@@ -494,6 +558,11 @@ categoria e meio de pagamento em `POST /api/v1/transactions`. A resposta não in
 nem inclui dados do recurso alheio. O `403` para operações proibidas sobre categoria padrão do
 sistema (visível a todos) e o `401` para falhas de autenticação permanecem inalterados.
 
+O `401` (token ausente, inválido ou expirado) e o `403` de `/api/v1/admin/**` (token válido de quem
+não está no grupo `admin`) são devolvidos pelo Spring Security, antes de chegar a qualquer
+controller, e saem no mesmo formato: `status`, `detail`, `timestamp` e `traceId`. O `detail` é
+genérico de propósito — não diz por que o token foi recusado nem qual grupo falta.
+
 ```json
 {
   "type": "https://finup.com.br/erros/validacao",
@@ -521,14 +590,15 @@ desenvolvimento (veja `.env.example`):
 | `SERVER_PORT` | `8080` | porta HTTP |
 | `SPRING_PROFILES_ACTIVE` | `dev` | perfil ativo; use `prod` no ambiente implantado |
 | `LOG_LEVEL` | `DEBUG` no perfil `dev`, `INFO` fora dele | nível de log de `br.com.finup` |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | origens do CORS, separadas por vírgula. O `.env.example` acrescenta `http://localhost:8081`, o Expo Web do `finup-mobile`, usado como fallback de teste do cadastro no navegador |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | origens do CORS, separadas por vírgula. O `.env.example` acrescenta `http://localhost:8081`, o Expo Web do `finup-mobile`, usado como fallback de teste do cadastro no navegador. Em produção, é a origem do painel. `*` não é aceito em nenhum ambiente: a aplicação não sobe |
 | `DB_NAME` | `finup` | nome do banco |
 | `DB_USER` | `finup_user` | usuário do banco |
 | `DB_PASSWORD` | **sem default** | senha do banco; sem ela a aplicação não sobe |
 | `DB_PORT` | `5432` | porta publicada pelo container do PostgreSQL |
 | `DB_HOST` | `localhost` | host do banco; rodando `./mvnw spring-boot:run` mantenha `localhost` — no `docker compose up -d --build` o serviço `app` já sobrescreve para `db` (nome do serviço do Postgres na mesma rede do compose) |
 | `COGNITO_USER_POOL_ID` | **sem default** | ID do grupo de usuários (`us-east-2_AbCdEf123`); a região sai do prefixo. Dispensado com `mock-auth` |
-| `COGNITO_CLIENT_ID` | **sem default** | ID do App Client (sem client secret). Dispensado com `mock-auth` |
+| `COGNITO_CLIENT_ID` | **sem default** | ID do App Client do app mobile (sem client secret). Dispensado com `mock-auth` |
+| `COGNITO_ADMIN_CLIENT_ID` | vazio | ID do App Client do painel web, no mesmo User Pool (sem client secret). Vazio, só o token do app é aceito e o painel recebe `401` |
 
 O `application.yml` importa o `.env` da raiz (`spring.config.import: optional:file:.env[.properties]`),
 então o mesmo arquivo serve para o `docker compose` e para a aplicação rodando via `./mvnw`. O `optional:`
