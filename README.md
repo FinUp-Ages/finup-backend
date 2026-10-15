@@ -392,17 +392,25 @@ AWS. As demais rotas usam só o `sub`, sem chamada de rede.
 
 ### O que pegar no console da AWS
 
+> **Nomes no console em português.** O console chama o *User Pool* de **Grupo de usuários** e o
+> *Group* de **Grupo**, e são coisas diferentes. O pool é o cadastro de todos os usuários do FinUp —
+> um só, o do `COGNITO_USER_POOL_ID`. Os grupos e os clientes da aplicação ficam **dentro** dele.
+> Quando a diferença importa, este README usa os nomes em inglês.
+
 Em **Cognito → Grupos de usuários → (o pool do FinUp)**:
 
 | Informação | Onde | Vai para o `.env` |
 |---|---|---|
 | ID do grupo de usuários (`us-east-2_AbCdEf123`) | página *Visão geral* do pool | `COGNITO_USER_POOL_ID` |
-| ID do cliente | *Clientes da aplicação → FinUp* (página de detalhes, não a de edição) | `COGNITO_CLIENT_ID` |
+| ID do cliente do app | *Clientes da aplicação → FinUp* (página de detalhes, não a de edição) | `COGNITO_CLIENT_ID` |
+| ID do cliente do painel | *Clientes da aplicação →* o cliente do painel | `COGNITO_ADMIN_CLIENT_ID` |
 
-A região vem do prefixo do ID do pool — não há variável para ela. No cliente da aplicação, confira:
+A região vem do prefixo do ID do pool — não há variável para ela. Nos dois clientes da aplicação,
+confira:
 
-- **Segredo do cliente vazio.** É o cliente do app mobile, que não guarda segredo. Com segredo, o
-  login pelo terminal abaixo falha.
+- **Segredo do cliente vazio.** São clientes públicos (app mobile e painel web), que não guardam
+  segredo. Com segredo, o login pelo terminal abaixo falha — e o Cognito não deixa remover o
+  segredo de um cliente que já existe: é preciso criar outro.
 - **Fluxos de autenticação:** `ALLOW_USER_AUTH`, `ALLOW_USER_SRP_AUTH` e `ALLOW_REFRESH_TOKEN_AUTH`.
   **Não** é preciso habilitar `ALLOW_USER_PASSWORD_AUTH`: o teste abaixo usa o `ALLOW_USER_AUTH`.
 
@@ -415,8 +423,19 @@ Como o pool do FinUp foi criado (e nada disso muda depois de criado):
 
 ### Painel administrativo: grupo `admin` e App Client próprio
 
-O painel web usa o **mesmo User Pool** do app, com duas diferenças: os administradores ficam no
-grupo `admin`, e o painel tem um App Client só dele.
+O painel web usa o **mesmo User Pool** do app — não existe um pool para o painel. Dentro do pool,
+duas peças são do painel: o grupo `admin` e um App Client só dele.
+
+```
+User Pool do FinUp (no console: "Grupo de usuários")
+├── Usuários                     todos, do app e do painel
+├── Grupos
+│   ├── admin                    administradores do painel
+│   └── outros, ex.: Customers   a API ignora
+└── Clientes da aplicação
+    ├── FinUp                    app mobile → COGNITO_CLIENT_ID
+    └── cliente do painel        painel web → COGNITO_ADMIN_CLIENT_ID
+```
 
 | Regra | Onde |
 |---|---|
@@ -424,24 +443,31 @@ grupo `admin`, e o painel tem um App Client só dele.
 | grupo `admin` do Cognito → papel `ADMIN` | `security/CognitoGroupsAuthoritiesConverter.java`, a partir do claim `cognito:groups` do access token |
 | sem token ou token inválido → `401`; token válido sem o grupo → `403` | os dois em `application/problem+json` |
 
-O que decide o acesso é o **grupo do usuário**, não o App Client: o `client_id` só diz por qual
-aplicação a pessoa entrou. O scope `aws.cognito.signin.user.admin`, que vem em todo access token do
-Cognito, também **não** é o grupo `admin` — ele só autoriza o usuário a ler os próprios atributos.
+O que decide o acesso é o **grupo do usuário**, não o App Client: a API aceita o token dos dois
+clientes em todas as rotas, e o `client_id` só diz por qual aplicação a pessoa entrou. O cliente
+do painel existe para o painel ter configuração própria — principalmente a validade do token,
+veja abaixo — e poder ser desligado sem afetar o app. O scope `aws.cognito.signin.user.admin`, que
+vem em todo access token do Cognito, também **não** é o grupo `admin`: ele só autoriza o usuário a
+ler os próprios atributos.
 
-O repositório não tem infraestrutura como código do Cognito. O grupo e o App Client são criados à
-mão, uma vez por ambiente, em **Cognito → Grupos de usuários → (o pool do FinUp)**:
+O repositório não tem infraestrutura como código do Cognito. Em cada ambiente, confira em
+**Cognito → Grupos de usuários → (o pool do FinUp)**:
 
-1. **Grupos → Criar grupo**, com o nome exatamente `admin` (minúsculas: o Cognito diferencia
-   `admin` de `Admin` e de `admins`). Não precisa de função do IAM.
-2. **Clientes da aplicação → Criar cliente da aplicação**, do tipo aplicação de página única (SPA),
+1. **Grupos:** um grupo chamado exatamente `admin` (minúsculas: o Cognito diferencia `admin` de
+   `Admin` e de `admins`). Se não existir, *Criar grupo*, sem função do IAM.
+2. **Clientes da aplicação:** um cliente para o painel, do tipo aplicação de página única (SPA),
    **sem segredo do cliente**. Fluxos de autenticação: `ALLOW_USER_SRP_AUTH` e
-   `ALLOW_REFRESH_TOKEN_AUTH`. Se o painel usar a página de login hospedada, cadastre a URL do
-   painel como URL de retorno e habilite o scope `aws.cognito.signin.user.admin`, senão o
-   `POST /api/v1/users` do passo 5 responde `401`.
-3. **Usuários → (o usuário) → Adicionar usuário ao grupo → `admin`**, para cada administrador.
-4. No ambiente da API, preencha `COGNITO_ADMIN_CLIENT_ID` com o ID do cliente criado no passo 2 e
-   inclua a origem do painel em `CORS_ALLOWED_ORIGINS`.
-5. No primeiro acesso, o painel chama `POST /api/v1/users` para criar o registro local do
+   `ALLOW_REFRESH_TOKEN_AUTH`, que o painel usa, e `ALLOW_USER_AUTH`, que o login pelo terminal
+   deste README usa. Se o painel usar a página de login hospedada, cadastre a URL do painel como
+   URL de retorno e habilite o scope `aws.cognito.signin.user.admin`, senão o `POST /api/v1/users`
+   do passo 6 responde `401`.
+3. **Validade do token de acesso** do cliente do painel: reduza para, por exemplo, 15 minutos (o
+   mínimo é 5). É ela que limita quanto tempo alguém tirado do grupo continua com acesso — veja
+   abaixo. O refresh token renova a sessão sem pedir login de novo.
+4. **Grupos → admin → Adicionar usuário**, para cada administrador.
+5. No ambiente da API, preencha `COGNITO_ADMIN_CLIENT_ID` com o ID do cliente do painel e inclua a
+   origem do painel em `CORS_ALLOWED_ORIGINS`.
+6. No primeiro acesso, o painel chama `POST /api/v1/users` para criar o registro local do
    administrador. Sem ele, `GET /api/v1/admin/me` responde `404`: o `id` devolvido é o do usuário
    local, o mesmo de `GET /api/v1/users/me`.
 
@@ -452,7 +478,8 @@ aws cognito-idp create-group --user-pool-id <pool id> --group-name admin \
   --description "Administradores do painel FinUp"
 
 aws cognito-idp create-user-pool-client --user-pool-id <pool id> --client-name finup-painel \
-  --no-generate-secret --explicit-auth-flows ALLOW_USER_SRP_AUTH ALLOW_REFRESH_TOKEN_AUTH
+  --no-generate-secret \
+  --explicit-auth-flows ALLOW_USER_AUTH ALLOW_USER_SRP_AUTH ALLOW_REFRESH_TOKEN_AUTH
 
 aws cognito-idp admin-add-user-to-group --user-pool-id <pool id> \
   --username <username> --group-name admin
@@ -463,8 +490,10 @@ Dois comportamentos do Cognito que valem saber:
 - O grupo entra no token **na hora do login**. Quem acabou de ser adicionado ao grupo precisa
   entrar de novo (ou renovar o token) para o `403` virar `200`.
 - Pelo mesmo motivo, **tirar alguém do grupo não derruba o acesso na hora**: o access token já
-  emitido continua valendo até expirar (1 hora, por padrão). Para cortar antes, revogue as sessões
-  do usuário no console.
+  emitido continua valendo até expirar. A API valida o token sozinha (assinatura e validade), sem
+  consultar o Cognito a cada requisição — por isso **revogar as sessões do usuário no console
+  também não derruba esse token**: só impede que ele obtenha tokens novos. O que limita a janela é
+  a validade do token de acesso do cliente do painel (passo 3).
 
 Com o profile `mock-auth` não há grupo: as rotas de admin ficam abertas a qualquer identidade
 simulada. É só para desenvolvimento, e esse profile não sobe em produção.
@@ -531,6 +560,27 @@ Nos comandos abaixo, `<regiao>` é o prefixo do ID do pool (ex.: `us-east-2`).
    preciso repetir o passo 3.
 
 No Windows, se o `curl` falhar com `CRYPT_E_NO_REVOCATION_CHECK`, acrescente `--ssl-no-revoke`.
+
+### Testar o acesso de admin pelo Swagger
+
+Com a API rodando contra o Cognito e `COGNITO_ADMIN_CLIENT_ID` preenchido, use um usuário que já
+exista no pool — não é preciso criar outro:
+
+1. Pegue o access token como no passo 3 de
+   [Testar o cadastro](#testar-o-cadastro-de-ponta-a-ponta), com o ID do **cliente do painel**.
+2. No Swagger, **Authorize** → cole o token, sem a palavra `Bearer` → execute
+   `GET /api/v1/admin/me`.
+3. Para mudar a situação do usuário, coloque-o no grupo ou tire-o dele em **Grupos → admin**,
+   no console, e faça login de novo.
+
+| Situação | Resposta |
+|---|---|
+| sem token, ou com o ID token no lugar do access token | `401` |
+| usuário fora do grupo `admin` | `403` |
+| usuário no grupo, mas com token emitido antes de entrar nele | `403` — faça login de novo |
+| no grupo, sem registro local nesta base | `404` — execute `POST /api/v1/users` uma vez |
+| no grupo, com registro local | `200` `{"id", "name", "email", "role": "ADMIN"}` |
+| tirado do grupo, ainda com o token antigo | `200` até o token expirar |
 
 ### Sem Cognito: profile `mock-auth`
 
