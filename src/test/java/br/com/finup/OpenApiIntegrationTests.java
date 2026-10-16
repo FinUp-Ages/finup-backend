@@ -133,4 +133,10 @@ class OpenApiIntegrationTests {
         .andExpect(status().is3xxRedirection())
         .andExpect(header().string("Location", containsString("/swagger-ui/index.html")));
   }
+
+  @Test
+  @DisplayName("Scalar disponibiliza a referencia da API")
+  void scalarReferenceIsAvailable() throws Exception {
+    mockMvc.perform(get("/docs")).andExpect(status().isOk());
+  }
 }
