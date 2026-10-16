@@ -70,7 +70,6 @@ scalar:
   path: /docs
   page-title: Finup Backend API
   theme: kepler
-#  theme: blue_planet
   dark-mode: true
 
 management:

@@ -20,6 +20,9 @@ import org.springframework.core.env.Environment;
  * <p>Tambem declara como a API se autentica, o que faz o Swagger UI mostrar o botao "Authorize":
  * com o Cognito, o access token (Bearer); com o profile {@code mock-auth}, os headers {@code
  * X-Mock-Cognito-*}. Vale para todos os endpoints, entao nenhum controller repete isso.
+ *
+ * <p>O {@code @Import} do Scalar e necessario: sem ele a autoconfiguracao do jar nao e aplicada e
+ * {@code /docs} responde 404 ({@code OpenApiIntegrationTests} cobre isso).
  */
 @Configuration
 @Import(ScalarWebMvcAutoConfiguration.class)

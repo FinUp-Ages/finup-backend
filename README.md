@@ -111,10 +111,12 @@ Com a aplicação em execução fora do perfil `prod`, a referência da API fica
 | O quê | URL |
 |---|---|
 | Scalar API Reference | http://localhost:8080/docs |
+| Swagger UI | http://localhost:8080/swagger-ui.html |
 | Contrato OpenAPI | http://localhost:8080/v3/api-docs |
 
-O Scalar lê o contrato OpenAPI gerado automaticamente pelo `springdoc` a partir dos
-controllers e DTOs da aplicação. Os metadados gerais da API ficam centralizados em
+O Scalar e o Swagger UI leem o contrato OpenAPI gerado automaticamente pelo `springdoc` a partir dos
+controllers e DTOs da aplicação. O Swagger UI continua disponível porque os roteiros de teste
+abaixo usam o botão **Authorize** dele. Os metadados gerais da API ficam centralizados em
 `config/OpenApiConfig.java`.
 
 > A documentação interativa e o contrato JSON ficam desabilitados no perfil `prod`.
