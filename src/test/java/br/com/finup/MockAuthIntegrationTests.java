@@ -51,7 +51,7 @@ class MockAuthIntegrationTests {
   void mockHeadersReachService() throws Exception {
     AuthenticatedIdentity identity =
         new AuthenticatedIdentity("mock-sub-ana", null, "ana@exemplo.com");
-    when(userService.findByAuthenticatedIdentity(identity))
+    when(userService.recordAccess(identity))
         .thenReturn(User.createFromCognitoIdentity("mock-sub-ana", null, "ana@exemplo.com"));
 
     mockMvc
