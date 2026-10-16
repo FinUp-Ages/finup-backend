@@ -23,8 +23,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Configuração dos widgets do dashboard por admin.
  *
- * <p>A identidade vem sempre do {@link AuthenticatedIdentityResolver}; ainda não há checagem de
- * perfil admin (o projeto não tem roles), então qualquer usuário autenticado acessa.
+ * <p>A identidade vem sempre do {@link AuthenticatedIdentityResolver}. Só administrador chega aqui:
+ * o {@code SecurityConfig} exige o grupo {@code admin} do Cognito em {@code /api/v1/admin/**}.
  */
 @RestController
 @RequestMapping("/api/v1/admin/dashboard/widgets")
@@ -50,6 +50,10 @@ public class AdminDashboardWidgetController {
         description = "Identidade autenticada ausente ou incompleta",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
     @ApiResponse(
+        responseCode = "403",
+        description = "Usuário fora do grupo admin",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
         responseCode = "404",
         description = "Usuário não encontrado",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
@@ -70,6 +74,10 @@ public class AdminDashboardWidgetController {
     @ApiResponse(
         responseCode = "401",
         description = "Identidade autenticada ausente ou incompleta",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "Usuário fora do grupo admin",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
     @ApiResponse(
         responseCode = "404",
