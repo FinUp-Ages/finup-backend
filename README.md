@@ -142,6 +142,13 @@ consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o b
 | `POST /api/v1/ai/assistant` | interpreta um texto livre e executa a ação financeira correspondente |
 | `GET /api/v1/assistant/conversations` | lista o histórico de conversas do usuário, ordenado pela atualização mais recente |
 | `GET /api/v1/assistant/conversations/{id}/messages` | lista as mensagens de uma conversa do usuário em ordem cronológica |
+| `GET /api/v1/admin/metrics/summary?period=7d\|30d\|90d` | **só admin.** Usuários ativos e novos no período, com o período anterior e a variação em % |
+| `GET /api/v1/admin/metrics/user-growth?months=6` | **só admin.** Cadastros por mês (1 a 24 meses, padrão 6), com o acumulado e o crescimento em % |
+
+As duas rotas de métricas exigem o grupo `admin` do Cognito, lido do claim `cognito:groups` do access
+token: autenticado fora do grupo recebe `403`. "Ativo" é quem registrou ao menos uma transação no
+período (ocorrência gerada por recorrência não conta). Os meses seguem o fuso de Brasília. No profile
+`mock-auth` o grupo não é verificado, como o resto da API.
 
 Categoria e meio de pagamento referenciados por uma transação precisam ser do
 próprio usuário — categoria padrão do sistema também vale. Referência de outro usuário responde

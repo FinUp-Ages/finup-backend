@@ -22,6 +22,7 @@ import br.com.finup.dto.AiAssistantResponse;
 import br.com.finup.model.User;
 import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
+import br.com.finup.security.ProblemDetailAccessDeniedHandler;
 import br.com.finup.security.ProblemDetailAuthenticationEntryPoint;
 import br.com.finup.service.AiAssistantService;
 import br.com.finup.service.CategoryService;
@@ -57,7 +58,12 @@ import org.springframework.test.web.servlet.MockMvc;
   TransactionController.class,
   AiAssistantController.class
 })
-@Import({SecurityConfig.class, CognitoConfig.class, ProblemDetailAuthenticationEntryPoint.class})
+@Import({
+  SecurityConfig.class,
+  CognitoConfig.class,
+  ProblemDetailAuthenticationEntryPoint.class,
+  ProblemDetailAccessDeniedHandler.class
+})
 @ActiveProfiles("test")
 @TestPropertySource(
     properties = {
