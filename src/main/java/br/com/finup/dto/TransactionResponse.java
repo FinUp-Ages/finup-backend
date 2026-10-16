@@ -12,7 +12,6 @@ import java.util.UUID;
 @Schema(description = "Transacao financeira cadastrada")
 public record TransactionResponse(
     UUID id,
-    UUID userId,
     UUID categoryId,
     UUID paymentMethodId,
     TransactionType type,

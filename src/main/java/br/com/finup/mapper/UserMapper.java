@@ -1,8 +1,10 @@
 package br.com.finup.mapper;
 
+import br.com.finup.dto.AdminMeResponse;
 import br.com.finup.dto.UserResponse;
 import br.com.finup.model.User;
 import br.com.finup.model.UserFinancialProfile;
+import br.com.finup.security.Role;
 import java.time.Instant;
 import java.util.List;
 
@@ -48,5 +50,13 @@ public final class UserMapper {
 
   public static List<UserResponse> toResponses(List<User> users) {
     return users.stream().map(UserMapper::toResponse).toList();
+  }
+
+  /**
+   * O papel e fixo porque a rota que usa esta resposta so e alcancada por administrador — veja o
+   * {@code SecurityConfig}.
+   */
+  public static AdminMeResponse toAdminMeResponse(User user) {
+    return new AdminMeResponse(user.getId(), user.getName(), user.getEmail(), Role.ADMIN);
   }
 }

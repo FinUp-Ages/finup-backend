@@ -40,6 +40,8 @@ services:
       # duas e sem mock-auth, o container reinicia em loop: veja `docker compose logs app`.
       COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-}
       COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-}
+      # Opcional: App Client do painel web. Vazio, so o token do app e aceito.
+      COGNITO_ADMIN_CLIENT_ID: ${COGNITO_ADMIN_CLIENT_ID:-}
 
       # Amazon Bedrock (assistente de IA). Sem credenciais o SDK cai na cadeia padrao da AWS, que
       # dentro do container nao tem perfil nem role: o assistente responde 502. Preencha no .env.

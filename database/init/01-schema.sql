@@ -245,3 +245,18 @@ CREATE TABLE IF NOT EXISTS user_lesson_progress (
   CONSTRAINT fk_user_lesson_progress_user FOREIGN KEY (user_id) REFERENCES users (id),
   CONSTRAINT fk_user_lesson_progress_lesson FOREIGN KEY (lesson_id) REFERENCES lessons (id)
 );
+
+-- Configuração dos widgets do dashboard por admin, gravada por
+-- PUT /api/v1/admin/dashboard/widgets (substitui a lista inteira do usuário).
+-- Quem já tem o volume do Postgres precisa recriá-lo (docker compose down -v) ou aplicar à mão.
+CREATE TABLE IF NOT EXISTS dashboard_widget_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  widget_id VARCHAR(100) NOT NULL,
+  enabled BOOLEAN NOT NULL,
+  position INTEGER NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_dashboard_widget_settings_user FOREIGN KEY (user_id) REFERENCES users (id),
+  CONSTRAINT uq_dashboard_widget_settings_user_widget UNIQUE (user_id, widget_id)
+);

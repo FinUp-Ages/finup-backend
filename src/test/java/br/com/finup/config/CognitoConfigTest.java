@@ -12,13 +12,13 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 
 /**
  * O que o decoder aceita alem da assinatura: issuer do nosso User Pool, {@code token_use=access} e
- * {@code client_id} do nosso App Client. A assinatura em si e responsabilidade do Nimbus e nao e
- * retestada aqui.
+ * {@code client_id} de um dos nossos App Clients (app ou painel). A assinatura em si e
+ * responsabilidade do Nimbus e nao e retestada aqui.
  */
 class CognitoConfigTest {
 
   private final CognitoProperties cognito =
-      new CognitoProperties("us-east-1_TestPool", "test-client");
+      new CognitoProperties("us-east-1_TestPool", "test-client", "test-admin-client");
   private final OAuth2TokenValidator<Jwt> validator = CognitoConfig.accessTokenValidator(cognito);
 
   @Test
@@ -48,11 +48,53 @@ class CognitoConfigTest {
   }
 
   @Test
+  @DisplayName("access token do app client do painel e aceito")
+  void acceptsAccessTokenFromAdminClient() {
+    Jwt token = accessToken().claim("client_id", "test-admin-client").build();
+
+    assertThat(validator.validate(token).hasErrors()).isFalse();
+  }
+
+  @Test
   @DisplayName("token de outro app client e recusado")
   void rejectsOtherClient() {
     Jwt token = accessToken().claim("client_id", "outro-client").build();
 
     assertThat(validator.validate(token).hasErrors()).isTrue();
+  }
+
+  @Test
+  @DisplayName("token sem client_id e recusado")
+  void rejectsTokenWithoutClientId() {
+    Jwt token = accessToken().claims(claims -> claims.remove("client_id")).build();
+
+    assertThat(validator.validate(token).hasErrors()).isTrue();
+  }
+
+  @Test
+  @DisplayName("sem app client do painel configurado, so o token do app e aceito")
+  void acceptsOnlyAppClientWhenAdminClientIsNotConfigured() {
+    CognitoProperties appOnly = new CognitoProperties("us-east-1_TestPool", "test-client", "");
+    OAuth2TokenValidator<Jwt> appOnlyValidator = CognitoConfig.accessTokenValidator(appOnly);
+
+    assertThat(appOnly.allowedClientIds()).containsExactly("test-client");
+    assertThat(appOnlyValidator.validate(accessToken().build()).hasErrors()).isFalse();
+    assertThat(
+            appOnlyValidator
+                .validate(accessToken().claim("client_id", "test-admin-client").build())
+                .hasErrors())
+        .isTrue();
+    assertThat(appOnlyValidator.validate(accessToken().claim("client_id", "").build()).hasErrors())
+        .isTrue();
+  }
+
+  @Test
+  @DisplayName("o mesmo app client nos dois papeis nao quebra a configuracao")
+  void sameClientForAppAndPanelIsAccepted() {
+    CognitoProperties shared =
+        new CognitoProperties("us-east-1_TestPool", "test-client", "test-client");
+
+    assertThat(shared.allowedClientIds()).containsExactly("test-client");
   }
 
   @Test

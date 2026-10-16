@@ -1,60 +1,33 @@
 {
-  "stage": "COMPLETED",
+  "stage": "REVIEWING",
   "task": "Disponibilizar Scalar fora de prod e desativar a documentacao em prod.",
-  "objective": "Substituir a interface Swagger pela referencia Scalar, manter o contrato OpenAPI fora de prod e garantir que /v3/api-docs, /swagger-ui.html e /docs retornem 404 no perfil prod.",
+  "objective": "Publicar a referencia Scalar em /docs fora de prod, mantendo o contrato OpenAPI e o Swagger UI, e garantir que /v3/api-docs, /swagger-ui.html e /docs retornem 404 no perfil prod.",
+  "decisions": [
+    "Swagger UI mantido junto com o Scalar: os roteiros do README (Authorize, teste de admin) usam o Swagger UI. Por isso continuam o springdoc-openapi-starter-webmvc-ui e o teste de redirect de /swagger-ui.html",
+    "@Import(ScalarWebMvcAutoConfiguration.class) mantido no OpenApiConfig: sem ele, /docs responde 404 (validado em 2026-10-16), embora o jar registre a autoconfiguracao em AutoConfiguration.imports",
+    "spring-boot-devtools fora deste PR, por estar fora do escopo"
+  ],
   "files_in_scope": [
     "pom.xml",
+    "src/main/java/br/com/finup/config/OpenApiConfig.java",
+    "src/main/java/br/com/finup/config/SecurityConfig.java",
     "src/main/resources/application.yml",
-    ".env.example",
-    "docker-compose.yml",
-    "postman/finup-backend.postman_collection.json",
-    "src/main/java/br/com/finup/config/BedrockProperties.java",
-    "src/main/java/br/com/finup/config/BedrockClientConfig.java",
-    "src/main/java/br/com/finup/config/ClockConfig.java",
-    "src/main/java/br/com/finup/model/AiModel.java",
-    "src/main/java/br/com/finup/service/BedrockLlmService.java",
-    "src/main/java/br/com/finup/service/AiAssistantService.java",
-    "src/main/java/br/com/finup/service/AiAction.java",
-    "src/main/java/br/com/finup/service/RegisterTransactionAiAction.java",
-    "src/main/java/br/com/finup/service/FinancialFeedbackAiAction.java",
-    "src/main/java/br/com/finup/dto/AiAssistantRequest.java",
-    "src/main/java/br/com/finup/dto/AiAssistantResponse.java",
-    "src/main/java/br/com/finup/controller/AiAssistantController.java",
-    "src/main/java/br/com/finup/exception/AiProviderException.java",
-    "src/test/java/br/com/finup/service/BedrockLlmServiceTest.java",
-    "src/test/java/br/com/finup/service/AiAssistantServiceTest.java",
-    "src/test/java/br/com/finup/service/FinancialFeedbackAiActionTest.java",
-    "src/test/java/br/com/finup/controller/AiAssistantControllerTest.java",
-    "database/init/01-schema.sql",
-    "src/main/java/br/com/finup/service/RiskySpending.java",
-    "src/main/java/br/com/finup/service/ConversationService.java",
-    "src/main/java/br/com/finup/repository/ConversationTranscriptStore.java",
-    "src/main/java/br/com/finup/repository/S3ConversationTranscriptStore.java",
-    "src/main/java/br/com/finup/repository/InMemoryConversationTranscriptStore.java",
-    "src/main/java/br/com/finup/config/ChatHistoryConfig.java",
-    "src/main/java/br/com/finup/controller/ConversationController.java",
-    "src/main/java/br/com/finup/model/Conversation.java",
-    "src/test/java/br/com/finup/config/SecurityConfigTest.java"
+    "src/test/java/br/com/finup/OpenApiIntegrationTests.java",
+    "src/test/java/br/com/finup/ProdDocumentationIntegrationTests.java",
+    "README.md",
+    ".railforge/state.json"
   ],
   "validation": {
-    "OpenApiIntegrationTests,ProdDocumentationIntegrationTests": "passed",
-    "spotless:check": "passed",
-    "./mvnw clean verify": "passed"
+    "mvn clean verify": "passed em 2026-10-16 apos o merge da develop em 135dd68 (319 testes, 0 falhas, spotless ok)",
+    "fora de prod": "/docs responde 200 (Scalar), /v3/api-docs responde 200 e /swagger-ui.html redireciona para a interface (OpenApiIntegrationTests)",
+    "prod": "/docs, /v3/api-docs e /swagger-ui.html respondem 404 (ProdDocumentationIntegrationTests)"
   },
-  "review": "State do merge reconciliado com a develop; devtools removido; OpenApiIntegrationTests preserva o contrato da develop e o Scalar continua em /docs fora de prod.",
+  "review": "Branch atualizada com a develop em 2026-10-16, com os conflitos de state.json e OpenApiIntegrationTests resolvidos (mantidos os testes do #41 e do #46, mais o do Scalar). Ajustes do review aplicados: devtools removido, comentarios do pom e do application.yml corrigidos e README voltando a listar o Swagger UI. Pendente: aprovacao e merge.",
+  "updated_at": "2026-10-16",
   "open_questions": [
-    "'aberturas' interpretado como pontos de extensao (AiAction); confirmar.",
-    "Bucket S3 (privado, bloqueio de acesso publico, criptografia) e permissao s3:GetObject/PutObject precisam ser provisionados fora deste repo; sem CHAT_HISTORY_BUCKET o historico fica em memoria.",
-    "Bancos existentes precisam de: ALTER TABLE conversations ADD COLUMN message_count INTEGER NOT NULL DEFAULT 0;",
-    "Categorias de risco precisam existir como padrao (nomes sugeridos: Apostas (Bets), Bebidas alcoólicas, Drogas) — fica com a tarefa de categorias; deteccao por nome nao reconhece nomes livres.",
-    "Titulo da conversa e o recorte da primeira mensagem (estrategia definitiva segue pendente com o time).",
-    "Sem busca por texto entre conversas: o corpo so existe no S3."
-  ],
-  "updated_at": "2026-10-11",
-  "decisions": [
-    "Gastos de risco (bets/apostas, bebidas alcoolicas, drogas) identificados por NOME da categoria, em uma classe unica (RiskySpending), sem coluna nova em categories (evita conflito com a tarefa de categorias); sempre citados no feedback como gasto evitavel.",
-    "Historico: Postgres guarda so metadados em conversations (titulo, datas, message_count); o corpo das mensagens fica em UM objeto JSON por conversa no S3 (conversations/{userId}/{conversationId}.json). Atualizacao e leitura+escrita do objeto sob lock de linha da conversa. Sem bucket configurado, usa store em memoria (dev/teste).",
-    "Escrita do historico e best-effort: se o S3 falhar depois de a acao ter sido executada, a resposta ao usuario nao falha (erro vai ao log).",
-    "Fora do escopo: dar memoria das conversas anteriores ao modelo; busca por texto entre conversas (inviavel com corpo so no S3); geracao de titulo por resumo do modelo (segue pendente com o time, usa recorte da primeira mensagem)."
+    "Em cada ambiente implantado: preencher COGNITO_ADMIN_CLIENT_ID e incluir a origem do painel em CORS_ALLOWED_ORIGINS. Se houver outro User Pool (ex.: producao), conferir nele o grupo 'admin' e o cliente do painel. Passo a passo no README",
+    "Confirmar com o time do painel que o primeiro acesso chama POST /api/v1/users antes de GET /api/v1/admin/me. Se o painel nao puder fazer isso, a alternativa e o backend criar o usuario local no primeiro acesso de um administrador",
+    "Consumidor: GET e PUT /api/v1/admin/dashboard/widgets passam a responder 403 para quem nao esta no grupo admin. Antes qualquer usuario autenticado acessava",
+    "Issues #35 e #36 continuam abertas citando o isCurrentUserAdmin() removido pelo #38: a #35 ficou sem objeto e a #36 precisa ser reescrita em termos de papel"
   ]
 }

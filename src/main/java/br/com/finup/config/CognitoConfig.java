@@ -1,5 +1,6 @@
 package br.com.finup.config;
 
+import java.util.Set;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -41,14 +42,20 @@ public class CognitoConfig {
    *   <li>ter sido emitido por este User Pool ({@code iss});
    *   <li>ser um access token ({@code token_use=access}) — o ID token tambem e assinado pelo mesmo
    *       pool, mas nao e credencial de acesso a API;
-   *   <li>ter sido emitido para o nosso App Client ({@code client_id}). O access token do Cognito
-   *       nao tem {@code aud}, por isso a checagem padrao de audience nao serve aqui.
+   *   <li>ter sido emitido para um dos nossos App Clients ({@code client_id}): o do app ou o do
+   *       painel. O access token do Cognito nao tem {@code aud}, por isso a checagem padrao de
+   *       audience nao serve aqui.
    * </ul>
+   *
+   * <p>O App Client diz por qual aplicacao a pessoa entrou, nao o que ela pode fazer: o acesso de
+   * administrador vem do grupo do usuario, conferido no {@code SecurityConfig}.
    */
   static OAuth2TokenValidator<Jwt> accessTokenValidator(CognitoProperties cognito) {
+    Set<String> allowedClientIds = cognito.allowedClientIds();
     return new DelegatingOAuth2TokenValidator<>(
         JwtValidators.createDefaultWithIssuer(cognito.issuerUri()),
         new JwtClaimValidator<String>("token_use", "access"::equals),
-        new JwtClaimValidator<String>("client_id", cognito.clientId()::equals));
+        new JwtClaimValidator<String>(
+            "client_id", clientId -> clientId != null && allowedClientIds.contains(clientId)));
   }
 }

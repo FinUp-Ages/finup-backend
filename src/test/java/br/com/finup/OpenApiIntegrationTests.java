@@ -1,9 +1,13 @@
 package br.com.finup;
 
-import static org.hamcrest.Matchers.*;
-import static org.springframework.http.MediaType.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -59,6 +63,9 @@ class OpenApiIntegrationTests {
             jsonPath("$.paths['/api/v1/assistant/conversations/{id}/messages'].get").exists())
         .andExpect(jsonPath("$.paths['/api/v1/ai/assistant'].post").exists())
         .andExpect(jsonPath("$.paths['/api/v1/ai/assistant'].post.parameters").doesNotExist())
+        .andExpect(jsonPath("$.paths['/api/v1/assistant/messages']").doesNotExist())
+        .andExpect(
+            jsonPath("$.components.schemas.TransactionResponse.properties.userId").doesNotExist())
         .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type").value("http"))
         .andExpect(jsonPath("$.components.schemas.CategoryListResponse.properties.id").exists())
         .andExpect(jsonPath("$.components.schemas.CategoryListResponse.properties.name").exists())
@@ -78,13 +85,44 @@ class OpenApiIntegrationTests {
         .andExpect(jsonPath("$.paths['/api/v1/transactions'].post.responses['404']").exists())
         .andExpect(
             jsonPath("$.paths['/api/v1/transactions'].post.responses['404'].description")
-                .value(containsString("inexistente")))
+                .value(containsString("outro usuario")))
         .andExpect(jsonPath("$.paths['/api/v1/categories/{id}'].put.responses['404']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/categories/{id}'].delete.responses['404']").exists())
         .andExpect(
             jsonPath(
                     "$.paths['/api/v1/assistant/conversations/{id}/messages'].get.responses['404']")
                 .exists());
+  }
+
+  @Test
+  @DisplayName("Swagger documenta GET /api/v1/admin/me com 200, 401 e 403 em problem+json")
+  void documentsAdminMe() throws Exception {
+    String adminMe = "$.paths['/api/v1/admin/me'].get.responses";
+    String problemJson = ".content['application/problem+json'].schema['$ref']";
+    String problemDetail = "#/components/schemas/ProblemDetail";
+    String adminMeResponse = "$.components.schemas.AdminMeResponse.properties";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                adminMe + "['200'].content.*.schema['$ref']",
+                org.hamcrest.Matchers.hasItem("#/components/schemas/AdminMeResponse")))
+        .andExpect(jsonPath(adminMe + "['401']" + problemJson).value(problemDetail))
+        .andExpect(jsonPath(adminMe + "['403']" + problemJson).value(problemDetail))
+        .andExpect(jsonPath(adminMe + "['404']" + problemJson).value(problemDetail))
+        .andExpect(jsonPath("$.components.schemas.ProblemDetail.properties.status").exists())
+        .andExpect(jsonPath("$.components.schemas.ProblemDetail.properties.detail").exists())
+        .andExpect(jsonPath(adminMeResponse + ".length()").value(4))
+        .andExpect(jsonPath(adminMeResponse + ".id").exists())
+        .andExpect(jsonPath(adminMeResponse + ".name").exists())
+        .andExpect(jsonPath(adminMeResponse + ".email").exists())
+        .andExpect(jsonPath(adminMeResponse + ".role.enum[0]").value("ADMIN"))
+        .andExpect(
+            jsonPath("$.paths['/api/v1/admin/dashboard/widgets'].get.responses['403']").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/admin/dashboard/widgets'].put.responses['403']").exists());
   }
 
   @Test
