@@ -21,9 +21,10 @@ import org.springframework.security.web.SecurityFilterChain;
  * /api/v1/users/email-availability}). Token ausente ou invalido vira 401 em RFC 7807, no mesmo
  * formato do {@code ApiExceptionHandler}.
  *
- * <p>As metricas do dashboard ({@code /api/v1/admin/metrics/**}) pedem, alem do token, o grupo
- * {@code admin} do Cognito: usuario autenticado fora dele recebe 403, tambem em RFC 7807. As outras
- * rotas de {@code /api/v1/admin} continuam abertas a qualquer autenticado.
+ * <p>{@code /api/v1/admin/**} pede, alem do token, o grupo {@code admin} do Cognito (claim {@code
+ * cognito:groups}, lido pelo {@link
+ * br.com.finup.security.CognitoGroupsJwtAuthenticationConverter}): usuario autenticado fora dele
+ * recebe 403, tambem em RFC 7807. A regra fica so aqui; nenhum controller de admin confere grupo.
  *
  * <p>Com o profile {@code mock-auth}: nada e barrado aqui — a identidade vem dos headers {@code
  * X-Mock-Cognito-*}, e quem devolve 401 quando eles faltam e o {@code
@@ -44,8 +45,8 @@ public class SecurityConfig {
   /** Consulta de e-mail do cadastro: publica so no POST, porque a pessoa ainda nao tem token. */
   private static final String EMAIL_AVAILABILITY_PATH = "/api/v1/users/email-availability";
 
-  /** Metricas do dashboard: so quem esta no grupo {@code admin} do Cognito. */
-  private static final String ADMIN_METRICS_PATH = "/api/v1/admin/metrics/**";
+  /** Painel administrativo (me, widgets, metricas): so quem esta no grupo {@code admin}. */
+  private static final String ADMIN_PATHS = "/api/v1/admin/**";
 
   private static final String ADMIN_AUTHORITY =
       CognitoGroupsJwtAuthenticationConverter.authorityOf("admin");
@@ -64,7 +65,7 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, EMAIL_AVAILABILITY_PATH)
                     .permitAll()
-                    .requestMatchers(ADMIN_METRICS_PATH)
+                    .requestMatchers(ADMIN_PATHS)
                     .hasAuthority(ADMIN_AUTHORITY)
                     .anyRequest()
                     .authenticated())

@@ -3,7 +3,7 @@
   "task": "Metricas do dashboard admin: GET /api/v1/admin/metrics/summary e /user-growth (contrato C3)",
   "objective": "Expor usuarios ativos e clientes novos por periodo (summary) e a serie mensal de cadastros (user-growth), restritos ao grupo admin do Cognito, com agregacao no banco. Receita, custo e plano ficam fora e viram backlog.",
   "decisions": [
-    "Admin = grupo 'admin' do Cognito (claim cognito:groups do access token). Decisao do time. Vale so para /api/v1/admin/metrics/**; /api/v1/admin/dashboard/** continua aberto a qualquer autenticado para nao mudar o contrato ja em uso",
+    "Admin = grupo 'admin' do Cognito (claim cognito:groups do access token). Decisao do time. Na integracao com a develop (2026-10-16) o solicitante decidiu manter o mecanismo desta branch (CognitoGroupsJwtAuthenticationConverter, autoridade GROUP_admin, ProblemDetailAccessDeniedHandler) no lugar do que o PR #46 trouxe (Role, CognitoGroupsAuthoritiesConverter, ROLE_ADMIN). A regra foi ampliada de /api/v1/admin/metrics/** para /api/v1/admin/**, porque o #46 ja protege /admin/me e os widgets com o mesmo criterio e os testes dele (AdminAuthIntegrationTests) exigem 403 nessas rotas",
     "Usuario ativo = criou ao menos uma transacao no periodo (COUNT DISTINCT user_id em transactions por created_at). Decisao do time. Ocorrencias geradas por recorrencia (recurrence_origin_id preenchido) nao contam: nao sao acao do usuario",
     "value e previousValue sao numeros de ponto flutuante, como no contrato C3 (o 12.5 do exemplo so fecha com o changePct de -4.0). Os valores reais saem como contagens (12.0)",
     "previousValue = mesma metrica no periodo imediatamente anterior, de mesmo tamanho. Janelas moveis terminando em agora: atual [now-N, now), anterior [now-2N, now-N)",
@@ -31,14 +31,14 @@
     "src/test/java/br/com/finup/service/AdminMetricsServiceTest.java",
     "src/test/java/br/com/finup/controller/AdminMetricsControllerTest.java",
     "src/test/java/br/com/finup/security/CognitoGroupsJwtAuthenticationConverterTest.java",
+    "src/test/java/br/com/finup/config/SecurityConfigTest.java",
     "src/test/java/br/com/finup/repository/UserRepositoryTest.java",
     "src/test/java/br/com/finup/repository/TransactionRepositoryTest.java",
-    "src/test/java/br/com/finup/config/SecurityConfigTest.java",
     "README.md",
     ".railforge/state.json"
   ],
   "validation": {
-    "mvn clean verify": "passed em 2026-10-15 (349 testes, 0 falhas, spotless ok)",
+    "mvn clean verify": "passed em 2026-10-16 sobre o merge da develop 135dd68 (#46) com o mecanismo de grupo desta branch: 384 testes, 0 falhas, spotless ok. Antes do merge: 349 testes em 2026-10-15",
     "testes novos": "AdminMetricsServiceTest (calculo de periodos, changePct, meses vazios, fuso, parametros invalidos), AdminMetricsControllerTest (200, 400, 401 e 403 dos dois endpoints, com o filtro de seguranca e o conversor de grupos reais), CognitoGroupsJwtAuthenticationConverterTest, e contagens nos repositorios de usuario e transacao (limites do intervalo, recorrencia)",
     "postgres real (profile dev,mock-auth)": "validado em 2026-10-15: summary 30d e 7d, user-growth com 6 e 3 meses e os 400 (period fora do enum ou ausente, months abc, -1 e 25) responderam como esperado; usuarios novos (5) e ativos (1) bateram com a contagem direta em SQL no mesmo banco",
     "cognito real (profile dev)": "validado em 2026-10-15 com access token real de usuario do grupo admin, contra o Postgres local com dados de teste em datas variadas: summary 7d, 30d e 90d e user-growth (6, 3, 1 e 24 meses) bateram com o valor calculado em SQL, incluindo changePct nao nulo, mes sem cadastro e exclusao de ocorrencia gerada por recorrencia; 10 casos de 400; 401 sem token, com token malformado, com assinatura adulterada e com payload adulterado",

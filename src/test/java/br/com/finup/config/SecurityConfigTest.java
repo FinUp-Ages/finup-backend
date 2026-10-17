@@ -46,7 +46,8 @@ import org.springframework.test.web.servlet.MockMvc;
  * controller desligam os filtros de seguranca, entao e aqui que se confirma que eles existem.
  *
  * <p>{@code jwt()} coloca um token ja validado no contexto, sem precisar de chave nem de rede. A
- * validacao dos claims do token em si esta no {@link CognitoConfigTest}.
+ * validacao dos claims do token em si esta no {@link CognitoConfigTest}. As regras de {@code
+ * /api/v1/admin/**}, que dependem dos grupos do token, estao no {@code AdminAuthIntegrationTests}.
  *
  * <p>{@code @ActiveProfiles("test")}: garante que {@code mock-auth} nao esta ativo, mesmo que a
  * maquina de quem roda tenha {@code SPRING_PROFILES_ACTIVE=dev,mock-auth}.
