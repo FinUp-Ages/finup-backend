@@ -60,6 +60,12 @@ class OpenApiIntegrationTests {
         .andExpect(jsonPath("$.paths['/api/v1/categories'].get").exists())
         .andExpect(jsonPath("$.paths['/api/v1/assistant/conversations'].get").exists())
         .andExpect(
+            jsonPath("$.components.schemas.ConversationResponse.properties.title.description")
+                .value(containsString("até 80 caracteres")))
+        .andExpect(
+            jsonPath("$.components.schemas.ConversationResponse.properties.title.description")
+                .value(containsString("antigas sem título")))
+        .andExpect(
             jsonPath("$.paths['/api/v1/assistant/conversations/{id}/messages'].get").exists())
         .andExpect(jsonPath("$.paths['/api/v1/ai/assistant'].post").exists())
         .andExpect(jsonPath("$.paths['/api/v1/ai/assistant'].post.parameters").doesNotExist())
