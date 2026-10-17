@@ -7,7 +7,10 @@ import br.com.finup.model.RecurrenceFrequency;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -188,6 +191,81 @@ class TransactionRepositoryTest {
 
     assertThatThrownBy(() -> insertGeneratedOccurrence(origin, LocalDate.of(2026, 10, 5)))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  @DisplayName("conta usuarios distintos no intervalo [from, to): inicio entra, fim nao")
+  void countsDistinctActiveUsersInHalfOpenInterval() {
+    Instant from = Instant.parse("2026-09-15T15:00:00Z");
+    Instant to = Instant.parse("2026-10-15T15:00:00Z");
+    UUID repeatsInside = UUID.randomUUID();
+    UUID exactlyAtFrom = UUID.randomUUID();
+    UUID exactlyAtTo = UUID.randomUUID();
+    UUID justBefore = UUID.randomUUID();
+
+    insertUserTransaction(repeatsInside, Instant.parse("2026-09-20T10:00:00Z"));
+    insertUserTransaction(repeatsInside, Instant.parse("2026-10-01T10:00:00Z"));
+    insertUserTransaction(exactlyAtFrom, from);
+    insertUserTransaction(exactlyAtTo, to);
+    insertUserTransaction(justBefore, from.minusSeconds(1));
+
+    assertThat(transactionRepository.countActiveUsersBetween(from, to)).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("ocorrencia gerada por recorrencia nao deixa o usuario ativo")
+  void generatedOccurrencesDoNotMakeAUserActive() {
+    Instant from = Instant.parse("2026-09-15T15:00:00Z");
+    Instant to = Instant.parse("2026-10-15T15:00:00Z");
+    Instant inside = Instant.parse("2026-10-01T10:00:00Z");
+    UUID onlyGenerated = UUID.randomUUID();
+    UUID generatedAndOwn = UUID.randomUUID();
+
+    insertGeneratedTransaction(onlyGenerated, inside);
+    insertGeneratedTransaction(generatedAndOwn, inside);
+    insertUserTransaction(generatedAndOwn, inside);
+
+    assertThat(transactionRepository.countActiveUsersBetween(from, to)).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("sem transacoes no intervalo, nenhum usuario ativo")
+  void countsZeroWhenThereAreNoTransactionsInTheInterval() {
+    insertUserTransaction(UUID.randomUUID(), Instant.parse("2026-01-10T10:00:00Z"));
+
+    assertThat(
+            transactionRepository.countActiveUsersBetween(
+                Instant.parse("2026-09-15T15:00:00Z"), Instant.parse("2026-10-15T15:00:00Z")))
+        .isZero();
+  }
+
+  /** Transacao feita pelo usuario, com o {@code created_at} escolhido pelo teste. */
+  private void insertUserTransaction(UUID userId, Instant createdAt) {
+    OffsetDateTime at = OffsetDateTime.ofInstant(createdAt, ZoneOffset.UTC);
+    jdbcTemplate.update(
+        "INSERT INTO transactions (id, user_id, category_id, type, description, amount,"
+            + " transaction_date, is_recurring, created_at, updated_at)"
+            + " VALUES (?, ?, ?, 'EXPENSE', 'Mercado', 10.00, DATE '2026-09-01', FALSE, ?, ?)",
+        UUID.randomUUID(),
+        userId,
+        UUID.randomUUID(),
+        at,
+        at);
+  }
+
+  /** Ocorrencia gerada pela serie recorrente: tem {@code recurrence_origin_id}. */
+  private void insertGeneratedTransaction(UUID userId, Instant createdAt) {
+    OffsetDateTime at = OffsetDateTime.ofInstant(createdAt, ZoneOffset.UTC);
+    jdbcTemplate.update(
+        "INSERT INTO transactions (id, user_id, category_id, type, description, amount,"
+            + " transaction_date, is_recurring, recurrence_origin_id, created_at, updated_at)"
+            + " VALUES (?, ?, ?, 'EXPENSE', 'Conta de luz', 10.00, DATE '2026-09-05', FALSE, ?, ?, ?)",
+        UUID.randomUUID(),
+        userId,
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        at,
+        at);
   }
 
   private Transaction monthlySeries(LocalDate transactionDate) {

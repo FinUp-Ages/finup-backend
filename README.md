@@ -143,10 +143,15 @@ consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o b
 | `GET /api/v1/assistant/conversations` | lista o histórico de conversas do usuário, ordenado pela atualização mais recente |
 | `GET /api/v1/assistant/conversations/{id}/messages` | lista as mensagens de uma conversa do usuário em ordem cronológica |
 | `GET /api/v1/admin/me` | **só grupo `admin`.** Devolve o administrador autenticado: `{"id", "name", "email", "role": "ADMIN"}` |
+| `GET /api/v1/admin/metrics/summary?period=7d\|30d\|90d` | **só grupo `admin`.** Usuários ativos e novos no período, com o período anterior e a variação em % |
+| `GET /api/v1/admin/metrics/user-growth?months=6` | **só grupo `admin`.** Cadastros por mês (1 a 24 meses, padrão 6), com o acumulado e o crescimento em % |
 
-Tudo sob `/api/v1/admin/**` — o `GET /api/v1/admin/me` e os widgets do dashboard — exige que o
-usuário esteja no grupo `admin` do Cognito. Token válido de quem não está no grupo responde `403`.
-Veja [Painel administrativo](#painel-administrativo-grupo-admin-e-app-client-próprio).
+Tudo sob `/api/v1/admin/**` — o `GET /api/v1/admin/me`, as métricas e os widgets do dashboard — exige
+que o usuário esteja no grupo `admin` do Cognito. Token válido de quem não está no grupo responde
+`403`. Veja [Painel administrativo](#painel-administrativo-grupo-admin-e-app-client-próprio).
+
+Nas métricas, "ativo" é quem registrou ao menos uma transação no período (ocorrência gerada por
+recorrência não conta), e os meses seguem o fuso de Brasília.
 
 Categoria e meio de pagamento referenciados por uma transação precisam ser do
 próprio usuário — categoria padrão do sistema também vale. Referência de outro usuário responde
