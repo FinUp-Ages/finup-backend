@@ -68,6 +68,12 @@
       <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
       <version>${springdoc.version}</version>
     </dependency>
+    <!-- Scalar API Reference em /docs: le o contrato gerado pelo springdoc -->
+    <dependency>
+      <groupId>com.scalar.maven</groupId>
+      <artifactId>scalar-webmvc</artifactId>
+      <version>0.6.74</version>
+    </dependency>
 
       <dependency>
         <groupId>org.springframework.boot</groupId>
