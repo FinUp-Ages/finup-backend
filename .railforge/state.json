@@ -1,33 +1,35 @@
 {
   "stage": "REVIEWING",
-  "task": "Disponibilizar Scalar fora de prod e desativar a documentacao em prod.",
-  "objective": "Publicar a referencia Scalar em /docs fora de prod, mantendo o contrato OpenAPI e o Swagger UI, e garantir que /v3/api-docs, /swagger-ui.html e /docs retornem 404 no perfil prod.",
-  "decisions": [
-    "Swagger UI mantido junto com o Scalar: os roteiros do README (Authorize, teste de admin) usam o Swagger UI. Por isso continuam o springdoc-openapi-starter-webmvc-ui e o teste de redirect de /swagger-ui.html",
-    "@Import(ScalarWebMvcAutoConfiguration.class) mantido no OpenApiConfig: sem ele, /docs responde 404 (validado em 2026-10-16), embora o jar registre a autoconfiguracao em AutoConfiguration.imports",
-    "spring-boot-devtools fora deste PR, por estar fora do escopo"
-  ],
+  "task": "[Backend] Fixar o profile dos testes de integracao",
+  "objective": "Tornar clean verify independente de SPRING_PROFILES_ACTIVE no .env local.",
   "files_in_scope": [
-    "pom.xml",
-    "src/main/java/br/com/finup/config/OpenApiConfig.java",
-    "src/main/java/br/com/finup/config/SecurityConfig.java",
-    "src/main/resources/application.yml",
     "src/test/java/br/com/finup/OpenApiIntegrationTests.java",
-    "src/test/java/br/com/finup/ProdDocumentationIntegrationTests.java",
-    "README.md",
+    "src/test/java/br/com/finup/FinUpApplicationTests.java",
     ".railforge/state.json"
   ],
+  "decisions": [
+    "Fixar test nos dois SpringBootTest sem profile; preservar os testes intencionais de mock-auth e todas as assercoes.",
+    "Preservar todas as alteracoes de codigo de origin/develop, incluindo novas assercoes OpenAPI e testes de autorizacao admin."
+  ],
+  "plan": [
+    "Atualizar develop e criar branch limpa a partir de 135dd68.",
+    "Reaplicar somente ActiveProfiles(test) nos dois testes.",
+    "Conferir equivalencia com o codigo ja validado nos tres cenarios e revisar diff."
+  ],
   "validation": {
-    "mvn clean verify": "passed em 2026-10-16 apos o merge da develop em 135dd68 (319 testes, 0 falhas, spotless ok)",
-    "fora de prod": "/docs responde 200 (Scalar), /v3/api-docs responde 200 e /swagger-ui.html redireciona para a interface (OpenApiIntegrationTests)",
-    "prod": "/docs, /v3/api-docs e /swagger-ui.html respondem 404 (ProdDocumentationIntegrationTests)"
+    "clean verify / .env dev,mock-auth": "passed em 2026-10-18: 317 testes, 0 falhas, 0 erros, 0 ignorados; Spotless aprovado",
+    "clean verify / .env dev": "passed em 2026-10-18: 317 testes, 0 falhas, 0 erros, 0 ignorados; Spotless aprovado",
+    "clean verify / sem .env": "passed em 2026-10-18: 317 testes, 0 falhas, 0 erros, 0 ignorados; Spotless aprovado",
+    "environment": "Windows, Java 21.0.1, Maven Wrapper 3.9.15. Tres cenarios validados em 2026-10-18 sobre 135dd68 mais a correcao. Apos reorganizar a branch, todos os arquivos versionados foram comparados com a copia validada: conteudo identico, exceto este registro; finais de linha normalizados. Byte Buddy por -DargLine=-javaagent devido ao sandbox. .env original preservado.",
+    "diff": "Somente os dois imports, as duas anotacoes ActiveProfiles(test) e este registro diferem da develop atualizada. Nenhum merge pendente.",
+    "merge da develop em 3caed7f": "passed em 2026-10-19: clean verify sem .env e com .env dev,mock-auth, 319 testes, 0 falhas, 0 erros, 0 ignorados; Spotless aprovado. Na develop sem a correcao, o mesmo .env dev,mock-auth reprova o OpenApiIntegrationTests (bearerAuth.scheme ausente)"
   },
-  "review": "Branch atualizada com a develop em 2026-10-16, com os conflitos de state.json e OpenApiIntegrationTests resolvidos (mantidos os testes do #41 e do #46, mais o do Scalar). Ajustes do review aplicados: devtools removido, comentarios do pom e do application.yml corrigidos e README voltando a listar o Swagger UI. Pendente: aprovacao e merge.",
-  "updated_at": "2026-10-16",
+  "updated_at": "2026-10-19",
+  "review": "Reorganizacao em 2026-10-18: merge anterior abortado, branch antiga preservada em fix/integration-test-profile-backup-20261018. develop atualizada por fast-forward e fix/integration-test-profile recriada a partir dela. Em 2026-10-19, apos o merge do #40, a develop foi mesclada de novo na branch: conflito so no state.json, mantido o registro desta tarefa (as open_questions da develop ja estavam aqui). Codigo revisado sem pedidos de mudanca. Pendente: aprovacao e merge.",
   "open_questions": [
-    "Em cada ambiente implantado: preencher COGNITO_ADMIN_CLIENT_ID e incluir a origem do painel em CORS_ALLOWED_ORIGINS. Se houver outro User Pool (ex.: producao), conferir nele o grupo 'admin' e o cliente do painel. Passo a passo no README",
-    "Confirmar com o time do painel que o primeiro acesso chama POST /api/v1/users antes de GET /api/v1/admin/me. Se o painel nao puder fazer isso, a alternativa e o backend criar o usuario local no primeiro acesso de um administrador",
-    "Consumidor: GET e PUT /api/v1/admin/dashboard/widgets passam a responder 403 para quem nao esta no grupo admin. Antes qualquer usuario autenticado acessava",
-    "Issues #35 e #36 continuam abertas citando o isCurrentUserAdmin() removido pelo #38: a #35 ficou sem objeto e a #36 precisa ser reescrita em termos de papel"
+    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Em cada ambiente implantado: preencher COGNITO_ADMIN_CLIENT_ID e incluir a origem do painel em CORS_ALLOWED_ORIGINS. Se houver outro User Pool (ex.: producao), conferir nele o grupo 'admin' e o cliente do painel. Passo a passo no README",
+    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Confirmar com o time do painel que o primeiro acesso chama POST /api/v1/users antes de GET /api/v1/admin/me. Se o painel nao puder fazer isso, a alternativa e o backend criar o usuario local no primeiro acesso de um administrador",
+    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Consumidor: GET e PUT /api/v1/admin/dashboard/widgets passam a responder 403 para quem nao esta no grupo admin. Antes qualquer usuario autenticado acessava",
+    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Issues #35 e #36 continuam abertas citando o isCurrentUserAdmin() removido pelo #38: a #35 ficou sem objeto e a #36 precisa ser reescrita em termos de papel"
   ]
 }
