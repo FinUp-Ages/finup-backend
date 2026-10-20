@@ -27,9 +27,15 @@
     "titles": "Testes aprovados para titulo salvo e listado, preservacao em turnos seguintes, conversas antigas nulas, limite 80/81, espacos Unicode, emojis e texto inutilizavel sem impedir criacao.",
     "contracts_and_failures": "Service, controller, repositorio e OpenAPI aprovados: autorizacao por dono, contrato Swagger atualizado e falha de historico sem derrubar resposta. Titulo local sem chamada externa ou timeout.",
     "diff_check": "git diff --check passou em 2026-10-17; diff de implementacao, contrato e testes revisado.",
-    "limits": "Validacao local com dubles e H2, sem AWS real ou execucao do app contra esta build. Resultados da validacao anterior preservados nesta restauracao do estado."
+    "limits": "Validacao local com dubles e H2, sem AWS real ou execucao do app contra esta build. Resultados da validacao anterior preservados nesta restauracao do estado.",
+    "merge da develop em 8bb42e4": "passed em 2026-10-19: clean verify sem .env, 321 testes, 0 falhas, 0 erros, 0 ignorados; Spotless aprovado. Com .env dev,mock-auth, OpenApiIntegrationTests, FinUpApplicationTests e ConversationServiceTest passam (16 testes). Diff contra a develop: so os 5 arquivos da tarefa e este registro; git diff --check ok"
   },
-  "review": "Criterios atendidos pela abordagem aprovada e validacao automatizada. Estado da tarefa restaurado apos substituicao pelo registro da develop. Sem commit ou PR.",
-  "open_questions": [],
-  "updated_at": "2026-10-17"
+  "review": "Criterios atendidos pela abordagem aprovada e validacao automatizada. Em 2026-10-19, apos os merges do #40 e do #49, a develop foi mesclada na branch: conflito so no state.json, mantido o registro desta tarefa e acrescentadas as open_questions herdadas da develop. Codigo revisado sem pedidos de mudanca. Pendente: aprovacao e merge.",
+  "open_questions": [
+    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Em cada ambiente implantado: preencher COGNITO_ADMIN_CLIENT_ID e incluir a origem do painel em CORS_ALLOWED_ORIGINS. Se houver outro User Pool (ex.: producao), conferir nele o grupo 'admin' e o cliente do painel. Passo a passo no README",
+    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Confirmar com o time do painel que o primeiro acesso chama POST /api/v1/users antes de GET /api/v1/admin/me. Se o painel nao puder fazer isso, a alternativa e o backend criar o usuario local no primeiro acesso de um administrador",
+    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Consumidor: GET e PUT /api/v1/admin/dashboard/widgets passam a responder 403 para quem nao esta no grupo admin. Antes qualquer usuario autenticado acessava",
+    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Issues #35 e #36 continuam abertas citando o isCurrentUserAdmin() removido pelo #38: a #35 ficou sem objeto e a #36 precisa ser reescrita em termos de papel"
+  ],
+  "updated_at": "2026-10-19"
 }

@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -30,6 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
       "finup.cognito.user-pool-id=us-east-1_TestPool",
       "finup.cognito.client-id=test-client"
     })
+@ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY)
 @AutoConfigureMockMvc
 class OpenApiIntegrationTests {
@@ -138,5 +140,11 @@ class OpenApiIntegrationTests {
         .perform(get("/swagger-ui.html"))
         .andExpect(status().is3xxRedirection())
         .andExpect(header().string("Location", containsString("/swagger-ui/index.html")));
+  }
+
+  @Test
+  @DisplayName("Scalar disponibiliza a referencia da API")
+  void scalarReferenceIsAvailable() throws Exception {
+    mockMvc.perform(get("/docs")).andExpect(status().isOk());
   }
 }
