@@ -2,6 +2,7 @@ package br.com.finup.controller;
 
 import br.com.finup.dto.StudyTrackCategoryResponse;
 import br.com.finup.dto.StudyTrackQuestionResponse;
+import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.StudyTrackQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -25,18 +26,28 @@ import org.springframework.web.bind.annotation.RestController;
 public class StudyTrackController {
 
   private final StudyTrackQueryService studyTrackQueryService;
+  private final AuthenticatedIdentityResolver authenticatedIdentityResolver;
 
-  public StudyTrackController(StudyTrackQueryService studyTrackQueryService) {
+  public StudyTrackController(
+      StudyTrackQueryService studyTrackQueryService,
+      AuthenticatedIdentityResolver authenticatedIdentityResolver) {
     this.studyTrackQueryService = studyTrackQueryService;
+    this.authenticatedIdentityResolver = authenticatedIdentityResolver;
   }
 
   @GetMapping("/categories")
   @Operation(
-    summary = "Lista as categorias da trilha de estudos",
-    description = "Retorna as categorias da trilha de estudos do usuário autenticado"
-  )
-  @ApiResponse(responseCode = "200", description = "Categorias retornadas com sucesso")
+      summary = "Lista as categorias da trilha de estudos",
+      description = "Retorna as categorias disponíveis para o usuário autenticado")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Categorias retornadas com sucesso"),
+    @ApiResponse(
+        responseCode = "401",
+        description = "Identidade autenticada ausente ou incompleta",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  })
   public ResponseEntity<List<StudyTrackCategoryResponse>> findCategories() {
+    authenticatedIdentityResolver.resolveCurrent();
     return ResponseEntity.ok(studyTrackQueryService.findCategories());
   }
 
@@ -48,12 +59,17 @@ public class StudyTrackController {
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Perguntas publicadas retornadas com sucesso"),
     @ApiResponse(
+        responseCode = "401",
+        description = "Identidade autenticada ausente ou incompleta",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
         responseCode = "404",
         description = "Categoria não encontrada",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   })
   public ResponseEntity<List<StudyTrackQuestionResponse>> findPublishedQuestions(
       @PathVariable UUID id) {
+    authenticatedIdentityResolver.resolveCurrent();
     return ResponseEntity.ok(studyTrackQueryService.findPublishedQuestions(id));
   }
 }

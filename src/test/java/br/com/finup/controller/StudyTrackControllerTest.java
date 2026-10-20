@@ -8,9 +8,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import br.com.finup.dto.StudyTrackCategoryResponse;
 import br.com.finup.dto.StudyTrackQuestionResponse;
 import br.com.finup.exception.CategoryNotFoundException;
+import br.com.finup.model.QuestionType;
+import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.StudyTrackQueryService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,16 +29,17 @@ class StudyTrackControllerTest {
 
   @Autowired private MockMvc mockMvc;
 
-  @Autowired private ObjectMapper objectMapper;
-
   @MockitoBean private StudyTrackQueryService studyTrackQueryService;
+
+  @MockitoBean private AuthenticatedIdentityResolver authenticatedIdentityResolver;
 
   @Test
   @DisplayName("GET categories devolve as categorias disponibilizadas pelo service")
   void findCategoriesReturns200() throws Exception {
     UUID categoryId = UUID.randomUUID();
     when(studyTrackQueryService.findCategories())
-        .thenReturn(List.of(new StudyTrackCategoryResponse(categoryId, "Investimentos")));
+        .thenReturn(
+            List.of(new StudyTrackCategoryResponse(categoryId, "Investimentos", "Renda fixa", 0)));
 
     mockMvc
         .perform(get("/api/v1/study-tracks/categories"))
@@ -52,7 +55,10 @@ class StudyTrackControllerTest {
     UUID questionId = UUID.randomUUID();
     StudyTrackQuestionResponse question =
         new StudyTrackQuestionResponse(
-            questionId, objectMapper.readTree("{\"prompt\":\"O que é uma ação?\"}"));
+            questionId,
+            QuestionType.MULTIPLE_CHOICE,
+            Map.of("prompt", "O que é uma ação?", "correctOptionId", "A"),
+            null);
     when(studyTrackQueryService.findPublishedQuestions(categoryId)).thenReturn(List.of(question));
 
     mockMvc
@@ -60,6 +66,7 @@ class StudyTrackControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].id").value(questionId.toString()))
         .andExpect(jsonPath("$[0].published.prompt").value("O que é uma ação?"))
+        .andExpect(jsonPath("$[0].published.correctOptionId").value("A"))
         .andExpect(jsonPath("$[0].draft").doesNotExist());
   }
 
