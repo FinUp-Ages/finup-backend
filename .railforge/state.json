@@ -1,20 +1,40 @@
 {
   "stage": "REVIEWING",
-  "task": "Definir e consolidar titulos das conversas do assistente",
-  "objective": "Persistir title de novas conversas sem comprometer o envio da mensagem e documentar quando pode vir null",
+  "task": "Metricas do dashboard admin: GET /api/v1/admin/metrics/summary e /user-growth (contrato C3)",
+  "objective": "Expor usuarios ativos e clientes novos por periodo (summary) e a serie mensal de cadastros (user-growth), restritos ao grupo admin do Cognito, com agregacao no banco. Receita, custo e plano ficam fora e viram backlog.",
   "decisions": [
-    "Fluxo implementado: POST /api/v1/ai/assistant; consumidor: menu de historico via GET /api/v1/assistant/conversations.",
-    "Decisao do solicitante em 2026-10-17: recorte normalizado da primeira mensagem, ate 80 pontos de codigo incluindo reticencias; sem chamada extra ao Bedrock.",
-    "Titulo preservado nos turnos seguintes. Conversas antigas sem titulo permanecem nulas, inclusive quando recebem novos turnos. Sem backfill ou migracao.",
-    "Texto ausente ou vazio apos normalizacao deixa o titulo nulo sem impedir a criacao da conversa; app deve manter fallback.",
-    "Coluna title existente suporta o limite. Autorizacao por dono preservada. Historico gravado apos a acao, em melhor esforco."
+    "Admin = grupo 'admin' do Cognito (claim cognito:groups do access token). Decisao do time. Na integracao com a develop (2026-10-16) o solicitante decidiu manter o mecanismo desta branch (CognitoGroupsJwtAuthenticationConverter, autoridade GROUP_admin, ProblemDetailAccessDeniedHandler) no lugar do que o PR #46 trouxe (Role, CognitoGroupsAuthoritiesConverter, ROLE_ADMIN). A regra foi ampliada de /api/v1/admin/metrics/** para /api/v1/admin/**, porque o #46 ja protege /admin/me e os widgets com o mesmo criterio e os testes dele (AdminAuthIntegrationTests) exigem 403 nessas rotas",
+    "Usuario ativo = criou ao menos uma transacao no periodo (COUNT DISTINCT user_id em transactions por created_at). Decisao do time. Ocorrencias geradas por recorrencia (recurrence_origin_id preenchido) nao contam: nao sao acao do usuario",
+    "value e previousValue sao numeros de ponto flutuante, como no contrato C3 (o 12.5 do exemplo so fecha com o changePct de -4.0). Os valores reais saem como contagens (12.0)",
+    "previousValue = mesma metrica no periodo imediatamente anterior, de mesmo tamanho. Janelas moveis terminando em agora: atual [now-N, now), anterior [now-2N, now-N)",
+    "changePct = (value - previousValue) / previousValue * 100, 1 casa, HALF_UP. Com previousValue = 0 devolve 0.0 (sem base de comparacao); omitir o campo quebraria o contrato",
+    "user-growth: months padrao 6, aceito de 1 a 24, o ultimo ponto e o mes corrente (parcial). totalUsers = cadastros acumulados ate o fim do mes. growthPct = (totalUsers do ultimo ponto - total antes do primeiro mes) / total antes do primeiro mes * 100; 0.0 se nao havia ninguem antes. O contrato nao define growthPct: esta e a leitura adotada",
+    "Meses e janelas usam o Clock da aplicacao (America/Sao_Paulo), nao UTC, para bater com o dia do usuario",
+    "Parametros invalidos (period fora de 7d|30d|90d ou ausente, months nao numerico, negativo, zero ou acima de 24) viram 400 com mensagem especifica via excecao de negocio; o handler generico do Spring nao e alterado",
+    "403 com ProblemDetail (mesmo formato do 401). Profile mock-auth continua sem barrar nada, como o resto da API",
+    "Sem indice novo em created_at: o schema nao tem migrations e a tabela e pequena; fica como risco registrado"
   ],
   "files_in_scope": [
-    "src/main/java/br/com/finup/service/ConversationService.java",
-    "src/main/java/br/com/finup/model/Conversation.java",
-    "src/main/java/br/com/finup/dto/ConversationResponse.java",
-    "src/test/java/br/com/finup/service/ConversationServiceTest.java",
-    "src/test/java/br/com/finup/OpenApiIntegrationTests.java",
+    "src/main/java/br/com/finup/controller/AdminMetricsController.java",
+    "src/main/java/br/com/finup/service/AdminMetricsService.java",
+    "src/main/java/br/com/finup/model/MetricsPeriod.java",
+    "src/main/java/br/com/finup/dto/MetricValueResponse.java",
+    "src/main/java/br/com/finup/dto/MetricsSummaryResponse.java",
+    "src/main/java/br/com/finup/dto/UserGrowthPointResponse.java",
+    "src/main/java/br/com/finup/dto/UserGrowthResponse.java",
+    "src/main/java/br/com/finup/exception/InvalidMetricsParameterException.java",
+    "src/main/java/br/com/finup/repository/UserRepository.java",
+    "src/main/java/br/com/finup/repository/TransactionRepository.java",
+    "src/main/java/br/com/finup/security/CognitoGroupsJwtAuthenticationConverter.java",
+    "src/main/java/br/com/finup/security/ProblemDetailAccessDeniedHandler.java",
+    "src/main/java/br/com/finup/config/SecurityConfig.java",
+    "src/test/java/br/com/finup/service/AdminMetricsServiceTest.java",
+    "src/test/java/br/com/finup/controller/AdminMetricsControllerTest.java",
+    "src/test/java/br/com/finup/security/CognitoGroupsJwtAuthenticationConverterTest.java",
+    "src/test/java/br/com/finup/config/SecurityConfigTest.java",
+    "src/test/java/br/com/finup/repository/UserRepositoryTest.java",
+    "src/test/java/br/com/finup/repository/TransactionRepositoryTest.java",
+    "README.md",
     ".railforge/state.json"
   ],
   "plan": [
@@ -23,19 +43,18 @@
     "Executar Maven verify, revisar diff e atualizar e reler estado."
   ],
   "validation": {
-    "maven_verify": "BUILD SUCCESS em 2026-10-17: 284 testes, zero falhas, erros ou ignorados; compilacao, empacotamento e Spotless aprovados apos corrigir quebra de linha no Javadoc de ConversationService.",
-    "titles": "Testes aprovados para titulo salvo e listado, preservacao em turnos seguintes, conversas antigas nulas, limite 80/81, espacos Unicode, emojis e texto inutilizavel sem impedir criacao.",
-    "contracts_and_failures": "Service, controller, repositorio e OpenAPI aprovados: autorizacao por dono, contrato Swagger atualizado e falha de historico sem derrubar resposta. Titulo local sem chamada externa ou timeout.",
-    "diff_check": "git diff --check passou em 2026-10-17; diff de implementacao, contrato e testes revisado.",
-    "limits": "Validacao local com dubles e H2, sem AWS real ou execucao do app contra esta build. Resultados da validacao anterior preservados nesta restauracao do estado.",
-    "merge da develop em 8bb42e4": "passed em 2026-10-19: clean verify sem .env, 321 testes, 0 falhas, 0 erros, 0 ignorados; Spotless aprovado. Com .env dev,mock-auth, OpenApiIntegrationTests, FinUpApplicationTests e ConversationServiceTest passam (16 testes). Diff contra a develop: so os 5 arquivos da tarefa e este registro; git diff --check ok"
+    "mvn clean verify": "passed em 2026-10-16 sobre o merge da develop 135dd68 (#46) com o mecanismo de grupo desta branch: 384 testes, 0 falhas, spotless ok. Antes do merge: 349 testes em 2026-10-15",
+    "testes novos": "AdminMetricsServiceTest (calculo de periodos, changePct, meses vazios, fuso, parametros invalidos), AdminMetricsControllerTest (200, 400, 401 e 403 dos dois endpoints, com o filtro de seguranca e o conversor de grupos reais), CognitoGroupsJwtAuthenticationConverterTest, e contagens nos repositorios de usuario e transacao (limites do intervalo, recorrencia)",
+    "postgres real (profile dev,mock-auth)": "validado em 2026-10-15: summary 30d e 7d, user-growth com 6 e 3 meses e os 400 (period fora do enum ou ausente, months abc, -1 e 25) responderam como esperado; usuarios novos (5) e ativos (1) bateram com a contagem direta em SQL no mesmo banco",
+    "cognito real (profile dev)": "validado em 2026-10-15 com access token real de usuario do grupo admin, contra o Postgres local com dados de teste em datas variadas: summary 7d, 30d e 90d e user-growth (6, 3, 1 e 24 meses) bateram com o valor calculado em SQL, incluindo changePct nao nulo, mes sem cadastro e exclusao de ocorrencia gerada por recorrencia; 10 casos de 400; 401 sem token, com token malformado, com assinatura adulterada e com payload adulterado",
+    "cognito real apos o merge com a develop (#46)": "revalidado em 2026-10-16 com access token real do grupo admin, sobre a branch ja mesclada: summary (7d, 30d, 90d), user-growth (6, 3, 1 e 24 meses), 10 casos de 400 e 4 de 401 (inclusive assinatura e payload adulterados) conforme o esperado em SQL; /admin/me e /admin/dashboard/widgets 200 com admin e 401 sem token; /users/me e /categories 200. O esperado de newUsers 7d mudou de 6/1 para 5/1 porque a janela e movel e um dia se passou (confirmado em SQL), sem relacao com o codigo",
+    "nao validado": "403 com token real de usuario fora do grupo admin (coberto so por teste com decoder JWT simulado); indice em created_at e desempenho com volume real; payload com o front do dashboard"
   },
-  "review": "Criterios atendidos pela abordagem aprovada e validacao automatizada. Em 2026-10-19, apos os merges do #40 e do #49, a develop foi mesclada na branch: conflito so no state.json, mantido o registro desta tarefa e acrescentadas as open_questions herdadas da develop. Codigo revisado sem pedidos de mudanca. Pendente: aprovacao e merge.",
+  "review": "Implementacao completa e validada em 2026-10-15; diff revisado. Commit e push autorizados pelo solicitante em 2026-10-15. PR contra a develop a ser aberto pelo solicitante (gh nao esta instalado). Pendente: validar o payload com o front, aprovacao e merge do PR, e confirmar o grupo admin nos User Pools de homologacao e producao. Dados de teste do banco local removidos.",
+  "updated_at": "2026-10-16",
   "open_questions": [
-    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Em cada ambiente implantado: preencher COGNITO_ADMIN_CLIENT_ID e incluir a origem do painel em CORS_ALLOWED_ORIGINS. Se houver outro User Pool (ex.: producao), conferir nele o grupo 'admin' e o cliente do painel. Passo a passo no README",
-    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Confirmar com o time do painel que o primeiro acesso chama POST /api/v1/users antes de GET /api/v1/admin/me. Se o painel nao puder fazer isso, a alternativa e o backend criar o usuario local no primeiro acesso de um administrador",
-    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Consumidor: GET e PUT /api/v1/admin/dashboard/widgets passam a responder 403 para quem nao esta no grupo admin. Antes qualquer usuario autenticado acessava",
-    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Issues #35 e #36 continuam abertas citando o isCurrentUserAdmin() removido pelo #38: a #35 ficou sem objeto e a #36 precisa ser reescrita em termos de papel"
-  ],
-  "updated_at": "2026-10-19"
+    "Definicao de growthPct e de changePct com previousValue = 0 sao leituras minhas do contrato C3: confirmar com o front do dashboard",
+    "O grupo 'admin' ja existe no User Pool de desenvolvimento (confirmado com token real em 2026-10-15); confirmar o mesmo nos User Pools de homologacao e producao antes do deploy, e os admins precisam logar de novo para o token trazer o claim",
+    "Backlog separado a registrar: receita, custo operacional e plano"
+  ]
 }
