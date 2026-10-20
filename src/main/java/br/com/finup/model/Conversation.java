@@ -18,10 +18,9 @@ import org.hibernate.annotations.UuidGenerator;
  * Conversa do usuário com o assistente.
  *
  * <p>Cobre o necessário para listar o histórico ({@code GET /api/v1/assistant/conversations}).
- * Criação de conversas e registro de mensagens ainda não existem no sistema, então {@code title} é
- * preenchido por quem implementar essa parte depois. A estratégia de título (recorte da primeira
- * mensagem do usuário vs. resumo curto pedido ao próprio modelo) depende de validação com o time e
- * fica fora do escopo desta feature.
+ * Novas conversas recebem um recorte normalizado da primeira mensagem do usuário, com até 80
+ * caracteres, sem chamada extra ao modelo. O título não muda nos turnos seguintes. Conversas
+ * antigas sem título permanecem com {@code title} nulo.
  */
 @Entity
 @Table(name = "conversations")

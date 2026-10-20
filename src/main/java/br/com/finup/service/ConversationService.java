@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ConversationService {
 
-  private static final int MAX_TITLE = 60;
+  private static final int MAX_TITLE = 80;
 
   private final ConversationRepository conversationRepository;
   private final UserService userService;
@@ -112,13 +112,20 @@ public class ConversationService {
   }
 
   /**
-   * Título provisório: recorte da primeira mensagem. A estratégia definitiva (recorte vs. resumo
-   * pedido ao modelo) segue pendente com o time.
+   * Recorte local da primeira mensagem, sem chamada ao modelo: até 80 pontos de código, incluindo
+   * reticências. Entradas ausentes ou vazias deixam o título nulo sem impedir a criação da
+   * conversa.
    */
   static String titleFrom(String firstMessage) {
-    String text = firstMessage.strip().replaceAll("\\s+", " ");
-    return text.length() <= MAX_TITLE
+    if (firstMessage == null) {
+      return null;
+    }
+    String text = firstMessage.replaceAll("(?U)\\s+", " ").strip();
+    if (text.isEmpty()) {
+      return null;
+    }
+    return text.codePointCount(0, text.length()) <= MAX_TITLE
         ? text
-        : text.substring(0, MAX_TITLE - 1).stripTrailing() + "…";
+        : text.substring(0, text.offsetByCodePoints(0, MAX_TITLE - 1)).stripTrailing() + "…";
   }
 }
