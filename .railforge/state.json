@@ -37,6 +37,11 @@
     "README.md",
     ".railforge/state.json"
   ],
+  "plan": [
+    "Consolidar estrategia aprovada no fluxo existente e atualizar contrato e documentacao.",
+    "Validar titulo salvo e listado, normalizacao, limite, Unicode, turnos seguintes, conversas antigas e texto inutilizavel.",
+    "Executar Maven verify, revisar diff e atualizar e reler estado."
+  ],
   "validation": {
     "mvn clean verify": "passed em 2026-10-16 sobre o merge da develop 135dd68 (#46) com o mecanismo de grupo desta branch: 384 testes, 0 falhas, spotless ok. Antes do merge: 349 testes em 2026-10-15",
     "testes novos": "AdminMetricsServiceTest (calculo de periodos, changePct, meses vazios, fuso, parametros invalidos), AdminMetricsControllerTest (200, 400, 401 e 403 dos dois endpoints, com o filtro de seguranca e o conversor de grupos reais), CognitoGroupsJwtAuthenticationConverterTest, e contagens nos repositorios de usuario e transacao (limites do intervalo, recorrencia)",

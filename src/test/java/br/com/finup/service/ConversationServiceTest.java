@@ -94,6 +94,18 @@ class ConversationServiceTest {
         conversationService.recordTurn(
             user, null, "gastei 7 reais na pucrs", "REGISTER_TRANSACTION", "Despesa registrada.");
 
+    org.mockito.ArgumentCaptor<Conversation> saved =
+        org.mockito.ArgumentCaptor.forClass(Conversation.class);
+    verify(conversationRepository, org.mockito.Mockito.atLeastOnce()).save(saved.capture());
+    Conversation conversation = saved.getValue();
+    assertThat(conversation.getTitle()).isEqualTo("gastei 7 reais na pucrs");
+    when(userService.findByAuthenticatedIdentity(IDENTITY)).thenReturn(user);
+    when(conversationRepository.findByUserOrderByUpdatedAtDesc(user))
+        .thenReturn(List.of(conversation));
+    assertThat(conversationService.findHistory(IDENTITY))
+        .extracting(ConversationResponse::title)
+        .containsExactly("gastei 7 reais na pucrs");
+
     List<ChatMessage> transcript = transcriptStore.read(user.getId(), id);
     assertThat(transcript)
         .extracting(ChatMessage::role, ChatMessage::text, ChatMessage::action)
@@ -119,6 +131,7 @@ class ConversationServiceTest {
         user, conversation.getId(), "segunda", "FINANCIAL_FEEDBACK", "r2");
 
     assertThat(conversation.getMessageCount()).isEqualTo(4);
+    assertThat(conversation.getTitle()).isEqualTo("Primeira");
     assertThat(transcriptStore.read(user.getId(), conversation.getId()))
         .extracting(ChatMessage::text)
         .containsExactly("primeira", "r1", "segunda", "r2");
@@ -205,6 +218,51 @@ class ConversationServiceTest {
     assertThat(ConversationService.titleFrom("  gastei   7 reais \n na pucrs "))
         .isEqualTo("gastei 7 reais na pucrs");
     String title = ConversationService.titleFrom("a".repeat(200));
-    assertThat(title).hasSize(60).endsWith("…");
+    assertThat(title).hasSize(80).endsWith("…");
+    assertThat(ConversationService.titleFrom("a".repeat(80))).isEqualTo("a".repeat(80));
+    assertThat(ConversationService.titleFrom("a".repeat(81))).isEqualTo("a".repeat(79) + "…");
+    assertThat(ConversationService.titleFrom("\u00a0gastei\u2003 7 reais\u00a0"))
+        .isEqualTo("gastei 7 reais");
+    String unicodeTitle = ConversationService.titleFrom("😀".repeat(81));
+    assertThat(unicodeTitle).isEqualTo("😀".repeat(79) + "…");
+  }
+
+  @Test
+  @DisplayName("conversa antiga sem titulo continua nula ao receber mensagens e ser listada")
+  void legacyConversationRemainsUntitled() {
+    Conversation conversation = conversationWithId(null);
+    when(conversationRepository.findByIdAndUserForUpdate(conversation.getId(), user))
+        .thenReturn(Optional.of(conversation));
+    when(conversationRepository.save(conversation)).thenReturn(conversation);
+    when(userService.findByAuthenticatedIdentity(IDENTITY)).thenReturn(user);
+    when(conversationRepository.findByUserOrderByUpdatedAtDesc(user))
+        .thenReturn(List.of(conversation));
+
+    conversationService.recordTurn(user, conversation.getId(), "oi", "X", "ola");
+
+    assertThat(conversation.getMessageCount()).isEqualTo(2);
+    assertThat(conversationService.findHistory(IDENTITY).get(0).title()).isNull();
+  }
+
+  @Test
+  @DisplayName("texto sem conteudo utilizavel nao impede a criacao da conversa")
+  void unusableTitleDoesNotPreventConversationCreation() {
+    assertThat(ConversationService.titleFrom(null)).isNull();
+    assertThat(ConversationService.titleFrom(" \n\t\u00a0")).isNull();
+    when(conversationRepository.save(any(Conversation.class)))
+        .thenAnswer(
+            invocation -> {
+              Conversation conversation = invocation.getArgument(0);
+              if (conversation.getId() == null) {
+                ReflectionTestUtils.setField(conversation, "id", UUID.randomUUID());
+              }
+              assertThat(conversation.getTitle()).isNull();
+              return conversation;
+            });
+
+    UUID id = conversationService.recordTurn(user, null, " \t ", "X", "ola");
+
+    assertThat(id).isNotNull();
+    assertThat(transcriptStore.read(user.getId(), id)).hasSize(2);
   }
 }

@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -30,6 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
       "finup.cognito.user-pool-id=us-east-1_TestPool",
       "finup.cognito.client-id=test-client"
     })
+@ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY)
 @AutoConfigureMockMvc
 class OpenApiIntegrationTests {
@@ -59,6 +61,12 @@ class OpenApiIntegrationTests {
                 .value(org.hamcrest.Matchers.containsInAnyOrder("from", "to")))
         .andExpect(jsonPath("$.paths['/api/v1/categories'].get").exists())
         .andExpect(jsonPath("$.paths['/api/v1/assistant/conversations'].get").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.ConversationResponse.properties.title.description")
+                .value(containsString("até 80 caracteres")))
+        .andExpect(
+            jsonPath("$.components.schemas.ConversationResponse.properties.title.description")
+                .value(containsString("antigas sem título")))
         .andExpect(
             jsonPath("$.paths['/api/v1/assistant/conversations/{id}/messages'].get").exists())
         .andExpect(jsonPath("$.paths['/api/v1/ai/assistant'].post").exists())
@@ -132,5 +140,11 @@ class OpenApiIntegrationTests {
         .perform(get("/swagger-ui.html"))
         .andExpect(status().is3xxRedirection())
         .andExpect(header().string("Location", containsString("/swagger-ui/index.html")));
+  }
+
+  @Test
+  @DisplayName("Scalar disponibiliza a referencia da API")
+  void scalarReferenceIsAvailable() throws Exception {
+    mockMvc.perform(get("/docs")).andExpect(status().isOk());
   }
 }
