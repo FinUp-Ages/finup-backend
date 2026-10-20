@@ -23,6 +23,9 @@ import org.springframework.stereotype.Component;
  * ApiExceptionHandler} nao alcanca. E o par do {@link ProblemDetailAuthenticationEntryPoint}: mesmo
  * formato e mesmos campos ({@code timestamp}, {@code traceId}). O detalhe e generico de proposito:
  * nao diz qual grupo falta.
+ *
+ * <p>A tentativa fica no log em {@code WARN}, com o {@code sub} de quem tentou: producao roda em
+ * {@code INFO}, e e esse log que mostra quem tentou entrar nas rotas de admin. Nao rebaixe o nivel.
  */
 @Component
 public class ProblemDetailAccessDeniedHandler implements AccessDeniedHandler {
@@ -49,11 +52,12 @@ public class ProblemDetailAccessDeniedHandler implements AccessDeniedHandler {
     problem.setType(TYPE_FORBIDDEN);
     problem.setProperty("timestamp", Instant.now());
     problem.setProperty("traceId", UUID.randomUUID().toString());
-    log.debug(
-        "Acesso negado [traceId={}]: {} {}",
+    log.warn(
+        "Acesso negado [traceId={}]: {} {} por sub={}",
         problem.getProperties().get("traceId"),
         request.getMethod(),
-        request.getRequestURI());
+        request.getRequestURI(),
+        request.getRemoteUser());
 
     response.setStatus(HttpStatus.FORBIDDEN.value());
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
