@@ -113,10 +113,10 @@ class UserRepositoryTest {
     User user =
         userRepository.saveAndFlush(
             User.createFromCognitoIdentity("cognito-sub-321", "Ana Souza", "ana2@exemplo.com"));
-    // Le de volta do banco (em vez de usar o Instant.now() em memoria): o banco trunca a
-    // precisao para microssegundos, e comparar com o valor em memoria (nanossegundos) e flaky.
-    Instant updatedAtBeforeAccess =
-        userRepository.findById(user.getId()).orElseThrow().getUpdatedAt();
+    // Truncado para microssegundos: e a precisao que o banco guarda, mas o findById dentro da
+    // mesma transacao devolve a entidade do cache de sessao do Hibernate (os nanossegundos em
+    // memoria do Instant.now()), nao uma leitura de verdade - comparar sem truncar e flaky.
+    Instant updatedAtBeforeAccess = user.getUpdatedAt().truncatedTo(ChronoUnit.MICROS);
     Instant now = Instant.parse("2026-10-09T12:00:00Z");
 
     int rowsUpdated =
@@ -125,7 +125,8 @@ class UserRepositoryTest {
     assertThat(rowsUpdated).isEqualTo(1);
     User reloaded = userRepository.findById(user.getId()).orElseThrow();
     assertThat(reloaded.getLastSeenAt()).isEqualTo(now);
-    assertThat(reloaded.getUpdatedAt()).isEqualTo(updatedAtBeforeAccess);
+    assertThat(reloaded.getUpdatedAt().truncatedTo(ChronoUnit.MICROS))
+        .isEqualTo(updatedAtBeforeAccess);
   }
 
   @Test
