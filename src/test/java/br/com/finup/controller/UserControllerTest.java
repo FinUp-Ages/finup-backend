@@ -289,7 +289,12 @@ class UserControllerTest {
     when(userService.findByIdForAuthenticatedIdentity(identity, otherId))
         .thenThrow(new ResourceNotFoundException("Usuario nao encontrado."));
 
-    mockMvc.perform(get("/api/v1/users/" + otherId)).andExpect(status().isNotFound());
+    mockMvc
+        .perform(get("/api/v1/users/" + otherId))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.name").doesNotExist())
+        .andExpect(jsonPath("$.email").doesNotExist());
   }
 
   @Test

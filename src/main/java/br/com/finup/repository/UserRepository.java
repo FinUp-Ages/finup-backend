@@ -31,4 +31,13 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       "update User u set u.lastSeenAt = :now"
           + " where u.id = :id and (u.lastSeenAt is null or u.lastSeenAt < :limit)")
   int touchLastSeen(@Param("id") UUID id, @Param("now") Instant now, @Param("limit") Instant limit);
+
+  /**
+   * Cadastros no intervalo {@code [from, to)}: o inicio entra e o fim nao, para nao contar duas
+   * vezes.
+   */
+  long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(Instant from, Instant to);
+
+  /** Cadastros anteriores a {@code to} (exclusive): o total acumulado ate esse instante. */
+  long countByCreatedAtLessThan(Instant to);
 }

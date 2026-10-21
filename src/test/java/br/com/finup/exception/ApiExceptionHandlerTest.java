@@ -63,7 +63,7 @@ class ApiExceptionHandlerTest {
                 .content("{\"name\":\"inexistente\",\"amount\":1}"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.status").value(404))
-        .andExpect(jsonPath("$.detail").value("Account nao encontrado: inexistente"));
+        .andExpect(jsonPath("$.detail").value("Categoria nao encontrada: inexistente"));
   }
 
   /** Controller minimo, existe so dentro deste teste. */
@@ -73,7 +73,7 @@ class ApiExceptionHandlerTest {
     @PostMapping("/test")
     void receive(@Valid @RequestBody Input input) {
       if ("inexistente".equals(input.name())) {
-        throw new ResourceNotFoundException("Account", input.name());
+        throw new ResourceNotFoundException("Categoria nao encontrada: " + input.name());
       }
     }
   }

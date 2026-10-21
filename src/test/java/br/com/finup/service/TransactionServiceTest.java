@@ -136,7 +136,7 @@ class TransactionServiceTest {
 
     assertThatThrownBy(() -> register(identity, categoryId, null))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessageContaining("Categoria");
+        .hasMessage("Categoria nao encontrada: " + categoryId);
     verify(transactionRepository, never()).save(any());
   }
 
@@ -155,7 +155,7 @@ class TransactionServiceTest {
 
     assertThatThrownBy(() -> register(identity, categoryId, paymentMethodId))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessageContaining("Meio de pagamento");
+        .hasMessage("Meio de pagamento nao encontrado: " + paymentMethodId);
     verify(transactionRepository, never()).save(any());
   }
 

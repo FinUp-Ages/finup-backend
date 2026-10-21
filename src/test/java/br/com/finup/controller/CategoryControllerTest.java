@@ -103,14 +103,34 @@ class CategoryControllerTest {
     UUID categoryId = UUID.randomUUID();
 
     when(categoryService.update(eq(IDENTITY), eq(categoryId), any()))
-        .thenThrow(new ResourceNotFoundException("Category", categoryId));
+        .thenThrow(new ResourceNotFoundException("Categoria nao encontrada: " + categoryId));
 
     mockMvc
         .perform(
             put("/api/v1/categories/{id}", categoryId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Academia e Esportes\",\"type\":\"EXPENSE\"}"))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.detail").value("Categoria nao encontrada: " + categoryId));
+  }
+
+  @Test
+  @DisplayName("PUT de categoria de outro usuario devolve 404 sem dados da categoria")
+  void updateForeignCategoryReturns404() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+
+    when(categoryService.update(eq(IDENTITY), eq(categoryId), any()))
+        .thenThrow(new ResourceNotFoundException("Categoria nao encontrada: " + categoryId));
+
+    mockMvc
+        .perform(
+            put("/api/v1/categories/{id}", categoryId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Outro nome\",\"type\":\"EXPENSE\"}"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.name").doesNotExist())
+        .andExpect(jsonPath("$.isDefault").doesNotExist());
   }
 
   @Test
@@ -152,11 +172,31 @@ class CategoryControllerTest {
   void deleteUnknownCategoryReturns404() throws Exception {
     UUID categoryId = UUID.randomUUID();
 
-    doThrow(new ResourceNotFoundException("Category", categoryId))
+    doThrow(new ResourceNotFoundException("Categoria nao encontrada: " + categoryId))
         .when(categoryService)
         .delete(eq(IDENTITY), eq(categoryId));
 
-    mockMvc.perform(delete("/api/v1/categories/{id}", categoryId)).andExpect(status().isNotFound());
+    mockMvc
+        .perform(delete("/api/v1/categories/{id}", categoryId))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.detail").value("Categoria nao encontrada: " + categoryId));
+  }
+
+  @Test
+  @DisplayName("DELETE de categoria de outro usuario devolve 404 sem dados da categoria")
+  void deleteForeignCategoryReturns404() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+
+    doThrow(new ResourceNotFoundException("Categoria nao encontrada: " + categoryId))
+        .when(categoryService)
+        .delete(eq(IDENTITY), eq(categoryId));
+
+    mockMvc
+        .perform(delete("/api/v1/categories/{id}", categoryId))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.name").doesNotExist())
+        .andExpect(jsonPath("$.isDefault").doesNotExist());
   }
 
   @Test

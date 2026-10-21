@@ -5,12 +5,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URI;
-import java.time.Instant;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
@@ -54,19 +51,15 @@ public class ProblemDetailAuthenticationEntryPoint implements AuthenticationEntr
     bearerEntryPoint.commence(request, response, authException);
 
     ProblemDetail problem =
-        ProblemDetail.forStatusAndDetail(
-            HttpStatus.UNAUTHORIZED, "Token de acesso ausente, invalido ou expirado.");
-    problem.setTitle(HttpStatus.UNAUTHORIZED.getReasonPhrase());
-    problem.setType(TYPE_UNAUTHORIZED);
-    problem.setProperty("timestamp", Instant.now());
-    problem.setProperty("traceId", UUID.randomUUID().toString());
+        SecurityProblemResponse.write(
+            response,
+            objectMapper,
+            HttpStatus.UNAUTHORIZED,
+            TYPE_UNAUTHORIZED,
+            "Token de acesso ausente, invalido ou expirado.");
     log.debug(
         "Requisicao recusada [traceId={}]: {}",
         problem.getProperties().get("traceId"),
         authException.getMessage());
-
-    response.setStatus(HttpStatus.UNAUTHORIZED.value());
-    response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-    objectMapper.writeValue(response.getOutputStream(), problem);
   }
 }

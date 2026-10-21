@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -30,6 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
       "finup.cognito.user-pool-id=us-east-1_TestPool",
       "finup.cognito.client-id=test-client"
     })
+@ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY)
 @AutoConfigureMockMvc
 class OpenApiIntegrationTests {
@@ -60,9 +62,18 @@ class OpenApiIntegrationTests {
         .andExpect(jsonPath("$.paths['/api/v1/categories'].get").exists())
         .andExpect(jsonPath("$.paths['/api/v1/assistant/conversations'].get").exists())
         .andExpect(
+            jsonPath("$.components.schemas.ConversationResponse.properties.title.description")
+                .value(containsString("até 80 caracteres")))
+        .andExpect(
+            jsonPath("$.components.schemas.ConversationResponse.properties.title.description")
+                .value(containsString("antigas sem título")))
+        .andExpect(
             jsonPath("$.paths['/api/v1/assistant/conversations/{id}/messages'].get").exists())
         .andExpect(jsonPath("$.paths['/api/v1/ai/assistant'].post").exists())
         .andExpect(jsonPath("$.paths['/api/v1/ai/assistant'].post.parameters").doesNotExist())
+        .andExpect(jsonPath("$.paths['/api/v1/assistant/messages']").doesNotExist())
+        .andExpect(
+            jsonPath("$.components.schemas.TransactionResponse.properties.userId").doesNotExist())
         .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type").value("http"))
         .andExpect(jsonPath("$.components.schemas.CategoryListResponse.properties.id").exists())
         .andExpect(jsonPath("$.components.schemas.CategoryListResponse.properties.name").exists())
@@ -73,11 +84,67 @@ class OpenApiIntegrationTests {
   }
 
   @Test
+  @DisplayName("Swagger documenta 404 para recursos de outro usuario nas rotas afetadas")
+  void documentsNotFoundForForeignResources() throws Exception {
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/api/v1/users/{id}'].get.responses['404']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/transactions'].post.responses['404']").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/transactions'].post.responses['404'].description")
+                .value(containsString("outro usuario")))
+        .andExpect(jsonPath("$.paths['/api/v1/categories/{id}'].put.responses['404']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/categories/{id}'].delete.responses['404']").exists())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/v1/assistant/conversations/{id}/messages'].get.responses['404']")
+                .exists());
+  }
+
+  @Test
+  @DisplayName("Swagger documenta GET /api/v1/admin/me com 200, 401 e 403 em problem+json")
+  void documentsAdminMe() throws Exception {
+    String adminMe = "$.paths['/api/v1/admin/me'].get.responses";
+    String problemJson = ".content['application/problem+json'].schema['$ref']";
+    String problemDetail = "#/components/schemas/ProblemDetail";
+    String adminMeResponse = "$.components.schemas.AdminMeResponse.properties";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                adminMe + "['200'].content.*.schema['$ref']",
+                org.hamcrest.Matchers.hasItem("#/components/schemas/AdminMeResponse")))
+        .andExpect(jsonPath(adminMe + "['401']" + problemJson).value(problemDetail))
+        .andExpect(jsonPath(adminMe + "['403']" + problemJson).value(problemDetail))
+        .andExpect(jsonPath(adminMe + "['404']" + problemJson).value(problemDetail))
+        .andExpect(jsonPath("$.components.schemas.ProblemDetail.properties.status").exists())
+        .andExpect(jsonPath("$.components.schemas.ProblemDetail.properties.detail").exists())
+        .andExpect(jsonPath(adminMeResponse + ".length()").value(4))
+        .andExpect(jsonPath(adminMeResponse + ".id").exists())
+        .andExpect(jsonPath(adminMeResponse + ".name").exists())
+        .andExpect(jsonPath(adminMeResponse + ".email").exists())
+        .andExpect(jsonPath(adminMeResponse + ".role.enum[0]").value("ADMIN"))
+        .andExpect(
+            jsonPath("$.paths['/api/v1/admin/dashboard/widgets'].get.responses['403']").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/admin/dashboard/widgets'].put.responses['403']").exists());
+  }
+
+  @Test
   @DisplayName("Swagger UI redireciona para a interface")
   void redirectsSwaggerUiToItsInterface() throws Exception {
     mockMvc
         .perform(get("/swagger-ui.html"))
         .andExpect(status().is3xxRedirection())
         .andExpect(header().string("Location", containsString("/swagger-ui/index.html")));
+  }
+
+  @Test
+  @DisplayName("Scalar disponibiliza a referencia da API")
+  void scalarReferenceIsAvailable() throws Exception {
+    mockMvc.perform(get("/docs")).andExpect(status().isOk());
   }
 }

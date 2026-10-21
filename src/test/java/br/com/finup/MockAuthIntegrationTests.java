@@ -2,6 +2,8 @@ package br.com.finup;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -14,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -23,7 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * identidade passa a vir dos headers {@code X-Mock-Cognito-*}. E o modo de quem desenvolve sem
  * usuario no User Pool.
  */
-@SpringBootTest
+@SpringBootTest(properties = "finup.cors.allowed-origins=http://localhost:5173")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY)
 @AutoConfigureMockMvc
 @ActiveProfiles("mock-auth")
@@ -58,6 +61,22 @@ class MockAuthIntegrationTests {
                 .header("X-Mock-Cognito-Email", "ana@exemplo.com"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.email").value("ana@exemplo.com"));
+  }
+
+  @Test
+  @DisplayName("o CORS aceita os headers de mock, para o navegador simular a identidade")
+  void corsPreflightAllowsMockHeaders() throws Exception {
+    mockMvc
+        .perform(
+            options("/api/v1/users/me")
+                .header(HttpHeaders.ORIGIN, "http://localhost:5173")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET")
+                .header(
+                    HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS,
+                    "x-mock-cognito-sub, x-mock-cognito-email, x-mock-cognito-name"))
+        .andExpect(status().isOk())
+        .andExpect(
+            header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:5173"));
   }
 
   @Test
