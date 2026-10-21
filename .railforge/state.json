@@ -1,40 +1,20 @@
 {
-  "stage": "REVIEWING",
-  "task": "Publicar contrato REST das rotas pendentes (PR #33) — reduzido ao que ainda vale apos #32, #38 e #39",
-  "objective": "Alinhar a branch docs/contrato-rest-rotas-pendentes a develop: as duas rotas que o PR publicava como stub 501 ja foram implementadas com outro contrato, entao os stubs saem e o PR passa a entregar so a remocao de userId de TransactionResponse e a documentacao das rotas reais.",
+  "stage": "COMPLETED",
+  "task": "Documentar contrato C4 de uso de IA e proposta de tabela",
+  "objective": "Produzir um documento com o formato final do endpoint GET /api/v1/admin/ai-usage e uma proposta unica de tabela para registrar uso da Bedrock por usuario, sem iniciar a implementacao.",
   "decisions": [
-    "GET /api/v1/transactions mantem o contrato implementado na develop (#32/#38): from e to obrigatorios, resposta {balance, transactions}. O contrato paginado proposto no PR (startDate, endDate, type, categoryId, page, size) foi descartado. Decisao do solicitante em 2026-10-09, na premissa de que o App seguiu a develop",
-    "POST /api/v1/assistant/messages (stub 501) foi removido: o assistente real e POST /api/v1/ai/assistant (#39). Manter o stub publicaria no Swagger uma rota que nunca responderia",
-    "userId continua removido de TransactionResponse (a identidade do dono nunca e devolvida ao cliente). Como AiAssistantResponse.transaction usa o mesmo mapper, o campo tambem some da resposta do assistente",
-    "A colecao Postman fica a da develop (#39, fluxo completo). A do PR, com respostas salvas para mock, descrevia os contratos descartados",
-    "TransactionController fica o da develop; do PR so permanece a descricao da tag. A descricao de 400 do POST proposta no PR nao foi portada porque atribuia ao 400 a regra de recurrenceFrequency, que responde 422",
-    "README fica identico ao da develop: as linhas de GET /transactions e POST /ai/assistant sao do PR #43 (docs: atualizar tabela de endpoints), que mescla sem conflito e geraria linhas duplicadas se este PR tambem as adicionasse",
-    "As verificacoes de OpenAPI entraram no teste ja existente em vez de um teste novo: um metodo novo naquele ponto do arquivo conflitava com os PRs #40 e #41",
-    "Consumidor confirmado pelo solicitante em 2026-10-09: o App usa from e to no GET /transactions e nao le nem reconhece userId na resposta do POST /transactions. Por inferencia, nao confirmada na tela do assistente, o mesmo vale para transaction.userId em POST /api/v1/ai/assistant"
+    "A Bedrock nao devolve custo em USD; o retorno util para uso vem de tokens de entrada e saida, e o custo estimado precisa ser calculado pela aplicacao a partir desses tokens e da tabela de precos do modelo.",
+    "O endpoint administrativo deve agregar por usuario e periodo usando um fato de uso por chamada, preservando userId, modelId, timestamps, inputTokens, outputTokens e estimatedCostUsd, sem gravar prompt ou resposta brutos.",
+    "Os numeros a expor no contrato sao requests, inputTokens, outputTokens e estimatedCostUsd nos totais; na listagem por usuario, requests e tokens sao suficientes na primeira versao."
   ],
   "files_in_scope": [
-    "src/main/java/br/com/finup/dto/TransactionResponse.java",
-    "src/main/java/br/com/finup/mapper/TransactionMapper.java",
-    "src/main/java/br/com/finup/controller/TransactionController.java",
-    "src/test/java/br/com/finup/controller/TransactionControllerTest.java",
-    "src/test/java/br/com/finup/OpenApiIntegrationTests.java",
+    "docs/ai-usage-c4.md",
     ".railforge/state.json"
   ],
   "validation": {
-    "mvn clean verify": "passed em 2026-10-09 (263 testes, 0 falhas, spotless ok) sobre o merge local da develop f374996 na branch",
-    "postgres real via docker compose (profile dev,mock-auth)": "validado em 2026-10-09 em stack isolada (projeto finup-validate), volume criado do zero com database/init e imagem construida do codigo mesclado; aplicacao subiu sem ERROR no log",
-    "swagger": "/v3/api-docs lista 13 paths, sem /api/v1/assistant/messages; GET /api/v1/transactions com from e to obrigatorios e resposta TransactionListResponse; TransactionResponse sem userId; schemas orfaos ausentes; swagger-ui responde 200",
-    "POST /api/v1/transactions": "201 sem userId na resposta (avulsa e recorrente MONTHLY com nextOccurrenceDate); userId falso no corpo ignorado; 422 para categoria incompativel e para recorrencia sem frequencia",
-    "GET /api/v1/transactions": "200 com balance 2879.50 e as 2 transacoes criadas, mais recente primeiro; periodo vazio devolve balance 0; sem from/to 400; from depois de to 400; parametros do contrato descartado (startDate/endDate) 400; sem identidade 401; outro usuario nao ve as transacoes",
-    "integridade no banco": "SELECT confirma user_id do usuario autenticado nas transacoes criadas, 0 linhas com o userId falso, 0 transacoes com tipo divergente da categoria; coluna user_id segue na tabela (so saiu do DTO)",
-    "assistente": "POST /api/v1/assistant/messages responde 404; GET /api/v1/assistant/conversations 200; POST /api/v1/ai/assistant sem credenciais AWS responde 502 em ProblemDetail",
-    "outros PRs abertos": "simulacao de merge sobre o resultado: #42, #43 e #44 sem conflito; #41 sem conflito; #40 so em .railforge/state.json; #37 ja conflita com a develop atual, independente deste PR",
-    "nao validado": "caminho feliz do POST /api/v1/ai/assistant com Bedrock real (sem credenciais AWS neste ambiente; coberto por AiAssistantControllerTest e AiAssistantServiceTest) e execucao do App mobile contra esta build"
+    "git diff --check": "passed em 2026-10-11"
   },
-  "review": "Ajustes feitos em 2026-10-09 como merge da develop (f374996) na branch docs/contrato-rest-rotas-pendentes. Commit e push autorizados pelo solicitante em 2026-10-09. Pendente: aprovacao e merge do PR #33 pelo GitHub.",
-  "updated_at": "2026-10-09",
-  "open_questions": [
-    "PR #37 cita POST /api/v1/assistant/messages como a rota que gravara mensagens; com o stub removido, essa referencia precisa apontar para POST /api/v1/ai/assistant",
-    "Titulo e descricao do PR #33 ainda descrevem a publicacao dos stubs 501 e precisam ser reescritos no GitHub"
-  ]
+  "review": "Documento criado em docs/ai-usage-c4.md com o contrato C4, a proposta de tabela e as decisoes de armazenamento; nao houve mudanca de codigo.",
+  "updated_at": "2026-10-11",
+  "open_questions": []
 }
