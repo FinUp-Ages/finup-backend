@@ -18,6 +18,7 @@ import br.com.finup.repository.UserRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
@@ -275,8 +276,8 @@ class UserServiceTest {
   }
 
   @Test
-  @DisplayName("recordAccess grava o primeiro acesso e persiste o usuario")
-  void recordAccessPersistsOnFirstAccess() {
+  @DisplayName("recordAccess pede ao repositorio para gravar o acesso, com throttle de uma hora")
+  void recordAccessDelegatesToRepositoryWithOneHourThrottle() {
     AuthenticatedIdentity identity =
         new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
     User existing =
@@ -287,25 +288,8 @@ class UserServiceTest {
 
     User result = userService.recordAccess(identity);
 
-    assertThat(result.getLastSeenAt()).isEqualTo(now);
-    verify(userRepository).save(existing);
-  }
-
-  @Test
-  @DisplayName("recordAccess dentro de uma hora do ultimo registro nao grava de novo")
-  void recordAccessWithinThrottleWindowDoesNotPersistAgain() {
-    AuthenticatedIdentity identity =
-        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
-    User existing =
-        User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
-    Instant firstAccess = Instant.parse("2026-10-09T12:00:00Z");
-    existing.touchLastSeen(firstAccess);
-    when(userRepository.findByCognitoId("cognito-sub-123")).thenReturn(Optional.of(existing));
-    when(clock.instant()).thenReturn(firstAccess.plusSeconds(1800));
-
-    userService.recordAccess(identity);
-
-    verify(userRepository, never()).save(any());
+    assertThat(result).isSameAs(existing);
+    verify(userRepository).touchLastSeen(existing.getId(), now, now.minus(Duration.ofHours(1)));
   }
 
   @Test
@@ -318,6 +302,6 @@ class UserServiceTest {
     assertThatThrownBy(() -> userService.recordAccess(identity))
         .isInstanceOf(ResourceNotFoundException.class);
 
-    verify(userRepository, never()).save(any());
+    verify(userRepository, never()).touchLastSeen(any(), any(), any());
   }
 }

@@ -26,7 +26,6 @@ import java.util.UUID;
 @Table(name = "users")
 public class User {
 
-  private static final Duration LAST_SEEN_THROTTLE = Duration.ofHours(1);
   private static final Duration ACTIVE_WINDOW = Duration.ofDays(7);
 
   @Id private UUID id;
@@ -114,21 +113,13 @@ public class User {
   }
 
   /**
-   * Registra o acesso corrente em {@code lastSeenAt}, no maximo uma vez por hora — chamadas mais
-   * frequentes de {@code GET /api/v1/users/me} nao geram escrita nova. Devolve se houve mudanca,
-   * para quem chama decidir se precisa persistir.
-   */
-  public boolean touchLastSeen(Instant now) {
-    if (lastSeenAt != null && Duration.between(lastSeenAt, now).compareTo(LAST_SEEN_THROTTLE) < 0) {
-      return false;
-    }
-    lastSeenAt = now;
-    return true;
-  }
-
-  /**
    * Status derivado de {@code lastSeenAt}: ACTIVE se o ultimo acesso registrado foi nos ultimos 7
    * dias. Quem nunca chamou {@code GET /api/v1/users/me} (lastSeenAt nulo) conta como inativo.
+   *
+   * <p>{@code lastSeenAt} e gravado direto no banco por {@link
+   * br.com.finup.repository.UserRepository#touchLastSeen}, sem passar por um setter nesta classe —
+   * assim o {@code GET /me} nunca aciona o {@link #markAsUpdated()}. Uma entidade carregada do
+   * banco reflete o valor atual normalmente, porque o mapeamento JPA preenche o campo na leitura.
    */
   public boolean isActive(Instant now) {
     return lastSeenAt != null && Duration.between(lastSeenAt, now).compareTo(ACTIVE_WINDOW) <= 0;

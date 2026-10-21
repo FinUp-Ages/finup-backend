@@ -3,6 +3,8 @@ package br.com.finup.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.finup.model.User;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,5 +62,61 @@ class UserRepositoryTest {
     assertThat(userRepository.findById(saved.getId()))
         .get()
         .satisfies(found -> assertThat(found.getName()).isNull());
+  }
+
+  @Test
+  @DisplayName("touchLastSeen grava o primeiro acesso sem alterar updatedAt")
+  void touchLastSeenRecordsFirstAccessWithoutTouchingUpdatedAt() {
+    User user =
+        userRepository.saveAndFlush(
+            User.createFromCognitoIdentity("cognito-sub-321", "Ana Souza", "ana2@exemplo.com"));
+    Instant updatedAtBeforeAccess = user.getUpdatedAt();
+    Instant now = Instant.parse("2026-10-09T12:00:00Z");
+
+    int rowsUpdated =
+        userRepository.touchLastSeen(user.getId(), now, now.minus(1, ChronoUnit.HOURS));
+
+    assertThat(rowsUpdated).isEqualTo(1);
+    User reloaded = userRepository.findById(user.getId()).orElseThrow();
+    assertThat(reloaded.getLastSeenAt()).isEqualTo(now);
+    assertThat(reloaded.getUpdatedAt()).isEqualTo(updatedAtBeforeAccess);
+  }
+
+  @Test
+  @DisplayName("touchLastSeen dentro de uma hora do ultimo registro nao atualiza")
+  void touchLastSeenWithinThrottleWindowIsIgnored() {
+    User user =
+        userRepository.saveAndFlush(
+            User.createFromCognitoIdentity("cognito-sub-322", "Ana Souza", "ana3@exemplo.com"));
+    Instant firstAccess = Instant.parse("2026-10-09T12:00:00Z");
+    userRepository.touchLastSeen(user.getId(), firstAccess, firstAccess.minus(1, ChronoUnit.HOURS));
+    Instant secondAccess = firstAccess.plus(30, ChronoUnit.MINUTES);
+
+    int rowsUpdated =
+        userRepository.touchLastSeen(
+            user.getId(), secondAccess, secondAccess.minus(1, ChronoUnit.HOURS));
+
+    assertThat(rowsUpdated).isZero();
+    assertThat(userRepository.findById(user.getId()).orElseThrow().getLastSeenAt())
+        .isEqualTo(firstAccess);
+  }
+
+  @Test
+  @DisplayName("touchLastSeen depois de mais de uma hora do ultimo registro atualiza de novo")
+  void touchLastSeenAfterThrottleWindowUpdatesAgain() {
+    User user =
+        userRepository.saveAndFlush(
+            User.createFromCognitoIdentity("cognito-sub-323", "Ana Souza", "ana4@exemplo.com"));
+    Instant firstAccess = Instant.parse("2026-10-09T12:00:00Z");
+    userRepository.touchLastSeen(user.getId(), firstAccess, firstAccess.minus(1, ChronoUnit.HOURS));
+    Instant secondAccess = firstAccess.plus(61, ChronoUnit.MINUTES);
+
+    int rowsUpdated =
+        userRepository.touchLastSeen(
+            user.getId(), secondAccess, secondAccess.minus(1, ChronoUnit.HOURS));
+
+    assertThat(rowsUpdated).isEqualTo(1);
+    assertThat(userRepository.findById(user.getId()).orElseThrow().getLastSeenAt())
+        .isEqualTo(secondAccess);
   }
 }

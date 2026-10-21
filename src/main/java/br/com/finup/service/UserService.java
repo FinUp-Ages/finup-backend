@@ -11,6 +11,8 @@ import br.com.finup.repository.UserRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
   private static final Logger log = LoggerFactory.getLogger(UserService.class);
+  private static final Duration LAST_SEEN_THROTTLE = Duration.ofHours(1);
 
   private final UserRepository userRepository;
   private final UserFinancialProfileRepository userFinancialProfileRepository;
@@ -145,17 +148,17 @@ public class UserService {
 
   /**
    * Busca o usuario pela identidade autenticada e registra o acesso em {@code lastSeenAt} — e o
-   * service que o {@code GET /api/v1/users/me} chama. {@link User#touchLastSeen} limita a escrita a
-   * no maximo uma vez por hora, entao so persiste de novo quando o throttle deixa passar.
+   * service que o {@code GET /api/v1/users/me} chama. {@link UserRepository#touchLastSeen} grava
+   * direto no banco, no maximo uma vez por hora, sem passar pela entidade gerenciada: assim o
+   * {@code GET /me} nunca atualiza {@code updatedAt}, que e sobre o cadastro, nao sobre acesso.
    *
    * @throws ResourceNotFoundException se essa identidade ainda nao tiver usuario local
    */
   @Transactional
   public User recordAccess(AuthenticatedIdentity identity) {
     User user = findByIdentityOrThrow(identity);
-    if (user.touchLastSeen(clock.instant())) {
-      userRepository.save(user);
-    }
+    Instant now = clock.instant();
+    userRepository.touchLastSeen(user.getId(), now, now.minus(LAST_SEEN_THROTTLE));
     return user;
   }
 

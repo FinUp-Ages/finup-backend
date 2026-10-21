@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /** Testa as invariantes de {@link User}, isolado de banco e de service. */
 class UserTest {
@@ -50,45 +51,6 @@ class UserTest {
   }
 
   @Test
-  @DisplayName("touchLastSeen grava o primeiro acesso e devolve true")
-  void touchLastSeenRecordsFirstAccess() {
-    User user = User.createFromCognitoIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
-    Instant now = Instant.parse("2026-10-09T12:00:00Z");
-
-    boolean changed = user.touchLastSeen(now);
-
-    assertThat(changed).isTrue();
-    assertThat(user.getLastSeenAt()).isEqualTo(now);
-  }
-
-  @Test
-  @DisplayName("touchLastSeen dentro de uma hora do ultimo registro nao atualiza e devolve false")
-  void touchLastSeenWithinThrottleWindowIsIgnored() {
-    User user = User.createFromCognitoIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
-    Instant firstAccess = Instant.parse("2026-10-09T12:00:00Z");
-    user.touchLastSeen(firstAccess);
-
-    boolean changed = user.touchLastSeen(firstAccess.plus(59, ChronoUnit.MINUTES));
-
-    assertThat(changed).isFalse();
-    assertThat(user.getLastSeenAt()).isEqualTo(firstAccess);
-  }
-
-  @Test
-  @DisplayName("touchLastSeen uma hora ou mais depois do ultimo registro atualiza de novo")
-  void touchLastSeenAfterThrottleWindowUpdates() {
-    User user = User.createFromCognitoIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
-    Instant firstAccess = Instant.parse("2026-10-09T12:00:00Z");
-    user.touchLastSeen(firstAccess);
-    Instant secondAccess = firstAccess.plus(1, ChronoUnit.HOURS);
-
-    boolean changed = user.touchLastSeen(secondAccess);
-
-    assertThat(changed).isTrue();
-    assertThat(user.getLastSeenAt()).isEqualTo(secondAccess);
-  }
-
-  @Test
   @DisplayName("isActive e false quando o usuario nunca acessou (lastSeenAt nulo)")
   void isActiveIsFalseWhenNeverSeen() {
     User user = User.createFromCognitoIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
@@ -101,7 +63,9 @@ class UserTest {
   void isActiveIsTrueWithinSevenDays() {
     User user = User.createFromCognitoIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
     Instant lastSeen = Instant.parse("2026-10-02T12:00:00Z");
-    user.touchLastSeen(lastSeen);
+    // lastSeenAt e gravado direto no banco por UserRepository.touchLastSeen, sem setter na
+    // entidade - o reflection simula aqui o valor que viria de uma leitura real do JPA.
+    ReflectionTestUtils.setField(user, "lastSeenAt", lastSeen);
 
     assertThat(user.isActive(lastSeen.plus(7, ChronoUnit.DAYS))).isTrue();
   }
@@ -111,7 +75,7 @@ class UserTest {
   void isActiveIsFalseAfterSevenDays() {
     User user = User.createFromCognitoIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
     Instant lastSeen = Instant.parse("2026-10-02T12:00:00Z");
-    user.touchLastSeen(lastSeen);
+    ReflectionTestUtils.setField(user, "lastSeenAt", lastSeen);
 
     assertThat(user.isActive(lastSeen.plus(7, ChronoUnit.DAYS).plusSeconds(1))).isFalse();
   }
