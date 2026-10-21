@@ -113,7 +113,10 @@ class UserRepositoryTest {
     User user =
         userRepository.saveAndFlush(
             User.createFromCognitoIdentity("cognito-sub-321", "Ana Souza", "ana2@exemplo.com"));
-    Instant updatedAtBeforeAccess = user.getUpdatedAt();
+    // Le de volta do banco (em vez de usar o Instant.now() em memoria): o banco trunca a
+    // precisao para microssegundos, e comparar com o valor em memoria (nanossegundos) e flaky.
+    Instant updatedAtBeforeAccess =
+        userRepository.findById(user.getId()).orElseThrow().getUpdatedAt();
     Instant now = Instant.parse("2026-10-09T12:00:00Z");
 
     int rowsUpdated =
