@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Valida o mapeamento JPA de usuario e as buscas por identidade do Cognito. */
@@ -23,6 +24,8 @@ class UserRepositoryTest {
   @Autowired private UserRepository userRepository;
 
   @Autowired private JdbcTemplate jdbcTemplate;
+
+  @Autowired private TestEntityManager entityManager;
 
   /** Cria o usuario e fixa o {@code created_at}, que o dominio sempre define como "agora". */
   private void saveUserCreatedAt(String cognitoId, String createdAt) {
@@ -113,10 +116,13 @@ class UserRepositoryTest {
     User user =
         userRepository.saveAndFlush(
             User.createFromCognitoIdentity("cognito-sub-321", "Ana Souza", "ana2@exemplo.com"));
-    // Truncado para microssegundos: e a precisao que o banco guarda, mas o findById dentro da
-    // mesma transacao devolve a entidade do cache de sessao do Hibernate (os nanossegundos em
-    // memoria do Instant.now()), nao uma leitura de verdade - comparar sem truncar e flaky.
-    Instant updatedAtBeforeAccess = user.getUpdatedAt().truncatedTo(ChronoUnit.MICROS);
+    // entityManager.clear() forca uma leitura de verdade do banco: o driver arredonda (nao so
+    // trunca) os nanossegundos do Instant.now() para a precisao de microssegundos da coluna, e
+    // sem isso o findById devolveria a entidade do cache de sessao, com o valor em memoria - a
+    // comparacao ficaria flaky mesmo truncando os dois lados.
+    entityManager.clear();
+    Instant updatedAtBeforeAccess =
+        userRepository.findById(user.getId()).orElseThrow().getUpdatedAt();
     Instant now = Instant.parse("2026-10-09T12:00:00Z");
 
     int rowsUpdated =
@@ -125,8 +131,7 @@ class UserRepositoryTest {
     assertThat(rowsUpdated).isEqualTo(1);
     User reloaded = userRepository.findById(user.getId()).orElseThrow();
     assertThat(reloaded.getLastSeenAt()).isEqualTo(now);
-    assertThat(reloaded.getUpdatedAt().truncatedTo(ChronoUnit.MICROS))
-        .isEqualTo(updatedAtBeforeAccess);
+    assertThat(reloaded.getUpdatedAt()).isEqualTo(updatedAtBeforeAccess);
   }
 
   @Test
