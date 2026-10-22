@@ -1,41 +1,46 @@
 {
   "stage": "REVIEWING",
-  "task": "Definir e consolidar titulos das conversas do assistente",
-  "objective": "Persistir title de novas conversas sem comprometer o envio da mensagem e documentar quando pode vir null",
+  "task": "86e3m95y3 - API de perguntas da Trilha: escrita (C6)",
+  "objective": "Implementar POST/GET por categoria e PUT/DELETE por pergunta, com validação por tipo, edição apenas do draft e acesso admin.",
+  "dependency": {
+    "pr": 51,
+    "commit": "0d236ba057d03ece524b3ce8675cd630626e3f78",
+    "decision": "Usuário autorizou usar a branch do PR #51 como base provisória, presumindo merge sem alterações. Sem modificar modelagem, migrations, seeds ou outros repositórios."
+  },
   "decisions": [
-    "Fluxo implementado: POST /api/v1/ai/assistant; consumidor: menu de historico via GET /api/v1/assistant/conversations.",
-    "Decisao do solicitante em 2026-10-17: recorte normalizado da primeira mensagem, ate 80 pontos de codigo incluindo reticencias; sem chamada extra ao Bedrock.",
-    "Titulo preservado nos turnos seguintes. Conversas antigas sem titulo permanecem nulas, inclusive quando recebem novos turnos. Sem backfill ou migracao.",
-    "Texto ausente ou vazio apos normalizacao deixa o titulo nulo sem impedir a criacao da conversa; app deve manter fallback.",
-    "Coluna title existente suporta o limite. Autorizacao por dono preservada. Historico gravado apos a acao, em melhor esforco."
+    "Contratos HTTP da task 86e3m95y3 e do consumidor web; exemplos antigos da modelagem não serão migrados nesta task.",
+    "Reutilizar entidades, repositories, status derivado e configuração de segurança da base.",
+    "PUT mantém o tipo original, confirmado pelo solicitante. Objetiva exige pelo menos uma correta conforme a task. Campos obrigatórios por tipo seguem os exemplos.",
+    "Sem regra adicional de marcador de lacuna, unicidade de respostas ou limite arbitrário.",
+    "POST 201; GET/PUT 200; DELETE 204; inválidos 400; inexistentes 404; segurança 401/403 fora de mock-auth."
   ],
   "files_in_scope": [
-    "src/main/java/br/com/finup/service/ConversationService.java",
-    "src/main/java/br/com/finup/model/Conversation.java",
-    "src/main/java/br/com/finup/dto/ConversationResponse.java",
-    "src/test/java/br/com/finup/service/ConversationServiceTest.java",
-    "src/test/java/br/com/finup/OpenApiIntegrationTests.java",
+    "src/main/java/br/com/finup/controller/AdminStudyQuestionController.java",
+    "src/main/java/br/com/finup/dto/StudyQuestionRequest.java",
+    "src/main/java/br/com/finup/dto/StudyQuestionResponse.java",
+    "src/main/java/br/com/finup/exception/InvalidStudyQuestionException.java",
+    "src/main/java/br/com/finup/mapper/StudyQuestionMapper.java",
+    "src/main/java/br/com/finup/service/StudyQuestionService.java",
+    "src/main/java/br/com/finup/service/StudyQuestionValidator.java",
+    "src/test/java/br/com/finup/service/StudyQuestionValidatorTest.java",
+    "src/test/java/br/com/finup/service/StudyQuestionServiceTest.java",
+    "src/test/java/br/com/finup/StudyQuestionIntegrationTests.java",
+    "contracts/study-questions-write-c6.md",
     ".railforge/state.json"
   ],
   "plan": [
-    "Consolidar estrategia aprovada no fluxo existente e atualizar contrato e documentacao.",
-    "Validar titulo salvo e listado, normalizacao, limite, Unicode, turnos seguintes, conversas antigas e texto inutilizavel.",
-    "Executar Maven verify, revisar diff e atualizar e reler estado."
+    "Implementar contrato e regras sem alterar a dependência.",
+    "Validar CRUD com persistência e segurança reais, preservação de publicação e OpenAPI.",
+    "Executar verify, revisar diff contra o PR #51 e registrar limitações."
   ],
   "validation": {
-    "maven_verify": "BUILD SUCCESS em 2026-10-17: 284 testes, zero falhas, erros ou ignorados; compilacao, empacotamento e Spotless aprovados apos corrigir quebra de linha no Javadoc de ConversationService.",
-    "titles": "Testes aprovados para titulo salvo e listado, preservacao em turnos seguintes, conversas antigas nulas, limite 80/81, espacos Unicode, emojis e texto inutilizavel sem impedir criacao.",
-    "contracts_and_failures": "Service, controller, repositorio e OpenAPI aprovados: autorizacao por dono, contrato Swagger atualizado e falha de historico sem derrubar resposta. Titulo local sem chamada externa ou timeout.",
-    "diff_check": "git diff --check passou em 2026-10-17; diff de implementacao, contrato e testes revisado.",
-    "limits": "Validacao local com dubles e H2, sem AWS real ou execucao do app contra esta build. Resultados da validacao anterior preservados nesta restauracao do estado.",
-    "merge da develop em 8bb42e4": "passed em 2026-10-19: clean verify sem .env, 321 testes, 0 falhas, 0 erros, 0 ignorados; Spotless aprovado. Com .env dev,mock-auth, OpenApiIntegrationTests, FinUpApplicationTests e ConversationServiceTest passam (16 testes). Diff contra a develop: so os 5 arquivos da tarefa e este registro; git diff --check ok"
+    "clean_verify": "Java 21: ./mvnw -B clean verify passou. 413 testes, 0 falhas, 0 erros, 0 ignorados; empacotamento e Spotless aprovados.",
+    "new_tests": "81 testes: 26 de validação, 7 de service e 48 integrados com HTTP, segurança e persistência reais. Incluem tipos, status derivados, 400/404, 401/403 nos quatro métodos, publicação preservada, troca de tipo proibida, UUID inválido e OpenAPI.",
+    "postgresql_16": "48 testes integrados finais passaram em banco PostgreSQL 16 exclusivo e descartável; JSONB, timestamps e CRUD verificados. Migrations da dependência não foram alteradas nem validadas aqui.",
+    "diff": "Revisão contra 0d236ba: somente arquivos desta task; nenhuma alteração em entidades, repositories, configuração, migrations ou seeds herdados. git diff --check passou.",
+    "environment": "Primeira execução no sandbox falhou ao iniciar o agente Mockito; reexecução autorizada fora do sandbox passou. Maven Clean ausente no cache foi baixado para executar clean verify.",
+    "manual_pending": "Tokens reais do Cognito, fluxo do painel com mocks desativados e nova validação após integração da dependência na develop. Exemplos JSON dos seeds do PR #51 diferem do contrato desta task e foram preservados."
   },
-  "review": "Criterios atendidos pela abordagem aprovada e validacao automatizada. Em 2026-10-19, apos os merges do #40 e do #49, a develop foi mesclada na branch: conflito so no state.json, mantido o registro desta tarefa e acrescentadas as open_questions herdadas da develop. Codigo revisado sem pedidos de mudanca. Pendente: aprovacao e merge.",
-  "open_questions": [
-    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Em cada ambiente implantado: preencher COGNITO_ADMIN_CLIENT_ID e incluir a origem do painel em CORS_ALLOWED_ORIGINS. Se houver outro User Pool (ex.: producao), conferir nele o grupo 'admin' e o cliente do painel. Passo a passo no README",
-    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Confirmar com o time do painel que o primeiro acesso chama POST /api/v1/users antes de GET /api/v1/admin/me. Se o painel nao puder fazer isso, a alternativa e o backend criar o usuario local no primeiro acesso de um administrador",
-    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Consumidor: GET e PUT /api/v1/admin/dashboard/widgets passam a responder 403 para quem nao esta no grupo admin. Antes qualquer usuario autenticado acessava",
-    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Issues #35 e #36 continuam abertas citando o isCurrentUserAdmin() removido pelo #38: a #35 ficou sem objeto e a #36 precisa ser reescrita em termos de papel"
-  ],
-  "updated_at": "2026-10-19"
+  "review": "Implementação e revisão local concluídas sobre o PR #51. Commit local autorizado pelo solicitante em 2026-10-21; push e abertura do PR draft serão feitos manualmente pelo solicitante. Descrição preparada com prioridade para a dependência da task 86e3m95k1 / PR #51 e o alinhamento do contrato JSON. Aguardando revisão humana, CI remoto e integração da dependência. Sem merge ou mudanças no ClickUp.",
+  "updated_at": "2026-10-21"
 }
