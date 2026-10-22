@@ -1,60 +1,45 @@
 {
   "stage": "REVIEWING",
-  "task": "Metricas do dashboard admin: GET /api/v1/admin/metrics/summary e /user-growth (contrato C3)",
-  "objective": "Expor usuarios ativos e clientes novos por periodo (summary) e a serie mensal de cadastros (user-growth), restritos ao grupo admin do Cognito, com agregacao no banco. Receita, custo e plano ficam fora e viram backlog.",
+  "task": "CRUD administrativo de categorias da trilha de estudos",
+  "objective": "Criar, listar, editar e remover categorias de estudo em /api/v1/admin/study-tracks/categories, com acesso ADMIN, contagens de perguntas por status derivado e contrato compatível com o front.",
   "decisions": [
-    "Admin = grupo 'admin' do Cognito (claim cognito:groups do access token). Decisao do time. Na integracao com a develop (2026-10-16) o solicitante decidiu manter o mecanismo desta branch (CognitoGroupsJwtAuthenticationConverter, autoridade GROUP_admin, ProblemDetailAccessDeniedHandler) no lugar do que o PR #46 trouxe (Role, CognitoGroupsAuthoritiesConverter, ROLE_ADMIN). A regra foi ampliada de /api/v1/admin/metrics/** para /api/v1/admin/**, porque o #46 ja protege /admin/me e os widgets com o mesmo criterio e os testes dele (AdminAuthIntegrationTests) exigem 403 nessas rotas",
-    "Usuario ativo = criou ao menos uma transacao no periodo (COUNT DISTINCT user_id em transactions por created_at). Decisao do time. Ocorrencias geradas por recorrencia (recurrence_origin_id preenchido) nao contam: nao sao acao do usuario",
-    "value e previousValue sao numeros de ponto flutuante, como no contrato C3 (o 12.5 do exemplo so fecha com o changePct de -4.0). Os valores reais saem como contagens (12.0)",
-    "previousValue = mesma metrica no periodo imediatamente anterior, de mesmo tamanho. Janelas moveis terminando em agora: atual [now-N, now), anterior [now-2N, now-N)",
-    "changePct = (value - previousValue) / previousValue * 100, 1 casa, HALF_UP. Com previousValue = 0 devolve 0.0 (sem base de comparacao); omitir o campo quebraria o contrato",
-    "user-growth: months padrao 6, aceito de 1 a 24, o ultimo ponto e o mes corrente (parcial). totalUsers = cadastros acumulados ate o fim do mes. growthPct = (totalUsers do ultimo ponto - total antes do primeiro mes) / total antes do primeiro mes * 100; 0.0 se nao havia ninguem antes. O contrato nao define growthPct: esta e a leitura adotada",
-    "Meses e janelas usam o Clock da aplicacao (America/Sao_Paulo), nao UTC, para bater com o dia do usuario",
-    "Parametros invalidos (period fora de 7d|30d|90d ou ausente, months nao numerico, negativo, zero ou acima de 24) viram 400 com mensagem especifica via excecao de negocio; o handler generico do Spring nao e alterado",
-    "403 com ProblemDetail (mesmo formato do 401). Profile mock-auth continua sem barrar nada, como o resto da API",
-    "Sem indice novo em created_at: o schema nao tem migrations e a tabela e pequena; fica como risco registrado"
+    "PUT devolve 200 com a categoria atualizada e DELETE devolve 204 sem corpo, conforme o contrato de integração do front",
+    "GET ordena por nome ascendente, reutilizando o repository existente",
+    "Limites de name e description seguem o schema existente: 100 e 255 caracteres; name não é único porque o C6 não definiu unicidade",
+    "description ausente ou nula é serializada como string vazia no response",
+    "draftCount conta DRAFT e PUBLISHED_WITH_CHANGES; publishedCount conta PUBLISHED e PUBLISHED_WITH_CHANGES",
+    "DELETE verifica perguntas vinculadas antes da remoção e responde 409 em vez de permitir o ON DELETE CASCADE",
+    "A autorização administrativa existente em /api/v1/admin/** será reutilizada, exigindo o grupo Cognito admin"
   ],
   "files_in_scope": [
-    "src/main/java/br/com/finup/controller/AdminMetricsController.java",
-    "src/main/java/br/com/finup/service/AdminMetricsService.java",
-    "src/main/java/br/com/finup/model/MetricsPeriod.java",
-    "src/main/java/br/com/finup/dto/MetricValueResponse.java",
-    "src/main/java/br/com/finup/dto/MetricsSummaryResponse.java",
-    "src/main/java/br/com/finup/dto/UserGrowthPointResponse.java",
-    "src/main/java/br/com/finup/dto/UserGrowthResponse.java",
-    "src/main/java/br/com/finup/exception/InvalidMetricsParameterException.java",
-    "src/main/java/br/com/finup/repository/UserRepository.java",
-    "src/main/java/br/com/finup/repository/TransactionRepository.java",
-    "src/main/java/br/com/finup/security/CognitoGroupsJwtAuthenticationConverter.java",
-    "src/main/java/br/com/finup/security/ProblemDetailAccessDeniedHandler.java",
-    "src/main/java/br/com/finup/config/SecurityConfig.java",
-    "src/test/java/br/com/finup/service/AdminMetricsServiceTest.java",
-    "src/test/java/br/com/finup/controller/AdminMetricsControllerTest.java",
-    "src/test/java/br/com/finup/security/CognitoGroupsJwtAuthenticationConverterTest.java",
-    "src/test/java/br/com/finup/config/SecurityConfigTest.java",
-    "src/test/java/br/com/finup/repository/UserRepositoryTest.java",
-    "src/test/java/br/com/finup/repository/TransactionRepositoryTest.java",
+    "src/main/java/br/com/finup/controller/AdminStudyCategoryController.java",
+    "src/main/java/br/com/finup/dto/StudyCategoryRequest.java",
+    "src/main/java/br/com/finup/dto/StudyCategoryResponse.java",
+    "src/main/java/br/com/finup/mapper/StudyCategoryMapper.java",
+    "src/main/java/br/com/finup/repository/StudyCategoryRepository.java",
+    "src/main/java/br/com/finup/repository/StudyQuestionRepository.java",
+    "src/main/java/br/com/finup/service/StudyCategoryService.java",
+    "src/test/java/br/com/finup/controller/AdminStudyCategoryControllerTest.java",
+    "src/test/java/br/com/finup/service/StudyCategoryServiceTest.java",
+    "src/test/java/br/com/finup/AdminAuthIntegrationTests.java",
     "README.md",
     ".railforge/state.json"
   ],
   "plan": [
-    "Consolidar estrategia aprovada no fluxo existente e atualizar contrato e documentacao.",
-    "Validar titulo salvo e listado, normalizacao, limite, Unicode, turnos seguintes, conversas antigas e texto inutilizavel.",
-    "Executar Maven verify, revisar diff e atualizar e reler estado."
+    "Inspecionar as classes da modelagem C6 e padrões de controllers admin, erros e testes.",
+    "Implementar request/response, CRUD administrativo, contagens agregadas no banco e conflito de remoção.",
+    "Adicionar testes de integração/web para CRUD, validação, 404, 409 e segurança ADMIN.",
+    "Atualizar Swagger/documentação, executar validação Maven e revisar o diff final."
   ],
   "validation": {
-    "mvn clean verify": "passed em 2026-10-16 sobre o merge da develop 135dd68 (#46) com o mecanismo de grupo desta branch: 384 testes, 0 falhas, spotless ok. Antes do merge: 349 testes em 2026-10-15",
-    "testes novos": "AdminMetricsServiceTest (calculo de periodos, changePct, meses vazios, fuso, parametros invalidos), AdminMetricsControllerTest (200, 400, 401 e 403 dos dois endpoints, com o filtro de seguranca e o conversor de grupos reais), CognitoGroupsJwtAuthenticationConverterTest, e contagens nos repositorios de usuario e transacao (limites do intervalo, recorrencia)",
-    "postgres real (profile dev,mock-auth)": "validado em 2026-10-15: summary 30d e 7d, user-growth com 6 e 3 meses e os 400 (period fora do enum ou ausente, months abc, -1 e 25) responderam como esperado; usuarios novos (5) e ativos (1) bateram com a contagem direta em SQL no mesmo banco",
-    "cognito real (profile dev)": "validado em 2026-10-15 com access token real de usuario do grupo admin, contra o Postgres local com dados de teste em datas variadas: summary 7d, 30d e 90d e user-growth (6, 3, 1 e 24 meses) bateram com o valor calculado em SQL, incluindo changePct nao nulo, mes sem cadastro e exclusao de ocorrencia gerada por recorrencia; 10 casos de 400; 401 sem token, com token malformado, com assinatura adulterada e com payload adulterado",
-    "cognito real apos o merge com a develop (#46)": "revalidado em 2026-10-16 com access token real do grupo admin, sobre a branch ja mesclada: summary (7d, 30d, 90d), user-growth (6, 3, 1 e 24 meses), 10 casos de 400 e 4 de 401 (inclusive assinatura e payload adulterados) conforme o esperado em SQL; /admin/me e /admin/dashboard/widgets 200 com admin e 401 sem token; /users/me e /categories 200. O esperado de newUsers 7d mudou de 6/1 para 5/1 porque a janela e movel e um dia se passou (confirmado em SQL), sem relacao com o codigo",
-    "nao validado": "403 com token real de usuario fora do grupo admin (coberto so por teste com decoder JWT simulado); indice em created_at e desempenho com volume real; payload com o front do dashboard"
+    "focused tests": "passed: AdminStudyCategoryControllerTest (7), StudyCategoryServiceTest (7), StudyCategoryMapperTest, StudyCategoryTest, StudyQuestionTest",
+    "integration CRUD tests": "passed: AdminStudyCategoryIntegrationTests (4), cobrindo CRUD, 400, 404 e 409",
+    "security and OpenAPI tests": "passed: AdminAuthIntegrationTests (14), incluindo 403 em GET/POST/PUT/DELETE, e OpenApiIntegrationTests",
+    "mvn clean verify": "passed em 2026-10-22 após a suíte de integração; código de saída 0, sem falhas ou erros",
+    "diff check": "passed: git diff --check",
+    "not validated": "CI remoto, aprovação de code review e merge na branch principal dependem do PR"
   },
-  "review": "Implementacao completa e validada em 2026-10-15; diff revisado. Commit e push autorizados pelo solicitante em 2026-10-15. PR contra a develop a ser aberto pelo solicitante (gh nao esta instalado). Pendente: validar o payload com o front, aprovacao e merge do PR, e confirmar o grupo admin nos User Pools de homologacao e producao. Dados de teste do banco local removidos.",
-  "updated_at": "2026-10-16",
-  "open_questions": [
-    "Definicao de growthPct e de changePct com previousValue = 0 sao leituras minhas do contrato C3: confirmar com o front do dashboard",
-    "O grupo 'admin' ja existe no User Pool de desenvolvimento (confirmado com token real em 2026-10-15); confirmar o mesmo nos User Pools de homologacao e producao antes do deploy, e os admins precisam logar de novo para o token trazer o claim",
-    "Backlog separado a registrar: receita, custo operacional e plano"
-  ]
+  "review": "Implementação revisada localmente: controller admin, validação, 404, 409, 204, contagens agregadas, normalização de description, Swagger e documentação conferidos. Nenhum commit foi criado.",
+  "updated_at": "2026-10-22",
+  "open_questions": []
 }

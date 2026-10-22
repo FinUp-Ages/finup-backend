@@ -5,8 +5,11 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -17,6 +20,7 @@ import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.service.UserService;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -159,12 +163,40 @@ class AdminAuthIntegrationTests {
   }
 
   @Test
-  @DisplayName("a regra vale para todo /api/v1/admin/**, inclusive os widgets do dashboard")
+  @DisplayName("a regra vale para todo /api/v1/admin/**, inclusive widgets e categorias")
   void otherAdminRoutesAlsoRequireAdminGroup() throws Exception {
     when(jwtDecoder.decode(TOKEN)).thenReturn(accessToken().build());
 
     mockMvc
         .perform(withToken(get("/api/v1/admin/dashboard/widgets")))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.status").value(403));
+
+    mockMvc
+        .perform(withToken(get("/api/v1/admin/study-tracks/categories")))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.status").value(403));
+
+    mockMvc
+        .perform(
+            withToken(
+                post("/api/v1/admin/study-tracks/categories")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"name\":\"CDB\"}")))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.status").value(403));
+
+    mockMvc
+        .perform(
+            withToken(
+                put("/api/v1/admin/study-tracks/categories/" + UUID.randomUUID())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"name\":\"CDB\"}")))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.status").value(403));
+
+    mockMvc
+        .perform(withToken(delete("/api/v1/admin/study-tracks/categories/" + UUID.randomUUID())))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.status").value(403));
 

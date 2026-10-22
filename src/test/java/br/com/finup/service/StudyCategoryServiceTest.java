@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.finup.dto.StudyCategoryRequest;
 import br.com.finup.dto.StudyCategoryResponse;
+import br.com.finup.exception.ConflictException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.mapper.StudyCategoryMapper;
 import br.com.finup.model.QuestionType;
@@ -110,5 +112,63 @@ class StudyCategoryServiceTest {
     assertThatThrownBy(() -> categoryService.getCategoryById(id))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("Categoria da trilha não encontrada");
+  }
+
+  @Test
+  @DisplayName("Deve criar categoria com nome e descrição")
+  void shouldCreateCategory() {
+    StudyCategory category = new StudyCategory("CDB", "Renda fixa");
+    when(categoryRepository.save(org.mockito.ArgumentMatchers.any(StudyCategory.class)))
+        .thenReturn(category);
+    when(questionRepository.findByCategoryId(category.getId())).thenReturn(List.of());
+
+    StudyCategoryResponse response =
+        categoryService.create(new StudyCategoryRequest(" CDB ", " Renda fixa "));
+
+    assertThat(response.name()).isEqualTo("CDB");
+    assertThat(response.description()).isEqualTo("Renda fixa");
+  }
+
+  @Test
+  @DisplayName("Deve atualizar categoria existente")
+  void shouldUpdateCategory() {
+    UUID id = UUID.randomUUID();
+    StudyCategory category = new StudyCategory(id, "CDB", null);
+    when(categoryRepository.findById(id)).thenReturn(Optional.of(category));
+    when(categoryRepository.save(category)).thenReturn(category);
+    when(questionRepository.findByCategoryId(id)).thenReturn(List.of());
+
+    StudyCategoryResponse response =
+        categoryService.update(id, new StudyCategoryRequest("Tesouro", null));
+
+    assertThat(response.name()).isEqualTo("Tesouro");
+    assertThat(response.description()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("Não deve remover categoria que possui perguntas")
+  void shouldRejectDeleteWhenCategoryHasQuestions() {
+    UUID id = UUID.randomUUID();
+    when(categoryRepository.findById(id))
+        .thenReturn(Optional.of(new StudyCategory(id, "CDB", null)));
+    when(questionRepository.existsByCategoryId(id)).thenReturn(true);
+
+    assertThatThrownBy(() -> categoryService.delete(id))
+        .isInstanceOf(ConflictException.class)
+        .hasMessageContaining("A categoria possui perguntas");
+  }
+
+  @Test
+  @DisplayName("Deve remover categoria sem perguntas")
+  void shouldDeleteCategoryWithoutQuestions() {
+    UUID id = UUID.randomUUID();
+    when(categoryRepository.findById(id))
+        .thenReturn(Optional.of(new StudyCategory(id, "CDB", null)));
+    when(questionRepository.existsByCategoryId(id)).thenReturn(false);
+
+    categoryService.delete(id);
+
+    verify(categoryRepository).deleteById(id);
+    verify(categoryRepository).flush();
   }
 }
