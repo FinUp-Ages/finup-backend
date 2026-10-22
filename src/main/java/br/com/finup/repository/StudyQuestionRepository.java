@@ -13,6 +13,8 @@ public interface StudyQuestionRepository extends JpaRepository<StudyQuestion, UU
 
   List<StudyQuestion> findByCategoryIdOrderByCreatedAtAsc(UUID categoryId);
 
+  boolean existsByCategoryId(UUID categoryId);
+
   @Query(
       value =
           """
