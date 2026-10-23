@@ -12,7 +12,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.finup.dto.DashboardWidgetsResponse;
+import br.com.finup.dto.MetricValueResponse;
+import br.com.finup.dto.MetricsSummaryResponse;
+import br.com.finup.dto.UserGrowthResponse;
 import br.com.finup.model.User;
+import br.com.finup.service.AdminMetricsService;
 import br.com.finup.service.DashboardWidgetService;
 import br.com.finup.service.UserService;
 import java.time.Instant;
@@ -111,10 +115,14 @@ class AdminRoutesSecurityIntegrationTests {
    * da requisicao ({@code null} quando nao ha). Rota admin nova precisa de uma linha aqui.
    */
   private static final Map<String, SuccessCase> SUCCESS_CASES =
-      Map.of(
-          "GET /api/v1/admin/me", new SuccessCase(HttpStatus.OK, null),
-          "GET /api/v1/admin/dashboard/widgets", new SuccessCase(HttpStatus.OK, null),
-          "PUT /api/v1/admin/dashboard/widgets", new SuccessCase(HttpStatus.OK, WIDGETS_BODY));
+      Map.ofEntries(
+          Map.entry("GET /api/v1/admin/me", new SuccessCase(HttpStatus.OK, null)),
+          Map.entry("GET /api/v1/admin/dashboard/widgets", new SuccessCase(HttpStatus.OK, null)),
+          Map.entry(
+              "PUT /api/v1/admin/dashboard/widgets", new SuccessCase(HttpStatus.OK, WIDGETS_BODY)),
+          Map.entry("GET /api/v1/admin/metrics/summary", new SuccessCase(HttpStatus.OK, null)),
+          Map.entry(
+              "GET /api/v1/admin/metrics/user-growth", new SuccessCase(HttpStatus.OK, null)));
 
   @Autowired private MockMvc mockMvc;
 
@@ -129,6 +137,8 @@ class AdminRoutesSecurityIntegrationTests {
 
   @MockitoBean private DashboardWidgetService dashboardWidgetService;
 
+  @MockitoBean private AdminMetricsService adminMetricsService;
+
   @BeforeEach
   void stubServices() {
     when(userService.findByAuthenticatedIdentity(any()))
@@ -136,6 +146,11 @@ class AdminRoutesSecurityIntegrationTests {
     when(dashboardWidgetService.find(any())).thenReturn(new DashboardWidgetsResponse(List.of()));
     when(dashboardWidgetService.replace(any(), any()))
         .thenReturn(new DashboardWidgetsResponse(List.of()));
+    when(adminMetricsService.summary(any()))
+        .thenReturn(
+            new MetricsSummaryResponse(
+                new MetricValueResponse(0, 0, 0), new MetricValueResponse(0, 0, 0)));
+    when(adminMetricsService.userGrowth(any())).thenReturn(new UserGrowthResponse(0, List.of()));
   }
 
   @Test
