@@ -18,7 +18,18 @@ import java.util.regex.Pattern;
 public enum RiskySpending {
   BETS("Apostas/bets", "\\bbets?\\b", "\\bapostas?\\b", "\\bcassino\\b", "jogos? de azar"),
   ALCOHOL("Bebidas alcoolicas", "bebidas? alcoolicas?", "\\balcool\\b", "\\bcervejas?\\b"),
-  DRUGS("Drogas", "\\bdrogas?\\b", "\\bentorpecentes?\\b");
+  DRUGS("Drogas", "\\bdrogas?\\b", "\\bentorpecentes?\\b"),
+  TOBACCO(
+      "Cigarro e tabaco",
+      "\\bcigarros?\\b",
+      "\\bcigarros? eletronicos?\\b",
+      "\\btabacos?\\b",
+      "\\btabacarias?\\b",
+      "\\bfumo\\b",
+      "\\bcharutos?\\b",
+      "\\bnarguiles?\\b",
+      "\\bvapes?\\b",
+      "\\bpods?\\b");
 
   private final String label;
   private final Pattern pattern;
