@@ -90,6 +90,10 @@ API já esperando o banco ficar `healthy` antes de iniciar.
 > executados quando o volume do Postgres está vazio. Vindo de uma versão anterior do banco, o container
 > sobe com o schema velho e os erros aparecem em SQL, não em configuração. Nesse caso, recrie o volume
 > antes — veja [Apagar o banco local e começar do zero](#apagar-o-banco-local-e-começar-do-zero).
+>
+> Para a coluna `users.last_seen_at` (último acesso), não precisa apagar o banco: com o `db` de pé,
+> `docker compose exec db psql -U $DB_USER -d $DB_NAME -c "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ"`.
+> Sem ela, toda rota que carrega o usuário responde `500` (`column ... last_seen_at does not exist`).
 
 **Ponto de atenção ao testar com o app mobile na mesma rede:** o `CORS_ALLOWED_ORIGINS` do `.env`
 só libera as origens já cadastradas (por padrão, `localhost` em algumas portas). Se o app mobile
@@ -132,7 +136,7 @@ consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o b
 |---|---|
 | `POST /api/v1/users/email-availability` | **público, sem token.** Diz se um e-mail já está cadastrado (`{"available": true\|false}`). Usado pelo formulário de cadastro |
 | `POST /api/v1/users` | cria o registro local da identidade autenticada. Corpo vazio |
-| `GET /api/v1/users/me` | devolve o usuário da identidade autenticada |
+| `GET /api/v1/users/me` | devolve o usuário da identidade autenticada e registra o último acesso (`last_seen_at`, no máximo uma vez por hora) |
 | `GET /api/v1/users/{id}` | devolve o próprio usuário (outro id dá `404`) |
 | `PATCH /api/v1/users/me/additional-info` | grava as informações complementares (Etapas 2 e 3 do cadastro) |
 | `POST /api/v1/users/me/finup-score/recalculate` | recalcula e persiste o FinUp Score |

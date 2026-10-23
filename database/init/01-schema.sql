@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Instante do ultimo GET /api/v1/users/me, gravado no maximo uma vez por hora (ver
--- User.touchLastSeen). Usado para a regra de status ACTIVE/INACTIVE (ultimos 7 dias) no
+-- UserRepository.touchLastSeen). Usado para a regra de status ACTIVE/INACTIVE (ultimos 7 dias) no
 -- GET /admin/users e na tabela de analise de usuarios do painel.
 -- Este script so roda quando o volume do Postgres e criado: quem ja tem o volume precisa
 -- recria-lo (docker compose down -v) ou aplicar este ALTER a mao.
