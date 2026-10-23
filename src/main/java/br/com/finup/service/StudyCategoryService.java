@@ -1,6 +1,8 @@
 package br.com.finup.service;
 
+import br.com.finup.dto.StudyCategoryRequest;
 import br.com.finup.dto.StudyCategoryResponse;
+import br.com.finup.exception.ConflictException;
 import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.mapper.StudyCategoryMapper;
 import br.com.finup.model.StudyCategory;
@@ -45,8 +47,46 @@ public class StudyCategoryService {
     return mapWithQuestionCounts(category);
   }
 
+  @Transactional
+  public StudyCategoryResponse create(StudyCategoryRequest request) {
+    StudyCategory category = new StudyCategory(request.name(), request.description());
+    StudyCategory saved = categoryRepository.save(category);
+    return mapWithQuestionCounts(saved);
+  }
+
+  @Transactional
+  public StudyCategoryResponse update(UUID id, StudyCategoryRequest request) {
+    StudyCategory category = findByIdOrThrow(id);
+    category.setName(request.name());
+    category.setDescription(request.description());
+    return mapWithQuestionCounts(categoryRepository.save(category));
+  }
+
+  @Transactional
+  public void delete(UUID id) {
+    findByIdOrThrow(id);
+    if (questionRepository.existsByCategoryId(id)) {
+      throw new ConflictException(
+          "A categoria possui perguntas e não pode ser removida. Remova as perguntas antes.");
+    }
+    categoryRepository.deleteById(id);
+    categoryRepository.flush();
+  }
+
   private StudyCategoryResponse mapWithQuestionCounts(StudyCategory category) {
+    StudyQuestionRepository.CategoryCountProjection counts =
+        questionRepository.countAggregatedByCategoryId(category.getId());
+    if (counts != null) {
+      return categoryMapper.toResponse(
+          category, counts.getDraftCount(), counts.getPublishedCount());
+    }
     List<StudyQuestion> questions = questionRepository.findByCategoryId(category.getId());
     return categoryMapper.toResponse(category, questions);
+  }
+
+  private StudyCategory findByIdOrThrow(UUID id) {
+    return categoryRepository
+        .findById(id)
+        .orElseThrow(() -> new ResourceNotFoundException("Categoria da trilha não encontrada"));
   }
 }
