@@ -60,6 +60,15 @@ class OpenApiIntegrationTests {
             jsonPath("$.paths['/api/v1/transactions'].get.parameters[*].name")
                 .value(org.hamcrest.Matchers.containsInAnyOrder("from", "to")))
         .andExpect(jsonPath("$.paths['/api/v1/categories'].get").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/study-tracks/categories'].get").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/study-tracks/categories/{id}/questions'].get").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.StudyTrackQuestionResponse.properties.published")
+                .exists())
+        .andExpect(
+            jsonPath("$.components.schemas.StudyTrackQuestionResponse.properties.draft")
+                .doesNotExist())
         .andExpect(jsonPath("$.paths['/api/v1/assistant/conversations'].get").exists())
         .andExpect(
             jsonPath("$.components.schemas.ConversationResponse.properties.title.description")

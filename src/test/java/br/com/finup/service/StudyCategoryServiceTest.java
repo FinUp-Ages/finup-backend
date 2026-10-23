@@ -7,8 +7,8 @@ import static org.mockito.Mockito.when;
 
 import br.com.finup.dto.StudyCategoryRequest;
 import br.com.finup.dto.StudyCategoryResponse;
+import br.com.finup.exception.CategoryNotFoundException;
 import br.com.finup.exception.ConflictException;
-import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.mapper.StudyCategoryMapper;
 import br.com.finup.model.QuestionType;
 import br.com.finup.model.StudyCategory;
@@ -110,7 +110,7 @@ class StudyCategoryServiceTest {
     when(categoryRepository.findById(id)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> categoryService.getCategoryById(id))
-        .isInstanceOf(ResourceNotFoundException.class)
+        .isInstanceOf(CategoryNotFoundException.class)
         .hasMessageContaining("Categoria da trilha não encontrada");
   }
 

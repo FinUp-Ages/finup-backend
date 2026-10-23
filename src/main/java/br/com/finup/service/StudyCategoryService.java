@@ -2,8 +2,8 @@ package br.com.finup.service;
 
 import br.com.finup.dto.StudyCategoryRequest;
 import br.com.finup.dto.StudyCategoryResponse;
+import br.com.finup.exception.CategoryNotFoundException;
 import br.com.finup.exception.ConflictException;
-import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.mapper.StudyCategoryMapper;
 import br.com.finup.model.StudyCategory;
 import br.com.finup.model.StudyQuestion;
@@ -43,7 +43,7 @@ public class StudyCategoryService {
     StudyCategory category =
         categoryRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Categoria da trilha não encontrada"));
+            .orElseThrow(() -> new CategoryNotFoundException("Categoria da trilha não encontrada"));
     return mapWithQuestionCounts(category);
   }
 
@@ -87,6 +87,6 @@ public class StudyCategoryService {
   private StudyCategory findByIdOrThrow(UUID id) {
     return categoryRepository
         .findById(id)
-        .orElseThrow(() -> new ResourceNotFoundException("Categoria da trilha não encontrada"));
+        .orElseThrow(() -> new CategoryNotFoundException("Categoria da trilha não encontrada"));
   }
 }
