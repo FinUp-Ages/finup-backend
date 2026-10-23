@@ -15,11 +15,14 @@ import br.com.finup.dto.DashboardWidgetsResponse;
 import br.com.finup.dto.MetricValueResponse;
 import br.com.finup.dto.MetricsSummaryResponse;
 import br.com.finup.dto.StudyCategoryResponse;
+import br.com.finup.dto.StudyQuestionResponse;
 import br.com.finup.dto.UserGrowthResponse;
+import br.com.finup.model.QuestionStatus;
 import br.com.finup.model.User;
 import br.com.finup.service.AdminMetricsService;
 import br.com.finup.service.DashboardWidgetService;
 import br.com.finup.service.StudyCategoryService;
+import br.com.finup.service.StudyQuestionService;
 import br.com.finup.service.UserService;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -112,6 +115,8 @@ class AdminRoutesSecurityIntegrationTests {
 
   private static final String CATEGORY_BODY = "{\"name\":\"CDB\",\"description\":\"Renda fixa\"}";
 
+  private static final String QUESTION_BODY = "{\"type\":\"FILL_BLANK\"}";
+
   private static final String WIDGETS_BODY =
       "{\"widgets\":[{\"id\":\"NEW_CLIENTS\",\"enabled\":true,\"position\":0}]}";
 
@@ -138,6 +143,18 @@ class AdminRoutesSecurityIntegrationTests {
               new SuccessCase(HttpStatus.OK, CATEGORY_BODY)),
           Map.entry(
               "DELETE /api/v1/admin/study-tracks/categories/{id}",
+              new SuccessCase(HttpStatus.NO_CONTENT, null)),
+          Map.entry(
+              "POST /api/v1/admin/study-tracks/categories/{categoryId}/questions",
+              new SuccessCase(HttpStatus.CREATED, QUESTION_BODY)),
+          Map.entry(
+              "GET /api/v1/admin/study-tracks/categories/{categoryId}/questions",
+              new SuccessCase(HttpStatus.OK, null)),
+          Map.entry(
+              "PUT /api/v1/admin/study-tracks/questions/{id}",
+              new SuccessCase(HttpStatus.OK, QUESTION_BODY)),
+          Map.entry(
+              "DELETE /api/v1/admin/study-tracks/questions/{id}",
               new SuccessCase(HttpStatus.NO_CONTENT, null)));
 
   @Autowired private MockMvc mockMvc;
@@ -157,6 +174,8 @@ class AdminRoutesSecurityIntegrationTests {
 
   @MockitoBean private StudyCategoryService studyCategoryService;
 
+  @MockitoBean private StudyQuestionService studyQuestionService;
+
   @BeforeEach
   void stubServices() {
     when(userService.findByAuthenticatedIdentity(any()))
@@ -175,6 +194,17 @@ class AdminRoutesSecurityIntegrationTests {
     when(studyCategoryService.listCategories()).thenReturn(List.of(category));
     when(studyCategoryService.create(any())).thenReturn(category);
     when(studyCategoryService.update(any(), any())).thenReturn(category);
+    StudyQuestionResponse question =
+        new StudyQuestionResponse(
+            UUID.fromString(PATH_VARIABLE_VALUE),
+            QuestionStatus.DRAFT,
+            Map.of(),
+            null,
+            Instant.now(),
+            null);
+    when(studyQuestionService.create(any(), any())).thenReturn(question);
+    when(studyQuestionService.findByCategory(any())).thenReturn(List.of(question));
+    when(studyQuestionService.update(any(), any())).thenReturn(question);
   }
 
   @Test
