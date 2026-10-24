@@ -176,8 +176,7 @@ class AdminAuthIntegrationTests {
   void regularUserStillReachesNonAdminRoutes() throws Exception {
     User user = User.createFromCognitoIdentity(SUB, "Ana Souza", "ana@exemplo.com");
     when(jwtDecoder.decode(TOKEN)).thenReturn(accessToken().build());
-    when(userService.findByAuthenticatedIdentity(new AuthenticatedIdentity(SUB, null, null)))
-        .thenReturn(user);
+    when(userService.recordAccess(new AuthenticatedIdentity(SUB, null, null))).thenReturn(user);
 
     mockMvc
         .perform(withToken(get("/api/v1/users/me")))

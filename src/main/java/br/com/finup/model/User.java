@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
@@ -24,6 +25,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "users")
 public class User {
+
+  private static final Duration ACTIVE_WINDOW = Duration.ofDays(7);
 
   @Id private UUID id;
 
@@ -54,6 +57,9 @@ public class User {
 
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
+
+  @Column(name = "last_seen_at")
+  private Instant lastSeenAt;
 
   protected User() {}
 
@@ -104,6 +110,19 @@ public class User {
    */
   public void updateFinUpScore(int newFinUpScore) {
     this.finUpScore = newFinUpScore;
+  }
+
+  /**
+   * Status derivado de {@code lastSeenAt}: ACTIVE se o ultimo acesso registrado foi nos ultimos 7
+   * dias. Quem nunca chamou {@code GET /api/v1/users/me} (lastSeenAt nulo) conta como inativo.
+   *
+   * <p>{@code lastSeenAt} e gravado direto no banco por {@link
+   * br.com.finup.repository.UserRepository#touchLastSeen}, sem passar por um setter nesta classe —
+   * assim o {@code GET /me} nunca aciona o {@link #markAsUpdated()}. Uma entidade carregada do
+   * banco reflete o valor atual normalmente, porque o mapeamento JPA preenche o campo na leitura.
+   */
+  public boolean isActive(Instant now) {
+    return lastSeenAt != null && Duration.between(lastSeenAt, now).compareTo(ACTIVE_WINDOW) <= 0;
   }
 
   @PreUpdate
@@ -157,6 +176,10 @@ public class User {
 
   public Instant getUpdatedAt() {
     return updatedAt;
+  }
+
+  public Instant getLastSeenAt() {
+    return lastSeenAt;
   }
 
   /** Identidade de entidade e o id — dois usuarios com o mesmo id sao o mesmo usuario. */
