@@ -17,6 +17,9 @@ import br.com.finup.repository.UserFinancialProfileRepository;
 import br.com.finup.repository.UserRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,6 +44,8 @@ class UserServiceTest {
   @Mock private UserRepository userRepository;
 
   @Mock private UserFinancialProfileRepository userFinancialProfileRepository;
+
+  @Mock private Clock clock;
 
   @InjectMocks private UserService userService;
 
@@ -268,5 +273,35 @@ class UserServiceTest {
     when(userRepository.existsByEmail("ana@exemplo.com")).thenReturn(true);
 
     assertThat(userService.isEmailAvailable("  Ana@Exemplo.COM ")).isFalse();
+  }
+
+  @Test
+  @DisplayName("recordAccess pede ao repositorio para gravar o acesso, com throttle de uma hora")
+  void recordAccessDelegatesToRepositoryWithOneHourThrottle() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
+    User existing =
+        User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
+    Instant now = Instant.parse("2026-10-09T12:00:00Z");
+    when(userRepository.findByCognitoId("cognito-sub-123")).thenReturn(Optional.of(existing));
+    when(clock.instant()).thenReturn(now);
+
+    User result = userService.recordAccess(identity);
+
+    assertThat(result).isSameAs(existing);
+    verify(userRepository).touchLastSeen(existing.getId(), now, now.minus(Duration.ofHours(1)));
+  }
+
+  @Test
+  @DisplayName("recordAccess com identidade sem usuario local lanca ResourceNotFoundException")
+  void recordAccessThrowsWhenIdentityHasNoLocalUser() {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-999", "Ana Souza", "ana@exemplo.com");
+    when(userRepository.findByCognitoId("cognito-sub-999")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> userService.recordAccess(identity))
+        .isInstanceOf(ResourceNotFoundException.class);
+
+    verify(userRepository, never()).touchLastSeen(any(), any(), any());
   }
 }

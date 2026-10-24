@@ -1,41 +1,38 @@
 {
   "stage": "REVIEWING",
-  "task": "Definir e consolidar titulos das conversas do assistente",
-  "objective": "Persistir title de novas conversas sem comprometer o envio da mensagem e documentar quando pode vir null",
+  "task": "Registrar o ultimo acesso do usuario no GET /api/v1/users/me (PR #45, task 86e3m95jz)",
+  "objective": "Gravar users.last_seen_at quando o app chama GET /api/v1/users/me, no maximo uma vez por hora, sem alterar updated_at, e deixar no dominio a regra de status ACTIVE (acesso nos ultimos 7 dias) para o futuro GET /admin/users.",
   "decisions": [
-    "Fluxo implementado: POST /api/v1/ai/assistant; consumidor: menu de historico via GET /api/v1/assistant/conversations.",
-    "Decisao do solicitante em 2026-10-17: recorte normalizado da primeira mensagem, ate 80 pontos de codigo incluindo reticencias; sem chamada extra ao Bedrock.",
-    "Titulo preservado nos turnos seguintes. Conversas antigas sem titulo permanecem nulas, inclusive quando recebem novos turnos. Sem backfill ou migracao.",
-    "Texto ausente ou vazio apos normalizacao deixa o titulo nulo sem impedir a criacao da conversa; app deve manter fallback.",
-    "Coluna title existente suporta o limite. Autorizacao por dono preservada. Historico gravado apos a acao, em melhor esforco."
+    "Gravacao por UPDATE direto no UserRepository.touchLastSeen: nao aciona o @PreUpdate markAsUpdated() (updatedAt e sobre o cadastro, nao sobre acesso) e deixa o throttle de 1 hora atomico no WHERE",
+    "Status nao e coluna: User.isActive(now) deriva de last_seen_at; nulo (nunca abriu o app) conta como inativo",
+    "So o GET /me registra acesso; as outras rotas que buscam o usuario nao tocam em last_seen_at",
+    "Coluna nova via ALTER TABLE ... ADD COLUMN IF NOT EXISTS em database/init/01-schema.sql, no padrao atual (sem ferramenta de migration)"
   ],
   "files_in_scope": [
-    "src/main/java/br/com/finup/service/ConversationService.java",
-    "src/main/java/br/com/finup/model/Conversation.java",
-    "src/main/java/br/com/finup/dto/ConversationResponse.java",
-    "src/test/java/br/com/finup/service/ConversationServiceTest.java",
-    "src/test/java/br/com/finup/OpenApiIntegrationTests.java",
+    "database/init/01-schema.sql",
+    "src/main/java/br/com/finup/model/User.java",
+    "src/main/java/br/com/finup/repository/UserRepository.java",
+    "src/main/java/br/com/finup/service/UserService.java",
+    "src/main/java/br/com/finup/controller/UserController.java",
+    "src/test/java/br/com/finup/model/UserTest.java",
+    "src/test/java/br/com/finup/repository/UserRepositoryTest.java",
+    "src/test/java/br/com/finup/service/UserServiceTest.java",
+    "src/test/java/br/com/finup/controller/UserControllerTest.java",
+    "src/test/java/br/com/finup/config/SecurityConfigTest.java",
+    "src/test/java/br/com/finup/MockAuthIntegrationTests.java",
+    "src/test/java/br/com/finup/AdminAuthIntegrationTests.java",
+    "README.md",
     ".railforge/state.json"
   ],
-  "plan": [
-    "Consolidar estrategia aprovada no fluxo existente e atualizar contrato e documentacao.",
-    "Validar titulo salvo e listado, normalizacao, limite, Unicode, turnos seguintes, conversas antigas e texto inutilizavel.",
-    "Executar Maven verify, revisar diff e atualizar e reler estado."
-  ],
   "validation": {
-    "maven_verify": "BUILD SUCCESS em 2026-10-17: 284 testes, zero falhas, erros ou ignorados; compilacao, empacotamento e Spotless aprovados apos corrigir quebra de linha no Javadoc de ConversationService.",
-    "titles": "Testes aprovados para titulo salvo e listado, preservacao em turnos seguintes, conversas antigas nulas, limite 80/81, espacos Unicode, emojis e texto inutilizavel sem impedir criacao.",
-    "contracts_and_failures": "Service, controller, repositorio e OpenAPI aprovados: autorizacao por dono, contrato Swagger atualizado e falha de historico sem derrubar resposta. Titulo local sem chamada externa ou timeout.",
-    "diff_check": "git diff --check passou em 2026-10-17; diff de implementacao, contrato e testes revisado.",
-    "limits": "Validacao local com dubles e H2, sem AWS real ou execucao do app contra esta build. Resultados da validacao anterior preservados nesta restauracao do estado.",
-    "merge da develop em 8bb42e4": "passed em 2026-10-19: clean verify sem .env, 321 testes, 0 falhas, 0 erros, 0 ignorados; Spotless aprovado. Com .env dev,mock-auth, OpenApiIntegrationTests, FinUpApplicationTests e ConversationServiceTest passam (16 testes). Diff contra a develop: so os 5 arquivos da tarefa e este registro; git diff --check ok"
+    "mvn clean verify": "passed em 2026-10-23 sobre 79404e4 (ja com a develop 6c3287c): 399 testes, 0 falhas, spotless ok",
+    "postgres real (profile dev,mock-auth)": "validado em 2026-10-23: GET /me 200 grava last_seen_at; segunda chamada em menos de 1h nao altera; com last_seen_at 2h atras grava de novo; updated_at nao muda em nenhuma chamada; sem header 401",
+    "banco anterior a coluna": "reproduzido em 2026-10-23: sem last_seen_at, /me e /categories respondem 500 (column last_seen_at does not exist); o ALTER documentado no README resolve sem apagar o banco"
   },
-  "review": "Criterios atendidos pela abordagem aprovada e validacao automatizada. Em 2026-10-19, apos os merges do #40 e do #49, a develop foi mesclada na branch: conflito so no state.json, mantido o registro desta tarefa e acrescentadas as open_questions herdadas da develop. Codigo revisado sem pedidos de mudanca. Pendente: aprovacao e merge.",
+  "review": "Mudancas pedidas no review de 2026-10-12 atendidas pelo autor (UPDATE direto, teste de updated_at). Ajustes finais do revisor em 2026-10-23: comentario do schema apontando para UserRepository.touchLastSeen, README com o registro de acesso no /me e o ALTER para quem ja tem o volume, e este estado. Pendente: aprovacao e merge.",
+  "updated_at": "2026-10-23",
   "open_questions": [
-    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Em cada ambiente implantado: preencher COGNITO_ADMIN_CLIENT_ID e incluir a origem do painel em CORS_ALLOWED_ORIGINS. Se houver outro User Pool (ex.: producao), conferir nele o grupo 'admin' e o cliente do painel. Passo a passo no README",
-    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Confirmar com o time do painel que o primeiro acesso chama POST /api/v1/users antes de GET /api/v1/admin/me. Se o painel nao puder fazer isso, a alternativa e o backend criar o usuario local no primeiro acesso de um administrador",
-    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Consumidor: GET e PUT /api/v1/admin/dashboard/widgets passam a responder 403 para quem nao esta no grupo admin. Antes qualquer usuario autenticado acessava",
-    "Herdado de origin/develop 135dd68 (autenticacao admin, fora do escopo desta task): Issues #35 e #36 continuam abertas citando o isCurrentUserAdmin() removido pelo #38: a #35 ficou sem objeto e a #36 precisa ser reescrita em termos de papel"
-  ],
-  "updated_at": "2026-10-19"
+    "isActive() e lastSeenAt ainda nao tem consumidor: entram no GET /admin/users (86e3m95y6). O web tipa lastSeenAt como string obrigatoria, mas no back ele e nulo para quem nunca abriu o app",
+    "Duas definicoes de usuario ativo: metrics/summary (#47) usa transacao no periodo; isActive() usa acesso ao app nos ultimos 7 dias. Alinhar nomes ou regra com o time"
+  ]
 }

@@ -125,7 +125,7 @@ public class UserController {
   })
   public UserResponse me() {
     AuthenticatedIdentity identity = authenticatedIdentityResolver.resolveCurrent();
-    User user = userService.findByAuthenticatedIdentity(identity);
+    User user = userService.recordAccess(identity);
     return UserMapper.toResponse(user, userService.findFinancialProfile(user).orElse(null));
   }
 

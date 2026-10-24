@@ -139,7 +139,7 @@ class UserControllerTest {
     User user =
         User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
     when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
-    when(userService.findByAuthenticatedIdentity(identity)).thenReturn(user);
+    when(userService.recordAccess(identity)).thenReturn(user);
 
     mockMvc
         .perform(get("/api/v1/users/me"))
@@ -153,7 +153,7 @@ class UserControllerTest {
     AuthenticatedIdentity identity =
         new AuthenticatedIdentity("cognito-sub-999", "Ana Souza", "ana@exemplo.com");
     when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
-    when(userService.findByAuthenticatedIdentity(identity))
+    when(userService.recordAccess(identity))
         .thenThrow(
             new ResourceNotFoundException("Usuario nao encontrado para a identidade autenticada."));
 
