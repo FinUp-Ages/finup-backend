@@ -1,38 +1,37 @@
 {
   "stage": "REVIEWING",
-  "task": "Registrar o ultimo acesso do usuario no GET /api/v1/users/me (PR #45, task 86e3m95jz)",
-  "objective": "Gravar users.last_seen_at quando o app chama GET /api/v1/users/me, no maximo uma vez por hora, sem alterar updated_at, e deixar no dominio a regra de status ACTIVE (acesso nos ultimos 7 dias) para o futuro GET /admin/users.",
+  "task": "Modelagem da Trilha de Estudos (ClickUp 86e3m95k1, contrato C6, PR #51)",
+  "objective": "Tabelas, entidades, status derivado e contagens de categoria e pergunta da trilha, com contrato e seed no mesmo formato de conteudo usado pela API de escrita e pelo painel",
   "decisions": [
-    "Gravacao por UPDATE direto no UserRepository.touchLastSeen: nao aciona o @PreUpdate markAsUpdated() (updatedAt e sobre o cadastro, nao sobre acesso) e deixa o throttle de 1 hora atomico no WHERE",
-    "Status nao e coluna: User.isActive(now) deriva de last_seen_at; nulo (nunca abriu o app) conta como inativo",
-    "So o GET /me registra acesso; as outras rotas que buscam o usuario nao tocam em last_seen_at",
-    "Coluna nova via ALTER TABLE ... ADD COLUMN IF NOT EXISTS em database/init/01-schema.sql, no padrao atual (sem ferramenta de migration)"
+    "Schema JSON de draft/published alinhado a task 86e3m95y3 (PR #54) e ao finup-web: FILL_BLANK {type,title,statement,answers,explanation}, MULTIPLE_CHOICE {type,statement,options[{text,correct}],explanation}, LEARNING {type,title,body}. O formato anterior (textWithBlanks, correctOptionId, content) nao tinha consumidor.",
+    "FK study_questions.category_id sem ON DELETE, como as demais FKs do schema: o banco recusa remover categoria com perguntas, reforcando o 409 da task 86e3m9600.",
+    "Classes Java da modelagem mantidas sem alteracao: StudyCategoryService, StudyQuestionRepository, StudyCategoryMapper e StudyCategoryServiceTest sao alterados pelos PRs #53, #54 e #55, que dependem desta base. O uso da query agregada no service fica com o #55.",
+    "Sem ferramenta de migration (issue #15): database/migrations documenta a mudanca e o rollback; database/init continua sendo o que o compose executa."
   ],
   "files_in_scope": [
+    "contracts/study-track-c6.md",
     "database/init/01-schema.sql",
-    "src/main/java/br/com/finup/model/User.java",
-    "src/main/java/br/com/finup/repository/UserRepository.java",
-    "src/main/java/br/com/finup/service/UserService.java",
-    "src/main/java/br/com/finup/controller/UserController.java",
-    "src/test/java/br/com/finup/model/UserTest.java",
-    "src/test/java/br/com/finup/repository/UserRepositoryTest.java",
-    "src/test/java/br/com/finup/service/UserServiceTest.java",
-    "src/test/java/br/com/finup/controller/UserControllerTest.java",
-    "src/test/java/br/com/finup/config/SecurityConfigTest.java",
-    "src/test/java/br/com/finup/MockAuthIntegrationTests.java",
-    "src/test/java/br/com/finup/AdminAuthIntegrationTests.java",
-    "README.md",
+    "database/init/03-test-data.sql",
+    "database/migrations/04-study-tracks-schema.sql",
+    "database/migrations/04-study-tracks-schema-rollback.sql",
+    "database/migrations/05-study-tracks-seed.sql",
     ".railforge/state.json"
   ],
+  "plan": [
+    "Alinhar secao 4 do contrato e os dois seeds ao formato gravado pela API de escrita.",
+    "Remover ON DELETE CASCADE da FK e o BOM dos arquivos SQL e do contrato.",
+    "Validar Maven verify, schema e seed do zero em Postgres 16, rollback e migrations, e aplicacao dos commits dos PRs dependentes."
+  ],
   "validation": {
-    "mvn clean verify": "passed em 2026-10-23 sobre 79404e4 (ja com a develop 6c3287c): 399 testes, 0 falhas, spotless ok",
-    "postgres real (profile dev,mock-auth)": "validado em 2026-10-23: GET /me 200 grava last_seen_at; segunda chamada em menos de 1h nao altera; com last_seen_at 2h atras grava de novo; updated_at nao muda em nenhuma chamada; sem header 401",
-    "banco anterior a coluna": "reproduzido em 2026-10-23: sem last_seen_at, /me e /categories respondem 500 (column last_seen_at does not exist); o ALTER documentado no README resolve sem apagar o banco"
+    "maven_verify": "BUILD SUCCESS em 2026-10-23 com a develop 8b21dfc mesclada: 456 testes, zero falhas ou erros; Spotless aprovado.",
+    "postgres": "postgres:16-alpine isolado em 2026-10-23, com a develop mesclada: database/init sobe do zero (inclui users.last_seen_at do #45); seed com os 3 tipos e os 3 status derivados; contagens 1/1 por categoria; DELETE de categoria com perguntas recusado pela FK (NO ACTION); rollback, 04 e 05 via psql sem erro.",
+    "dependentes": "Commits proprios dos PRs #53, #54 e #55 (0d236ba..head) aplicam sem conflito sobre esta mudanca, exceto o state.json, que cada PR reescreve.",
+    "limits": "Testes de integracao usam H2 com create-drop a partir das entidades; os scripts SQL so foram validados no Postgres manualmente."
   },
-  "review": "Mudancas pedidas no review de 2026-10-12 atendidas pelo autor (UPDATE direto, teste de updated_at). Ajustes finais do revisor em 2026-10-23: comentario do schema apontando para UserRepository.touchLastSeen, README com o registro de acesso no /me e o ALTER para quem ja tem o volume, e este estado. Pendente: aprovacao e merge.",
-  "updated_at": "2026-10-23",
+  "review": "Review do PR #51 apontou divergencia entre o schema JSON documentado/seed e os consumidores (task 86e3m95y3, PR #54, finup-web fillBlankContract.ts). Correcao aplicada sem alterar codigo Java, num commit novo sobre 0d236ba; a develop (8b21dfc, #45) foi mesclada na branch em 2026-10-23, sem conflito e sem reescrever historico, porque o #54 usa esta branch como base e o #53/#55 levam o 0d236ba. Pendente: aprovacao e merge. Mergear com merge commit (nao squash) para o 0d236ba virar ancestral da develop: assim #53 e #55 nao precisam de rebase, e o #54 so troca a base para develop.",
   "open_questions": [
-    "isActive() e lastSeenAt ainda nao tem consumidor: entram no GET /admin/users (86e3m95y6). O web tipa lastSeenAt como string obrigatoria, mas no back ele e nulo para quem nunca abriu o app",
-    "Duas definicoes de usuario ativo: metrics/summary (#47) usa transacao no periodo; isActive() usa acesso ao app nos ultimos 7 dias. Alinhar nomes ou regra com o time"
-  ]
+    "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): isActive() e lastSeenAt ainda nao tem consumidor: entram no GET /admin/users (86e3m95y6). O web tipa lastSeenAt como string obrigatoria, mas no back ele e nulo para quem nunca abriu o app",
+    "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): Duas definicoes de usuario ativo: metrics/summary (#47) usa transacao no periodo; isActive() usa acesso ao app nos ultimos 7 dias. Alinhar nomes ou regra com o time"
+  ],
+  "updated_at": "2026-10-23"
 }
