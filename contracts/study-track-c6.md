@@ -1,4 +1,4 @@
-﻿# Contrato C6 - Modelagem da Trilha de Estudos
+# Contrato C6 - Modelagem da Trilha de Estudos
 
 Este contrato define a modelagem de dados, status derivados, contagens agregadas e os schemas JSON para as perguntas e categorias da **Trilha de Estudos**.
 
@@ -23,7 +23,7 @@ Representa um item da trilha de estudos (pergunta ou conteúdo educativo).
 | Coluna | Tipo | Restrições | Descrição |
 | :--- | :--- | :--- | :--- |
 | `id` | `UUID` | PK, DEFAULT `gen_random_uuid()` | Identificador único |
-| `category_id` | `UUID` | NOT NULL, FK `study_categories(id)` ON DELETE CASCADE | Categoria vinculada |
+| `category_id` | `UUID` | NOT NULL, FK `study_categories(id)` | Categoria vinculada |
 | `type` | `VARCHAR(50)` | NOT NULL, CHECK (`FILL_BLANK`, `MULTIPLE_CHOICE`, `LEARNING`) | Tipo de pergunta |
 | `draft` | `JSONB` | NOT NULL | Conteúdo em rascunho / edição |
 | `published` | `JSONB` | NULL | Conteúdo ativo em produção |
@@ -33,6 +33,8 @@ Representa um item da trilha de estudos (pergunta ou conteúdo educativo).
 
 **Índices:**
 - `idx_study_questions_category_id` sobre `category_id`: otimiza buscas e contagens agregadas por categoria.
+
+A FK não tem `ON DELETE`, como as demais do schema: o banco recusa remover uma categoria que ainda tem perguntas, o que reforça a regra da API de categorias (409 ao remover categoria com perguntas).
 
 ---
 
@@ -71,53 +73,41 @@ O DTO `StudyCategoryResponse` expõe:
 
 ## 4. Schemas JSON por Tipo de Pergunta
 
-### 4.1 `MULTIPLE_CHOICE` (Múltipla Escolha)
-Estrutura para questões de escolha única com alternativas:
+`draft` e `published` guardam o mesmo formato: o conteúdo enviado no POST/PUT da API de escrita (task 86e3m95y3), com o `type` repetido dentro do JSON. Só os campos do tipo são gravados; os campos dos outros tipos são descartados. A validação por tipo é responsabilidade da API de escrita.
+
+### 4.1 `MULTIPLE_CHOICE` (Objetiva)
+Enunciado com alternativas; pelo menos uma alternativa tem `correct: true`. `explanation` é opcional.
 ```json
 {
-  "statement": "Quantos meses de custo de vida é recomendado manter na reserva de emergência?",
+  "type": "MULTIPLE_CHOICE",
+  "statement": "Quantos meses de custo de vida é recomendado manter em uma reserva de emergência?",
   "options": [
-    { "id": "A", "text": "1 a 2 meses" },
-    { "id": "B", "text": "3 a 6 meses" },
-    { "id": "C", "text": "12 a 24 meses" }
+    { "text": "1 a 2 meses", "correct": false },
+    { "text": "3 a 6 meses", "correct": true },
+    { "text": "12 a 24 meses", "correct": false }
   ],
-  "correctOptionId": "B",
-  "explanation": "O consenso financeiro recomenda entre 3 a 6 meses de despesas essenciais."
+  "explanation": "O consenso financeiro recomenda entre 3 e 6 meses de despesas essenciais."
 }
 ```
 
-### 4.2 `FILL_BLANK` (Preenchimento de Lacunas)
-Estrutura para questões interativas onde o usuário preenche lacunas `{termo}`:
+### 4.2 `FILL_BLANK` (Preencher lacuna)
+O `statement` marca a lacuna com `___`; `answers` lista as respostas aceitas (pelo menos uma). `explanation` é opcional.
 ```json
 {
-  "textWithBlanks": "A reserva de emergência deve ser aplicada em investimentos de alta {liquidez} e baixo {risco}.",
-  "blanks": [
-    {
-      "index": 0,
-      "expectedAnswer": "liquidez",
-      "acceptableAnswers": ["liquidez", "facilidade de resgate"]
-    },
-    {
-      "index": 1,
-      "expectedAnswer": "risco",
-      "acceptableAnswers": ["risco", "risco de perda"]
-    }
-  ],
-  "explanation": "Alta liquidez permite o resgate imediato e baixo risco protege o valor principal."
+  "type": "FILL_BLANK",
+  "title": "Onde aplicar a reserva",
+  "statement": "A reserva de emergência deve ser aplicada em investimentos de alta ___.",
+  "answers": ["liquidez", "liquidez diária"],
+  "explanation": "Alta liquidez garante que você possa resgatar o dinheiro no momento em que precisar."
 }
 ```
 
-### 4.3 `LEARNING` (Conteúdo Educacional / Teórico)
-Estrutura para cards informativos e lições teóricas:
+### 4.3 `LEARNING` (Conteúdo explicativo)
+Título e corpo em Markdown, preservado como foi enviado.
 ```json
 {
+  "type": "LEARNING",
   "title": "O que é CDI e taxa Selic?",
-  "content": "O CDI é a taxa média praticada nos empréstimos entre instituições financeiras, acompanhando a Selic meta.",
-  "keyTakeaways": [
-    "A Selic é a taxa básica de juros definida pelo Copom.",
-    "O CDI rende historicamente cerca de 0,10% abaixo da Selic.",
-    "Títulos a 100% do CDI acompanham o rendimento dessa taxa."
-  ],
-  "tips": "Para a reserva de emergência, prefira CDBs com liquidez diária a pelo menos 100% do CDI."
+  "body": "## CDI e Selic\n\nO CDI é a taxa média dos empréstimos entre bancos, muito usada como referência da renda fixa."
 }
 ```

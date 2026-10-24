@@ -287,7 +287,7 @@ CREATE TABLE IF NOT EXISTS study_questions (
   published_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_study_questions_category FOREIGN KEY (category_id) REFERENCES study_categories (id) ON DELETE CASCADE,
+  CONSTRAINT fk_study_questions_category FOREIGN KEY (category_id) REFERENCES study_categories (id),
   CONSTRAINT chk_study_questions_type CHECK (type IN ('FILL_BLANK', 'MULTIPLE_CHOICE', 'LEARNING'))
 );
 
