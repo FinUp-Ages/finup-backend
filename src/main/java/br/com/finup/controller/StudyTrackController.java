@@ -32,9 +32,8 @@ public class StudyTrackController {
 
   @GetMapping("/categories")
   @Operation(
-    summary = "Lista as categorias da trilha de estudos",
-    description = "Retorna as categorias da trilha de estudos do usuário autenticado"
-  )
+      summary = "Lista as categorias da trilha de estudos",
+      description = "Retorna as categorias da trilha de estudos do usuário autenticado")
   @ApiResponse(responseCode = "200", description = "Categorias retornadas com sucesso")
   public ResponseEntity<List<StudyTrackCategoryResponse>> findCategories() {
     return ResponseEntity.ok(studyTrackQueryService.findCategories());
