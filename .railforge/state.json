@@ -23,6 +23,7 @@
     "src/test/java/br/com/finup/controller/AdminStudyCategoryIntegrationTests.java",
     "src/test/java/br/com/finup/service/StudyCategoryServiceTest.java",
     "src/test/java/br/com/finup/AdminAuthIntegrationTests.java",
+    "src/test/java/br/com/finup/AdminRoutesSecurityIntegrationTests.java",
     "README.md",
     ".railforge/state.json"
   ],
@@ -36,11 +37,12 @@
     "focused tests": "passed: AdminStudyCategoryControllerTest (7), StudyCategoryServiceTest (7), StudyCategoryMapperTest, StudyCategoryTest, StudyQuestionTest",
     "integration CRUD tests": "passed: AdminStudyCategoryIntegrationTests (4), cobrindo CRUD, 400, 404 e 409",
     "security and OpenAPI tests": "passed: AdminAuthIntegrationTests (14), incluindo 403 em GET/POST/PUT/DELETE, e OpenApiIntegrationTests",
-    "mvn clean verify": "passed em 2026-10-22 após a suíte de integração; código de saída 0, sem falhas ou erros",
+    "admin route security matrix": "passed: AdminRoutesSecurityIntegrationTests (82), incluindo sucesso e 401/403 para as quatro rotas de categorias",
+    "mvn clean verify": "passed em 2026-10-25; 507 testes, 0 falhas, 0 erros, Spotless limpo e build success",
     "diff check": "passed: git diff --check",
     "not validated": "CI remoto, aprovação de code review e merge na branch principal dependem do PR"
   },
-  "review": "Implementação revisada localmente: controller admin, validação, 404, 409, 204, contagens agregadas, normalização de description, Swagger e documentação conferidos.",
+  "review": "Implementação revisada localmente após rebase sobre develop: controller admin, validação, 404, 409, 204, contagens agregadas, normalização de description, Swagger, documentação e matriz centralizada de segurança conferidos.",
   "open_questions": [
     "Herdado de origin/develop: isActive() e lastSeenAt ainda não têm consumidor; entram no GET /admin/users.",
     "Herdado de origin/develop: metrics/summary usa transações no período, enquanto isActive() usa acesso ao app nos últimos 7 dias; alinhar nomes ou regra com o time."
