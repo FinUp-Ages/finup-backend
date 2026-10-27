@@ -1,60 +1,38 @@
 {
   "stage": "REVIEWING",
-  "task": "Metricas do dashboard admin: GET /api/v1/admin/metrics/summary e /user-growth (contrato C3)",
-  "objective": "Expor usuarios ativos e clientes novos por periodo (summary) e a serie mensal de cadastros (user-growth), restritos ao grupo admin do Cognito, com agregacao no banco. Receita, custo e plano ficam fora e viram backlog.",
+  "task": "Modelagem da Trilha de Estudos (ClickUp 86e3m95k1, contrato C6, PR #51)",
+  "objective": "Tabelas, entidades, status derivado e contagens de categoria e pergunta da trilha, com contrato e seed no mesmo formato de conteudo usado pela API de escrita e pelo painel",
   "decisions": [
-    "Admin = grupo 'admin' do Cognito (claim cognito:groups do access token). Decisao do time. Na integracao com a develop (2026-10-16) o solicitante decidiu manter o mecanismo desta branch (CognitoGroupsJwtAuthenticationConverter, autoridade GROUP_admin, ProblemDetailAccessDeniedHandler) no lugar do que o PR #46 trouxe (Role, CognitoGroupsAuthoritiesConverter, ROLE_ADMIN). A regra foi ampliada de /api/v1/admin/metrics/** para /api/v1/admin/**, porque o #46 ja protege /admin/me e os widgets com o mesmo criterio e os testes dele (AdminAuthIntegrationTests) exigem 403 nessas rotas",
-    "Usuario ativo = criou ao menos uma transacao no periodo (COUNT DISTINCT user_id em transactions por created_at). Decisao do time. Ocorrencias geradas por recorrencia (recurrence_origin_id preenchido) nao contam: nao sao acao do usuario",
-    "value e previousValue sao numeros de ponto flutuante, como no contrato C3 (o 12.5 do exemplo so fecha com o changePct de -4.0). Os valores reais saem como contagens (12.0)",
-    "previousValue = mesma metrica no periodo imediatamente anterior, de mesmo tamanho. Janelas moveis terminando em agora: atual [now-N, now), anterior [now-2N, now-N)",
-    "changePct = (value - previousValue) / previousValue * 100, 1 casa, HALF_UP. Com previousValue = 0 devolve 0.0 (sem base de comparacao); omitir o campo quebraria o contrato",
-    "user-growth: months padrao 6, aceito de 1 a 24, o ultimo ponto e o mes corrente (parcial). totalUsers = cadastros acumulados ate o fim do mes. growthPct = (totalUsers do ultimo ponto - total antes do primeiro mes) / total antes do primeiro mes * 100; 0.0 se nao havia ninguem antes. O contrato nao define growthPct: esta e a leitura adotada",
-    "Meses e janelas usam o Clock da aplicacao (America/Sao_Paulo), nao UTC, para bater com o dia do usuario",
-    "Parametros invalidos (period fora de 7d|30d|90d ou ausente, months nao numerico, negativo, zero ou acima de 24) viram 400 com mensagem especifica via excecao de negocio; o handler generico do Spring nao e alterado",
-    "403 com ProblemDetail (mesmo formato do 401). Profile mock-auth continua sem barrar nada, como o resto da API",
-    "Sem indice novo em created_at: o schema nao tem migrations e a tabela e pequena; fica como risco registrado"
+    "Schema JSON de draft/published alinhado a task 86e3m95y3 (PR #54) e ao finup-web: FILL_BLANK {type,title,statement,answers,explanation}, MULTIPLE_CHOICE {type,statement,options[{text,correct}],explanation}, LEARNING {type,title,body}. O formato anterior (textWithBlanks, correctOptionId, content) nao tinha consumidor.",
+    "FK study_questions.category_id sem ON DELETE, como as demais FKs do schema: o banco recusa remover categoria com perguntas, reforcando o 409 da task 86e3m9600.",
+    "Classes Java da modelagem mantidas sem alteracao: StudyCategoryService, StudyQuestionRepository, StudyCategoryMapper e StudyCategoryServiceTest sao alterados pelos PRs #53, #54 e #55, que dependem desta base. O uso da query agregada no service fica com o #55.",
+    "Sem ferramenta de migration (issue #15): database/migrations documenta a mudanca e o rollback; database/init continua sendo o que o compose executa."
   ],
   "files_in_scope": [
-    "src/main/java/br/com/finup/controller/AdminMetricsController.java",
-    "src/main/java/br/com/finup/service/AdminMetricsService.java",
-    "src/main/java/br/com/finup/model/MetricsPeriod.java",
-    "src/main/java/br/com/finup/dto/MetricValueResponse.java",
-    "src/main/java/br/com/finup/dto/MetricsSummaryResponse.java",
-    "src/main/java/br/com/finup/dto/UserGrowthPointResponse.java",
-    "src/main/java/br/com/finup/dto/UserGrowthResponse.java",
-    "src/main/java/br/com/finup/exception/InvalidMetricsParameterException.java",
-    "src/main/java/br/com/finup/repository/UserRepository.java",
-    "src/main/java/br/com/finup/repository/TransactionRepository.java",
-    "src/main/java/br/com/finup/security/CognitoGroupsJwtAuthenticationConverter.java",
-    "src/main/java/br/com/finup/security/ProblemDetailAccessDeniedHandler.java",
-    "src/main/java/br/com/finup/config/SecurityConfig.java",
-    "src/test/java/br/com/finup/service/AdminMetricsServiceTest.java",
-    "src/test/java/br/com/finup/controller/AdminMetricsControllerTest.java",
-    "src/test/java/br/com/finup/security/CognitoGroupsJwtAuthenticationConverterTest.java",
-    "src/test/java/br/com/finup/config/SecurityConfigTest.java",
-    "src/test/java/br/com/finup/repository/UserRepositoryTest.java",
-    "src/test/java/br/com/finup/repository/TransactionRepositoryTest.java",
-    "README.md",
+    "contracts/study-track-c6.md",
+    "database/init/01-schema.sql",
+    "database/init/03-test-data.sql",
+    "database/migrations/04-study-tracks-schema.sql",
+    "database/migrations/04-study-tracks-schema-rollback.sql",
+    "database/migrations/05-study-tracks-seed.sql",
+    "src/test/java/br/com/finup/AdminRoutesSecurityIntegrationTests.java",
     ".railforge/state.json"
   ],
   "plan": [
-    "Consolidar estrategia aprovada no fluxo existente e atualizar contrato e documentacao.",
-    "Validar titulo salvo e listado, normalizacao, limite, Unicode, turnos seguintes, conversas antigas e texto inutilizavel.",
-    "Executar Maven verify, revisar diff e atualizar e reler estado."
+    "Alinhar secao 4 do contrato e os dois seeds ao formato gravado pela API de escrita.",
+    "Remover ON DELETE CASCADE da FK e o BOM dos arquivos SQL e do contrato.",
+    "Validar Maven verify, schema e seed do zero em Postgres 16, rollback e migrations, e aplicacao dos commits dos PRs dependentes."
   ],
   "validation": {
-    "mvn clean verify": "passed em 2026-10-16 sobre o merge da develop 135dd68 (#46) com o mecanismo de grupo desta branch: 384 testes, 0 falhas, spotless ok. Antes do merge: 349 testes em 2026-10-15",
-    "testes novos": "AdminMetricsServiceTest (calculo de periodos, changePct, meses vazios, fuso, parametros invalidos), AdminMetricsControllerTest (200, 400, 401 e 403 dos dois endpoints, com o filtro de seguranca e o conversor de grupos reais), CognitoGroupsJwtAuthenticationConverterTest, e contagens nos repositorios de usuario e transacao (limites do intervalo, recorrencia)",
-    "postgres real (profile dev,mock-auth)": "validado em 2026-10-15: summary 30d e 7d, user-growth com 6 e 3 meses e os 400 (period fora do enum ou ausente, months abc, -1 e 25) responderam como esperado; usuarios novos (5) e ativos (1) bateram com a contagem direta em SQL no mesmo banco",
-    "cognito real (profile dev)": "validado em 2026-10-15 com access token real de usuario do grupo admin, contra o Postgres local com dados de teste em datas variadas: summary 7d, 30d e 90d e user-growth (6, 3, 1 e 24 meses) bateram com o valor calculado em SQL, incluindo changePct nao nulo, mes sem cadastro e exclusao de ocorrencia gerada por recorrencia; 10 casos de 400; 401 sem token, com token malformado, com assinatura adulterada e com payload adulterado",
-    "cognito real apos o merge com a develop (#46)": "revalidado em 2026-10-16 com access token real do grupo admin, sobre a branch ja mesclada: summary (7d, 30d, 90d), user-growth (6, 3, 1 e 24 meses), 10 casos de 400 e 4 de 401 (inclusive assinatura e payload adulterados) conforme o esperado em SQL; /admin/me e /admin/dashboard/widgets 200 com admin e 401 sem token; /users/me e /categories 200. O esperado de newUsers 7d mudou de 6/1 para 5/1 porque a janela e movel e um dia se passou (confirmado em SQL), sem relacao com o codigo",
-    "nao validado": "403 com token real de usuario fora do grupo admin (coberto so por teste com decoder JWT simulado); indice em created_at e desempenho com volume real; payload com o front do dashboard"
+    "maven_verify": "BUILD SUCCESS em 2026-10-27 apos o merge com a develop: 573 testes, zero falhas ou erros; Spotless aprovado. AdminRoutesSecurityIntegrationTests ganhou os 4 casos de sucesso das rotas de perguntas (#54) e o mock de StudyQuestionService.",
+    "postgres": "postgres:16-alpine isolado em 2026-10-23, com a develop mesclada: database/init sobe do zero (inclui users.last_seen_at do #45); seed com os 3 tipos e os 3 status derivados; contagens 1/1 por categoria; DELETE de categoria com perguntas recusado pela FK (NO ACTION); rollback, 04 e 05 via psql sem erro.",
+    "dependentes": "Commits proprios dos PRs #53, #54 e #55 (0d236ba..head) aplicam sem conflito sobre esta mudanca, exceto o state.json, que cada PR reescreve.",
+    "limits": "Testes de integracao usam H2 com create-drop a partir das entidades; os scripts SQL so foram validados no Postgres manualmente."
   },
-  "review": "Implementacao completa e validada em 2026-10-15; diff revisado. Commit e push autorizados pelo solicitante em 2026-10-15. PR contra a develop a ser aberto pelo solicitante (gh nao esta instalado). Pendente: validar o payload com o front, aprovacao e merge do PR, e confirmar o grupo admin nos User Pools de homologacao e producao. Dados de teste do banco local removidos.",
-  "updated_at": "2026-10-16",
+  "review": "Review do PR #51 apontou divergencia entre o schema JSON documentado/seed e os consumidores (task 86e3m95y3, PR #54, finup-web fillBlankContract.ts). Correcao aplicada sem alterar codigo Java, num commit novo sobre 0d236ba; a develop (8b21dfc, #45) foi mesclada na branch em 2026-10-23, sem conflito e sem reescrever historico, porque o #54 usa esta branch como base e o #53/#55 levam o 0d236ba. Pendente: aprovacao e merge. Mergear com merge commit (nao squash) para o 0d236ba virar ancestral da develop: assim #53 e #55 nao precisam de rebase, e o #54 so troca a base para develop.",
   "open_questions": [
-    "Definicao de growthPct e de changePct com previousValue = 0 sao leituras minhas do contrato C3: confirmar com o front do dashboard",
-    "O grupo 'admin' ja existe no User Pool de desenvolvimento (confirmado com token real em 2026-10-15); confirmar o mesmo nos User Pools de homologacao e producao antes do deploy, e os admins precisam logar de novo para o token trazer o claim",
-    "Backlog separado a registrar: receita, custo operacional e plano"
-  ]
+    "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): isActive() e lastSeenAt ainda nao tem consumidor: entram no GET /admin/users (86e3m95y6). O web tipa lastSeenAt como string obrigatoria, mas no back ele e nulo para quem nunca abriu o app",
+    "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): Duas definicoes de usuario ativo: metrics/summary (#47) usa transacao no periodo; isActive() usa acesso ao app nos ultimos 7 dias. Alinhar nomes ou regra com o time"
+  ],
+  "updated_at": "2026-10-27"
 }

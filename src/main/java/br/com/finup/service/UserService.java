@@ -10,6 +10,9 @@ import br.com.finup.repository.UserFinancialProfileRepository;
 import br.com.finup.repository.UserRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,15 +36,19 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
   private static final Logger log = LoggerFactory.getLogger(UserService.class);
+  private static final Duration LAST_SEEN_THROTTLE = Duration.ofHours(1);
 
   private final UserRepository userRepository;
   private final UserFinancialProfileRepository userFinancialProfileRepository;
+  private final Clock clock;
 
   public UserService(
       UserRepository userRepository,
-      UserFinancialProfileRepository userFinancialProfileRepository) {
+      UserFinancialProfileRepository userFinancialProfileRepository,
+      Clock clock) {
     this.userRepository = userRepository;
     this.userFinancialProfileRepository = userFinancialProfileRepository;
+    this.clock = clock;
   }
 
   /**
@@ -137,6 +144,22 @@ public class UserService {
    */
   public User findByAuthenticatedIdentity(AuthenticatedIdentity identity) {
     return findByIdentityOrThrow(identity);
+  }
+
+  /**
+   * Busca o usuario pela identidade autenticada e registra o acesso em {@code lastSeenAt} — e o
+   * service que o {@code GET /api/v1/users/me} chama. {@link UserRepository#touchLastSeen} grava
+   * direto no banco, no maximo uma vez por hora, sem passar pela entidade gerenciada: assim o
+   * {@code GET /me} nunca atualiza {@code updatedAt}, que e sobre o cadastro, nao sobre acesso.
+   *
+   * @throws ResourceNotFoundException se essa identidade ainda nao tiver usuario local
+   */
+  @Transactional
+  public User recordAccess(AuthenticatedIdentity identity) {
+    User user = findByIdentityOrThrow(identity);
+    Instant now = clock.instant();
+    userRepository.touchLastSeen(user.getId(), now, now.minus(LAST_SEEN_THROTTLE));
+    return user;
   }
 
   /**
