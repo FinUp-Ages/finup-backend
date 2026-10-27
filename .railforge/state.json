@@ -1,37 +1,41 @@
 {
   "stage": "REVIEWING",
-  "task": "Modelagem da Trilha de Estudos (ClickUp 86e3m95k1, contrato C6, PR #51)",
-  "objective": "Tabelas, entidades, status derivado e contagens de categoria e pergunta da trilha, com contrato e seed no mesmo formato de conteudo usado pela API de escrita e pelo painel",
+  "task": "Publicar, despublicar e descartar alteracoes da Trilha (ClickUp 86e3m95k1, contrato C6)",
+  "objective": "POST /questions/{id}/publish, POST /questions/{id}/unpublish e DELETE /questions/{id}/draft sob /api/v1/admin/study-tracks, com status derivado correto depois de cada acao e contagens da categoria refletindo as mudancas.",
   "decisions": [
-    "Schema JSON de draft/published alinhado a task 86e3m95y3 (PR #54) e ao finup-web: FILL_BLANK {type,title,statement,answers,explanation}, MULTIPLE_CHOICE {type,statement,options[{text,correct}],explanation}, LEARNING {type,title,body}. O formato anterior (textWithBlanks, correctOptionId, content) nao tinha consumidor.",
-    "FK study_questions.category_id sem ON DELETE, como as demais FKs do schema: o banco recusa remover categoria com perguntas, reforcando o 409 da task 86e3m9600.",
-    "Classes Java da modelagem mantidas sem alteracao: StudyCategoryService, StudyQuestionRepository, StudyCategoryMapper e StudyCategoryServiceTest sao alterados pelos PRs #53, #54 e #55, que dependem desta base. O uso da query agregada no service fica com o #55.",
-    "Sem ferramenta de migration (issue #15): database/migrations documenta a mudanca e o rollback; database/init continua sendo o que o compose executa."
+    "Base provisoria: commit 799474c (PR #54, API administrativa de perguntas, ainda fora da develop) cherry-picked sobre a develop. A task reaproveita StudyQuestionValidator, StudyQuestionResponse e StudyQuestionMapper do #54 em vez de duplica-los. O PR passa a ser contra a develop quando o #54 for mesclado.",
+    "Service e controller novos (StudyQuestionPublicationService e AdminStudyQuestionPublicationController) no mesmo prefixo do #54, para nao editar os arquivos dele e evitar conflito de merge. Nenhuma coluna ou tabela nova: o status continua derivado.",
+    "O rascunho gravado passa pelo mesmo StudyQuestionValidator do POST e do PUT (lido como StudyQuestionRequest); invalido responde 400 com 'Rascunho invalido, nao foi publicado: <motivo>' e nada e gravado. Tipo do rascunho diferente do tipo da pergunta tambem e 400.",
+    "Descartar sem versao publicada responde 409 (o enunciado deixava 409 ou 400 para o contrato): a requisicao e valida e so conflita com o estado, o mesmo criterio da remocao de categoria com perguntas.",
+    "O descarte devolve 200 com a pergunta restaurada, e nao 204, para o painel atualizar a tela e porque o criterio pede conferir o status depois de cada acao.",
+    "Sem efeito sao idempotentes e nao gravam nada (nem updatedAt nem publishedAt): publicar o que ja esta PUBLISHED (nem valida), despublicar o que esta DRAFT, descartar o que esta PUBLISHED. Decisao minha; o enunciado nao cobre esses casos.",
+    "Despublicar preserva o rascunho, inclusive com edicao pendente.",
+    "Lock pessimista (SELECT FOR UPDATE) na linha em cada acao, para acoes simultaneas na mesma pergunta nao se desfazerem. publishedAt truncado para microssegundos, a precisao da coluna, para a resposta ser igual as leituras seguintes.",
+    "Autorizacao: nenhuma regra nova. /api/v1/admin/** ja exige o grupo admin no SecurityConfig, entao as tres rotas exigem ADMIN."
   ],
   "files_in_scope": [
-    "contracts/study-track-c6.md",
-    "database/init/01-schema.sql",
-    "database/init/03-test-data.sql",
-    "database/migrations/04-study-tracks-schema.sql",
-    "database/migrations/04-study-tracks-schema-rollback.sql",
-    "database/migrations/05-study-tracks-seed.sql",
+    "src/main/java/br/com/finup/service/StudyQuestionPublicationService.java",
+    "src/main/java/br/com/finup/controller/AdminStudyQuestionPublicationController.java",
+    "src/test/java/br/com/finup/service/StudyQuestionPublicationServiceTest.java",
+    "src/test/java/br/com/finup/StudyQuestionPublicationIntegrationTests.java",
+    "src/test/java/br/com/finup/AdminRoutesSecurityIntegrationTests.java",
+    "contracts/study-questions-publication-c6.md",
+    "README.md",
     ".railforge/state.json"
   ],
-  "plan": [
-    "Alinhar secao 4 do contrato e os dois seeds ao formato gravado pela API de escrita.",
-    "Remover ON DELETE CASCADE da FK e o BOM dos arquivos SQL e do contrato.",
-    "Validar Maven verify, schema e seed do zero em Postgres 16, rollback e migrations, e aplicacao dos commits dos PRs dependentes."
-  ],
   "validation": {
-    "maven_verify": "BUILD SUCCESS em 2026-10-23 com a develop 8b21dfc mesclada: 456 testes, zero falhas ou erros; Spotless aprovado.",
-    "postgres": "postgres:16-alpine isolado em 2026-10-23, com a develop mesclada: database/init sobe do zero (inclui users.last_seen_at do #45); seed com os 3 tipos e os 3 status derivados; contagens 1/1 por categoria; DELETE de categoria com perguntas recusado pela FK (NO ACTION); rollback, 04 e 05 via psql sem erro.",
-    "dependentes": "Commits proprios dos PRs #53, #54 e #55 (0d236ba..head) aplicam sem conflito sobre esta mudanca, exceto o state.json, que cada PR reescreve.",
-    "limits": "Testes de integracao usam H2 com create-drop a partir das entidades; os scripts SQL so foram validados no Postgres manualmente."
+    "mvn clean verify": "passed em 2026-10-26: 654 testes, 0 falhas, spotless ok (inclui o commit 799474c do #54)",
+    "testes novos": "StudyQuestionPublicationServiceTest (29): transicoes, rascunho invalido por tipo, no-ops, copia profunda, 404, truncamento do publishedAt. StudyQuestionPublicationIntegrationTests (25): ciclo completo com contagens da categoria a cada passo, os tres tipos, 400/404/409, 401/403 sem alterar a pergunta, Swagger. AdminRoutesSecurityIntegrationTests: as 4 rotas do #54 e as 3 novas entraram em SUCCESS_CASES.",
+    "postgres real + cognito real": "validado em 2026-10-26 com access token real do grupo admin, API no profile dev, Postgres 16 local com as migrations 04 e 05 aplicadas: 41 verificacoes OK, incluindo jsonb draft = published conferido no banco apos cada acao, contagens da categoria no jsonb, 400 de rascunho invalido sem nada publicado, 409 do descarte, 404, 400 de UUID, 401 (sem token e assinatura adulterada) e 24 acoes simultaneas na mesma pergunta sem nenhum 500 e com estado final coerente. Rotas antigas (admin/me, metrics, widgets, users/me, categories) seguem 200.",
+    "lacunas fechadas ao vivo (2026-10-27)": "mesmo token real e Postgres real: despublicar com edicao pendente mantem o rascunho editado (resposta e banco); descartar sem edicao pendente responde 200 sem gravar (updated_at e published_at identicos antes e depois); publicar sem edicao pendente, despublicar DRAFT e descartar DRAFT (409) tambem nao gravam nada; o Swagger vivo documenta 200/401/403/404 nas tres rotas, 400 no publish e 409 no descarte. Bateria completa repetida: 41 de 41.",
+    "nao validado": "403 com token real de usuario fora do grupo admin (fora do escopo pedido; coberto por teste com decoder simulado); payload com o painel (finup-web)"
   },
-  "review": "Review do PR #51 apontou divergencia entre o schema JSON documentado/seed e os consumidores (task 86e3m95y3, PR #54, finup-web fillBlankContract.ts). Correcao aplicada sem alterar codigo Java, num commit novo sobre 0d236ba; a develop (8b21dfc, #45) foi mesclada na branch em 2026-10-23, sem conflito e sem reescrever historico, porque o #54 usa esta branch como base e o #53/#55 levam o 0d236ba. Pendente: aprovacao e merge. Mergear com merge commit (nao squash) para o 0d236ba virar ancestral da develop: assim #53 e #55 nao precisam de rebase, e o #54 so troca a base para develop.",
+  "review": "Implementacao e validacao concluidas em 2026-10-26. Nenhum commit feito. Pendente: autorizacao do solicitante para commit e PR, aprovacao e merge, e o PR #54 entrar na develop (esta branch carrega o commit dele).",
+  "updated_at": "2026-10-26",
   "open_questions": [
-    "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): isActive() e lastSeenAt ainda nao tem consumidor: entram no GET /admin/users (86e3m95y6). O web tipa lastSeenAt como string obrigatoria, mas no back ele e nulo para quem nunca abriu o app",
-    "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): Duas definicoes de usuario ativo: metrics/summary (#47) usa transacao no periodo; isActive() usa acesso ao app nos ultimos 7 dias. Alinhar nomes ou regra com o time"
-  ],
-  "updated_at": "2026-10-23"
+    "PUT /questions/{id} (#54) le e regrava a linha inteira sem lock. Se rodar junto de uma publicacao, o ultimo a gravar pode desfazer o outro (por exemplo voltar published a nulo). Correcao natural: @DynamicUpdate em StudyQuestion ou o mesmo lock no PUT; fora desta task por tocar codigo do #51 e do #54.",
+    "Confirmar com o front (finup-web) que o descarte devolver a pergunta (200) e nao 204 atende, e que 409 para 'sem versao publicada' e o esperado.",
+    "README: a tabela de endpoints ganhou as tres rotas (3 linhas). A edicao chegou a ser gravada mesmo tendo sido interrompida, e fica a criterio do solicitante manter ou reverter.",
+    "Banco local: foram aplicadas as migrations 04 e 05 e users.last_seen_at (aditivas). Quem ja tem volume do Postgres precisa fazer o mesmo ou recriar o volume."
+  ]
 }
