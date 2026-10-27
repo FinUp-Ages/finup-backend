@@ -14,6 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Valida o mapeamento JPA de usuario e as buscas por identidade do Cognito. */
@@ -36,6 +38,24 @@ class UserRepositoryTest {
         "UPDATE users SET created_at = ? WHERE id = ?",
         OffsetDateTime.ofInstant(Instant.parse(createdAt), ZoneOffset.UTC),
         user.getId());
+  }
+
+  /**
+   * Cria o usuario com nome, e-mail e {@code last_seen_at} escolhidos (gravado direto via SQL, fora
+   * do throttle de {@code touchLastSeen}) — usado pelos testes de {@code search}.
+   */
+  private User saveUserWithLastSeen(String cognitoId, String name, String lastSeenAt) {
+    User user =
+        userRepository.saveAndFlush(
+            User.createFromCognitoIdentity(cognitoId, name, cognitoId + "@exemplo.com"));
+    if (lastSeenAt != null) {
+      jdbcTemplate.update(
+          "UPDATE users SET last_seen_at = ? WHERE id = ?",
+          OffsetDateTime.ofInstant(Instant.parse(lastSeenAt), ZoneOffset.UTC),
+          user.getId());
+    }
+    entityManager.clear();
+    return user;
   }
 
   @Test
@@ -170,5 +190,84 @@ class UserRepositoryTest {
     assertThat(rowsUpdated).isEqualTo(1);
     assertThat(userRepository.findById(user.getId()).orElseThrow().getLastSeenAt())
         .isEqualTo(secondAccess);
+  }
+
+  @Test
+  @DisplayName("search pagina corretamente, sem filtro")
+  void searchPaginatesWithoutFilter() {
+    saveUserWithLastSeen("page-a", "Usuario A", null);
+    saveUserWithLastSeen("page-b", "Usuario B", null);
+    saveUserWithLastSeen("page-c", "Usuario C", null);
+
+    Page<User> firstPage =
+        userRepository.search(
+            null, null, Instant.parse("2026-10-09T12:00:00Z"), PageRequest.of(0, 2));
+    Page<User> secondPage =
+        userRepository.search(
+            null, null, Instant.parse("2026-10-09T12:00:00Z"), PageRequest.of(1, 2));
+
+    assertThat(firstPage.getContent()).hasSize(2);
+    assertThat(firstPage.getTotalElements()).isEqualTo(3);
+    assertThat(firstPage.getTotalPages()).isEqualTo(2);
+    assertThat(secondPage.getContent()).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("search com status ACTIVE devolve so quem acessou nos ultimos 7 dias")
+  void searchFiltersActiveStatus() {
+    Instant now = Instant.parse("2026-10-09T12:00:00Z");
+    Instant activeSince = User.activeSince(now);
+    saveUserWithLastSeen("ativo", "Usuario Ativo", now.minus(1, ChronoUnit.DAYS).toString());
+    saveUserWithLastSeen(
+        "inativo-antigo", "Usuario Inativo", now.minus(8, ChronoUnit.DAYS).toString());
+    saveUserWithLastSeen("nunca-acessou", "Usuario Sem Acesso", null);
+
+    Page<User> active = userRepository.search(null, true, activeSince, PageRequest.of(0, 20));
+    Page<User> inactive = userRepository.search(null, false, activeSince, PageRequest.of(0, 20));
+
+    assertThat(active.getContent()).extracting(User::getCognitoId).containsExactly("ativo");
+    assertThat(inactive.getContent())
+        .extracting(User::getCognitoId)
+        .containsExactlyInAnyOrder("inativo-antigo", "nunca-acessou");
+  }
+
+  @Test
+  @DisplayName("search busca por nome, sem diferenciar maiusculas de minusculas")
+  void searchFiltersByNameCaseInsensitive() {
+    saveUserWithLastSeen("carlos", "Carlos Jose", null);
+    saveUserWithLastSeen("ana", "Ana Souza", null);
+
+    Page<User> found =
+        userRepository.search(
+            "CARLOS", null, Instant.parse("2026-10-09T12:00:00Z"), PageRequest.of(0, 20));
+
+    assertThat(found.getContent()).extracting(User::getCognitoId).containsExactly("carlos");
+  }
+
+  @Test
+  @DisplayName("search busca por e-mail, sem diferenciar maiusculas de minusculas")
+  void searchFiltersByEmailCaseInsensitive() {
+    saveUserWithLastSeen("carlos", "Carlos Jose", null);
+    saveUserWithLastSeen("ana", "Ana Souza", null);
+
+    Page<User> found =
+        userRepository.search(
+            "ANA@EXEMPLO", null, Instant.parse("2026-10-09T12:00:00Z"), PageRequest.of(0, 20));
+
+    assertThat(found.getContent()).extracting(User::getCognitoId).containsExactly("ana");
+  }
+
+  @Test
+  @DisplayName("search combina busca por texto e filtro de status")
+  void searchCombinesTextAndStatusFilters() {
+    Instant now = Instant.parse("2026-10-09T12:00:00Z");
+    Instant activeSince = User.activeSince(now);
+    saveUserWithLastSeen("carlos-ativo", "Carlos Jose", now.minus(1, ChronoUnit.DAYS).toString());
+    saveUserWithLastSeen("carlos-inativo", "Carlos Pereira", null);
+    saveUserWithLastSeen("ana-ativa", "Ana Souza", now.minus(1, ChronoUnit.DAYS).toString());
+
+    Page<User> found = userRepository.search("carlos", true, activeSince, PageRequest.of(0, 20));
+
+    assertThat(found.getContent()).extracting(User::getCognitoId).containsExactly("carlos-ativo");
   }
 }

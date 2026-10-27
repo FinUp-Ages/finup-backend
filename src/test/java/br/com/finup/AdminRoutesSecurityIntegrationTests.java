@@ -11,14 +11,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.finup.dto.AdminUserResponse;
 import br.com.finup.dto.DashboardWidgetsResponse;
 import br.com.finup.dto.MetricValueResponse;
 import br.com.finup.dto.MetricsSummaryResponse;
+import br.com.finup.dto.PageResponse;
 import br.com.finup.dto.StudyQuestionResponse;
 import br.com.finup.dto.UserGrowthResponse;
 import br.com.finup.model.QuestionStatus;
 import br.com.finup.model.User;
 import br.com.finup.service.AdminMetricsService;
+import br.com.finup.service.AdminUserService;
 import br.com.finup.service.DashboardWidgetService;
 import br.com.finup.service.StudyQuestionService;
 import br.com.finup.service.UserService;
@@ -128,6 +131,7 @@ class AdminRoutesSecurityIntegrationTests {
           "PUT /api/v1/admin/dashboard/widgets", new SuccessCase(HttpStatus.OK, WIDGETS_BODY),
           "GET /api/v1/admin/metrics/summary", new SuccessCase(HttpStatus.OK, null),
           "GET /api/v1/admin/metrics/user-growth", new SuccessCase(HttpStatus.OK, null),
+          "GET /api/v1/admin/users", new SuccessCase(HttpStatus.OK, null),
           "POST /api/v1/admin/study-tracks/categories/{categoryId}/questions",
               new SuccessCase(HttpStatus.CREATED, QUESTION_BODY),
           "GET /api/v1/admin/study-tracks/categories/{categoryId}/questions",
@@ -152,6 +156,8 @@ class AdminRoutesSecurityIntegrationTests {
 
   @MockitoBean private AdminMetricsService adminMetricsService;
 
+  @MockitoBean private AdminUserService adminUserService;
+
   @MockitoBean private StudyQuestionService studyQuestionService;
 
   @BeforeEach
@@ -164,6 +170,8 @@ class AdminRoutesSecurityIntegrationTests {
     MetricValueResponse zero = new MetricValueResponse(0.0, 0.0, 0.0);
     when(adminMetricsService.summary(any())).thenReturn(new MetricsSummaryResponse(zero, zero));
     when(adminMetricsService.userGrowth(any())).thenReturn(new UserGrowthResponse(0.0, List.of()));
+    when(adminUserService.listUsers(any(), any(), any(), any()))
+        .thenReturn(new PageResponse<AdminUserResponse>(List.of(), 0, 20, 0, 0));
     StudyQuestionResponse question =
         new StudyQuestionResponse(
             UUID.randomUUID(), QuestionStatus.DRAFT, Map.of(), null, Instant.now(), null);
@@ -206,7 +214,12 @@ class AdminRoutesSecurityIntegrationTests {
         .andExpect(jsonPath("$.detail").value(UNAUTHORIZED_DETAIL));
 
     verifyNoInteractions(
-        jwtDecoder, userService, dashboardWidgetService, adminMetricsService, studyQuestionService);
+        jwtDecoder,
+        userService,
+        dashboardWidgetService,
+        adminMetricsService,
+        adminUserService,
+        studyQuestionService);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -223,7 +236,11 @@ class AdminRoutesSecurityIntegrationTests {
         .andExpect(jsonPath("$.detail").value(UNAUTHORIZED_DETAIL));
 
     verifyNoInteractions(
-        userService, dashboardWidgetService, adminMetricsService, studyQuestionService);
+        userService,
+        dashboardWidgetService,
+        adminMetricsService,
+        adminUserService,
+        studyQuestionService);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -246,7 +263,11 @@ class AdminRoutesSecurityIntegrationTests {
         .andExpect(jsonPath("$.detail").value(UNAUTHORIZED_DETAIL));
 
     verifyNoInteractions(
-        userService, dashboardWidgetService, adminMetricsService, studyQuestionService);
+        userService,
+        dashboardWidgetService,
+        adminMetricsService,
+        adminUserService,
+        studyQuestionService);
   }
 
   @ParameterizedTest(name = "{0} | cognito:groups = {1}")
@@ -263,7 +284,11 @@ class AdminRoutesSecurityIntegrationTests {
         .andExpect(jsonPath("$.status").value(403));
 
     verifyNoInteractions(
-        userService, dashboardWidgetService, adminMetricsService, studyQuestionService);
+        userService,
+        dashboardWidgetService,
+        adminMetricsService,
+        adminUserService,
+        studyQuestionService);
   }
 
   @ParameterizedTest(name = "{0}")
