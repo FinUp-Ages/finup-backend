@@ -1,6 +1,7 @@
 package br.com.finup.repository;
 
 import br.com.finup.model.Transaction;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -43,4 +44,16 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
 
   List<Transaction> findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
       UUID userId, LocalDate from, LocalDate to);
+
+  /**
+   * Usuarios distintos que registraram uma transacao no intervalo {@code [from, to)}. Mede o
+   * momento em que o usuario agiu ({@code created_at}), e nao a data que ele escolheu para a
+   * transacao, que pode ser retroativa. Ocorrencias geradas por recorrencia ({@code
+   * recurrence_origin_id} preenchido) ficam de fora: nao sao acao do usuario, e uma serie mensal o
+   * deixaria "ativo" para sempre.
+   */
+  @Query(
+      "SELECT COUNT(DISTINCT t.userId) FROM Transaction t"
+          + " WHERE t.createdAt >= :from AND t.createdAt < :to AND t.recurrenceOriginId IS NULL")
+  long countActiveUsersBetween(@Param("from") Instant from, @Param("to") Instant to);
 }

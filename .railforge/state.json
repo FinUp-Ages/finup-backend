@@ -1,46 +1,37 @@
 {
   "stage": "REVIEWING",
-  "task": "86e3m95y3 - API de perguntas da Trilha: escrita (C6)",
-  "objective": "Implementar POST/GET por categoria e PUT/DELETE por pergunta, com validação por tipo, edição apenas do draft e acesso admin.",
-  "dependency": {
-    "pr": 51,
-    "commit": "0d236ba057d03ece524b3ce8675cd630626e3f78",
-    "decision": "Usuário autorizou usar a branch do PR #51 como base provisória, presumindo merge sem alterações. Sem modificar modelagem, migrations, seeds ou outros repositórios."
-  },
+  "task": "Modelagem da Trilha de Estudos (ClickUp 86e3m95k1, contrato C6, PR #51)",
+  "objective": "Tabelas, entidades, status derivado e contagens de categoria e pergunta da trilha, com contrato e seed no mesmo formato de conteudo usado pela API de escrita e pelo painel",
   "decisions": [
-    "Contratos HTTP da task 86e3m95y3 e do consumidor web; exemplos antigos da modelagem não serão migrados nesta task.",
-    "Reutilizar entidades, repositories, status derivado e configuração de segurança da base.",
-    "PUT mantém o tipo original, confirmado pelo solicitante. Objetiva exige pelo menos uma correta conforme a task. Campos obrigatórios por tipo seguem os exemplos.",
-    "Sem regra adicional de marcador de lacuna, unicidade de respostas ou limite arbitrário.",
-    "POST 201; GET/PUT 200; DELETE 204; inválidos 400; inexistentes 404; segurança 401/403 fora de mock-auth."
+    "Schema JSON de draft/published alinhado a task 86e3m95y3 (PR #54) e ao finup-web: FILL_BLANK {type,title,statement,answers,explanation}, MULTIPLE_CHOICE {type,statement,options[{text,correct}],explanation}, LEARNING {type,title,body}. O formato anterior (textWithBlanks, correctOptionId, content) nao tinha consumidor.",
+    "FK study_questions.category_id sem ON DELETE, como as demais FKs do schema: o banco recusa remover categoria com perguntas, reforcando o 409 da task 86e3m9600.",
+    "Classes Java da modelagem mantidas sem alteracao: StudyCategoryService, StudyQuestionRepository, StudyCategoryMapper e StudyCategoryServiceTest sao alterados pelos PRs #53, #54 e #55, que dependem desta base. O uso da query agregada no service fica com o #55.",
+    "Sem ferramenta de migration (issue #15): database/migrations documenta a mudanca e o rollback; database/init continua sendo o que o compose executa."
   ],
   "files_in_scope": [
-    "src/main/java/br/com/finup/controller/AdminStudyQuestionController.java",
-    "src/main/java/br/com/finup/dto/StudyQuestionRequest.java",
-    "src/main/java/br/com/finup/dto/StudyQuestionResponse.java",
-    "src/main/java/br/com/finup/exception/InvalidStudyQuestionException.java",
-    "src/main/java/br/com/finup/mapper/StudyQuestionMapper.java",
-    "src/main/java/br/com/finup/service/StudyQuestionService.java",
-    "src/main/java/br/com/finup/service/StudyQuestionValidator.java",
-    "src/test/java/br/com/finup/service/StudyQuestionValidatorTest.java",
-    "src/test/java/br/com/finup/service/StudyQuestionServiceTest.java",
-    "src/test/java/br/com/finup/StudyQuestionIntegrationTests.java",
-    "contracts/study-questions-write-c6.md",
+    "contracts/study-track-c6.md",
+    "database/init/01-schema.sql",
+    "database/init/03-test-data.sql",
+    "database/migrations/04-study-tracks-schema.sql",
+    "database/migrations/04-study-tracks-schema-rollback.sql",
+    "database/migrations/05-study-tracks-seed.sql",
     ".railforge/state.json"
   ],
   "plan": [
-    "Implementar contrato e regras sem alterar a dependência.",
-    "Validar CRUD com persistência e segurança reais, preservação de publicação e OpenAPI.",
-    "Executar verify, revisar diff contra o PR #51 e registrar limitações."
+    "Alinhar secao 4 do contrato e os dois seeds ao formato gravado pela API de escrita.",
+    "Remover ON DELETE CASCADE da FK e o BOM dos arquivos SQL e do contrato.",
+    "Validar Maven verify, schema e seed do zero em Postgres 16, rollback e migrations, e aplicacao dos commits dos PRs dependentes."
   ],
   "validation": {
-    "clean_verify": "Java 21: ./mvnw -B clean verify passou. 413 testes, 0 falhas, 0 erros, 0 ignorados; empacotamento e Spotless aprovados.",
-    "new_tests": "81 testes: 26 de validação, 7 de service e 48 integrados com HTTP, segurança e persistência reais. Incluem tipos, status derivados, 400/404, 401/403 nos quatro métodos, publicação preservada, troca de tipo proibida, UUID inválido e OpenAPI.",
-    "postgresql_16": "48 testes integrados finais passaram em banco PostgreSQL 16 exclusivo e descartável; JSONB, timestamps e CRUD verificados. Migrations da dependência não foram alteradas nem validadas aqui.",
-    "diff": "Revisão contra 0d236ba: somente arquivos desta task; nenhuma alteração em entidades, repositories, configuração, migrations ou seeds herdados. git diff --check passou.",
-    "environment": "Primeira execução no sandbox falhou ao iniciar o agente Mockito; reexecução autorizada fora do sandbox passou. Maven Clean ausente no cache foi baixado para executar clean verify.",
-    "manual_pending": "Tokens reais do Cognito, fluxo do painel com mocks desativados e nova validação após integração da dependência na develop. Exemplos JSON dos seeds do PR #51 diferem do contrato desta task e foram preservados."
+    "maven_verify": "BUILD SUCCESS em 2026-10-23 com a develop 8b21dfc mesclada: 456 testes, zero falhas ou erros; Spotless aprovado.",
+    "postgres": "postgres:16-alpine isolado em 2026-10-23, com a develop mesclada: database/init sobe do zero (inclui users.last_seen_at do #45); seed com os 3 tipos e os 3 status derivados; contagens 1/1 por categoria; DELETE de categoria com perguntas recusado pela FK (NO ACTION); rollback, 04 e 05 via psql sem erro.",
+    "dependentes": "Commits proprios dos PRs #53, #54 e #55 (0d236ba..head) aplicam sem conflito sobre esta mudanca, exceto o state.json, que cada PR reescreve.",
+    "limits": "Testes de integracao usam H2 com create-drop a partir das entidades; os scripts SQL so foram validados no Postgres manualmente."
   },
-  "review": "Implementação e revisão local concluídas sobre o PR #51. Commit local autorizado pelo solicitante em 2026-10-21; push e abertura do PR draft serão feitos manualmente pelo solicitante. Descrição preparada com prioridade para a dependência da task 86e3m95k1 / PR #51 e o alinhamento do contrato JSON. Aguardando revisão humana, CI remoto e integração da dependência. Sem merge ou mudanças no ClickUp.",
-  "updated_at": "2026-10-21"
+  "review": "Review do PR #51 apontou divergencia entre o schema JSON documentado/seed e os consumidores (task 86e3m95y3, PR #54, finup-web fillBlankContract.ts). Correcao aplicada sem alterar codigo Java, num commit novo sobre 0d236ba; a develop (8b21dfc, #45) foi mesclada na branch em 2026-10-23, sem conflito e sem reescrever historico, porque o #54 usa esta branch como base e o #53/#55 levam o 0d236ba. Pendente: aprovacao e merge. Mergear com merge commit (nao squash) para o 0d236ba virar ancestral da develop: assim #53 e #55 nao precisam de rebase, e o #54 so troca a base para develop.",
+  "open_questions": [
+    "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): isActive() e lastSeenAt ainda nao tem consumidor: entram no GET /admin/users (86e3m95y6). O web tipa lastSeenAt como string obrigatoria, mas no back ele e nulo para quem nunca abriu o app",
+    "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): Duas definicoes de usuario ativo: metrics/summary (#47) usa transacao no periodo; isActive() usa acesso ao app nos ultimos 7 dias. Alinhar nomes ou regra com o time"
+  ],
+  "updated_at": "2026-10-23"
 }

@@ -3,12 +3,18 @@ package br.com.finup.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.finup.model.User;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Valida o mapeamento JPA de usuario e as buscas por identidade do Cognito. */
 @DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=create-drop")
@@ -16,6 +22,48 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 class UserRepositoryTest {
 
   @Autowired private UserRepository userRepository;
+
+  @Autowired private JdbcTemplate jdbcTemplate;
+
+  @Autowired private TestEntityManager entityManager;
+
+  /** Cria o usuario e fixa o {@code created_at}, que o dominio sempre define como "agora". */
+  private void saveUserCreatedAt(String cognitoId, String createdAt) {
+    User user =
+        userRepository.saveAndFlush(
+            User.createFromCognitoIdentity(cognitoId, null, cognitoId + "@exemplo.com"));
+    jdbcTemplate.update(
+        "UPDATE users SET created_at = ? WHERE id = ?",
+        OffsetDateTime.ofInstant(Instant.parse(createdAt), ZoneOffset.UTC),
+        user.getId());
+  }
+
+  @Test
+  @DisplayName("conta cadastros no intervalo [from, to): inicio entra, fim nao")
+  void countsSignUpsInHalfOpenInterval() {
+    saveUserCreatedAt("antes", "2026-09-30T23:59:59Z");
+    saveUserCreatedAt("no-inicio", "2026-10-01T00:00:00Z");
+    saveUserCreatedAt("no-fim-do-mes", "2026-10-31T23:59:59Z");
+    saveUserCreatedAt("no-limite-superior", "2026-11-01T00:00:00Z");
+
+    assertThat(
+            userRepository.countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                Instant.parse("2026-10-01T00:00:00Z"), Instant.parse("2026-11-01T00:00:00Z")))
+        .isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("conta o acumulado de cadastros anteriores a um instante, sem incluir o proprio")
+  void countsSignUpsBeforeAnInstant() {
+    saveUserCreatedAt("a", "2026-08-10T10:00:00Z");
+    saveUserCreatedAt("b", "2026-09-30T23:59:59Z");
+    saveUserCreatedAt("c", "2026-10-01T00:00:00Z");
+
+    assertThat(userRepository.countByCreatedAtLessThan(Instant.parse("2026-10-01T00:00:00Z")))
+        .isEqualTo(2);
+    assertThat(userRepository.countByCreatedAtLessThan(Instant.parse("2026-01-01T00:00:00Z")))
+        .isZero();
+  }
 
   @Test
   @DisplayName("persiste e encontra usuario pelo cognitoId")
@@ -60,5 +108,67 @@ class UserRepositoryTest {
     assertThat(userRepository.findById(saved.getId()))
         .get()
         .satisfies(found -> assertThat(found.getName()).isNull());
+  }
+
+  @Test
+  @DisplayName("touchLastSeen grava o primeiro acesso sem alterar updatedAt")
+  void touchLastSeenRecordsFirstAccessWithoutTouchingUpdatedAt() {
+    User user =
+        userRepository.saveAndFlush(
+            User.createFromCognitoIdentity("cognito-sub-321", "Ana Souza", "ana2@exemplo.com"));
+    // entityManager.clear() forca uma leitura de verdade do banco: o driver arredonda (nao so
+    // trunca) os nanossegundos do Instant.now() para a precisao de microssegundos da coluna, e
+    // sem isso o findById devolveria a entidade do cache de sessao, com o valor em memoria - a
+    // comparacao ficaria flaky mesmo truncando os dois lados.
+    entityManager.clear();
+    Instant updatedAtBeforeAccess =
+        userRepository.findById(user.getId()).orElseThrow().getUpdatedAt();
+    Instant now = Instant.parse("2026-10-09T12:00:00Z");
+
+    int rowsUpdated =
+        userRepository.touchLastSeen(user.getId(), now, now.minus(1, ChronoUnit.HOURS));
+
+    assertThat(rowsUpdated).isEqualTo(1);
+    User reloaded = userRepository.findById(user.getId()).orElseThrow();
+    assertThat(reloaded.getLastSeenAt()).isEqualTo(now);
+    assertThat(reloaded.getUpdatedAt()).isEqualTo(updatedAtBeforeAccess);
+  }
+
+  @Test
+  @DisplayName("touchLastSeen dentro de uma hora do ultimo registro nao atualiza")
+  void touchLastSeenWithinThrottleWindowIsIgnored() {
+    User user =
+        userRepository.saveAndFlush(
+            User.createFromCognitoIdentity("cognito-sub-322", "Ana Souza", "ana3@exemplo.com"));
+    Instant firstAccess = Instant.parse("2026-10-09T12:00:00Z");
+    userRepository.touchLastSeen(user.getId(), firstAccess, firstAccess.minus(1, ChronoUnit.HOURS));
+    Instant secondAccess = firstAccess.plus(30, ChronoUnit.MINUTES);
+
+    int rowsUpdated =
+        userRepository.touchLastSeen(
+            user.getId(), secondAccess, secondAccess.minus(1, ChronoUnit.HOURS));
+
+    assertThat(rowsUpdated).isZero();
+    assertThat(userRepository.findById(user.getId()).orElseThrow().getLastSeenAt())
+        .isEqualTo(firstAccess);
+  }
+
+  @Test
+  @DisplayName("touchLastSeen depois de mais de uma hora do ultimo registro atualiza de novo")
+  void touchLastSeenAfterThrottleWindowUpdatesAgain() {
+    User user =
+        userRepository.saveAndFlush(
+            User.createFromCognitoIdentity("cognito-sub-323", "Ana Souza", "ana4@exemplo.com"));
+    Instant firstAccess = Instant.parse("2026-10-09T12:00:00Z");
+    userRepository.touchLastSeen(user.getId(), firstAccess, firstAccess.minus(1, ChronoUnit.HOURS));
+    Instant secondAccess = firstAccess.plus(61, ChronoUnit.MINUTES);
+
+    int rowsUpdated =
+        userRepository.touchLastSeen(
+            user.getId(), secondAccess, secondAccess.minus(1, ChronoUnit.HOURS));
+
+    assertThat(rowsUpdated).isEqualTo(1);
+    assertThat(userRepository.findById(user.getId()).orElseThrow().getLastSeenAt())
+        .isEqualTo(secondAccess);
   }
 }
