@@ -15,6 +15,7 @@
     "database/migrations/04-study-tracks-schema.sql",
     "database/migrations/04-study-tracks-schema-rollback.sql",
     "database/migrations/05-study-tracks-seed.sql",
+    "src/test/java/br/com/finup/AdminRoutesSecurityIntegrationTests.java",
     ".railforge/state.json"
   ],
   "plan": [
@@ -23,7 +24,7 @@
     "Validar Maven verify, schema e seed do zero em Postgres 16, rollback e migrations, e aplicacao dos commits dos PRs dependentes."
   ],
   "validation": {
-    "maven_verify": "BUILD SUCCESS em 2026-10-23 com a develop 8b21dfc mesclada: 456 testes, zero falhas ou erros; Spotless aprovado.",
+    "maven_verify": "BUILD SUCCESS em 2026-10-27 apos o merge com a develop: 573 testes, zero falhas ou erros; Spotless aprovado. AdminRoutesSecurityIntegrationTests ganhou os 4 casos de sucesso das rotas de perguntas (#54) e o mock de StudyQuestionService.",
     "postgres": "postgres:16-alpine isolado em 2026-10-23, com a develop mesclada: database/init sobe do zero (inclui users.last_seen_at do #45); seed com os 3 tipos e os 3 status derivados; contagens 1/1 por categoria; DELETE de categoria com perguntas recusado pela FK (NO ACTION); rollback, 04 e 05 via psql sem erro.",
     "dependentes": "Commits proprios dos PRs #53, #54 e #55 (0d236ba..head) aplicam sem conflito sobre esta mudanca, exceto o state.json, que cada PR reescreve.",
     "limits": "Testes de integracao usam H2 com create-drop a partir das entidades; os scripts SQL so foram validados no Postgres manualmente."
@@ -33,5 +34,5 @@
     "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): isActive() e lastSeenAt ainda nao tem consumidor: entram no GET /admin/users (86e3m95y6). O web tipa lastSeenAt como string obrigatoria, mas no back ele e nulo para quem nunca abriu o app",
     "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): Duas definicoes de usuario ativo: metrics/summary (#47) usa transacao no periodo; isActive() usa acesso ao app nos ultimos 7 dias. Alinhar nomes ou regra com o time"
   ],
-  "updated_at": "2026-10-23"
+  "updated_at": "2026-10-27"
 }
