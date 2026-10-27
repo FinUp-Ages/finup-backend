@@ -13,6 +13,7 @@ import br.com.finup.model.User;
 import br.com.finup.repository.CategoryRepository;
 import br.com.finup.repository.TransactionRepository;
 import br.com.finup.security.AuthenticatedIdentity;
+import br.com.finup.service.AiSpendingClassifier.ClassificationKey;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -20,10 +21,12 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -78,7 +81,8 @@ public class SpendingAlertService {
 
     User user = userService.findByAuthenticatedIdentity(identity);
     LocalDate today = LocalDate.now(clock);
-    LocalDate from = today.minusDays(days);
+    // Hoje conta como um dos N dias: days=30 cobre 30 datas, não 31.
+    LocalDate from = today.minusDays(days - 1L);
 
     List<Transaction> transactions =
         transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
@@ -98,17 +102,37 @@ public class SpendingAlertService {
     Map<UUID, List<Transaction>> expensesByCategory =
         expenses.stream().collect(Collectors.groupingBy(Transaction::getCategoryId));
 
+    Map<UUID, String> categoryNames = new HashMap<>();
+    for (UUID categoryId : expensesByCategory.keySet()) {
+      Category category = categoryMap.get(categoryId);
+      if (category == null) {
+        category = categoryRepository.findById(categoryId).orElse(null);
+      }
+      categoryNames.put(categoryId, category != null ? category.getName() : "Sem categoria");
+    }
+
+    // Tudo o que está fora das regras vai junto para a IA: uma chamada por requisição, não uma por
+    // transação.
+    List<ClassificationKey> outsideRules =
+        expensesByCategory.entrySet().stream()
+            .filter(e -> RiskySpending.fromCategoryName(categoryNames.get(e.getKey())).isEmpty())
+            .flatMap(
+                e ->
+                    e.getValue().stream()
+                        .map(
+                            t ->
+                                new ClassificationKey(
+                                    categoryNames.get(e.getKey()), t.getDescription())))
+            .toList();
+    Set<ClassificationKey> riskyByAi =
+        outsideRules.isEmpty() ? Set.of() : aiClassifier.findRisky(outsideRules);
+
     List<SpendingAlertItemResponse> alerts = new ArrayList<>();
 
     for (Map.Entry<UUID, List<Transaction>> entry : expensesByCategory.entrySet()) {
       UUID categoryId = entry.getKey();
       List<Transaction> catExpenses = entry.getValue();
-
-      Category category = categoryMap.get(categoryId);
-      if (category == null) {
-        category = categoryRepository.findById(categoryId).orElse(null);
-      }
-      String categoryName = category != null ? category.getName() : "Sem categoria";
+      String categoryName = categoryNames.get(categoryId);
 
       Optional<RiskySpending> ruleMatch = RiskySpending.fromCategoryName(categoryName);
 
@@ -136,7 +160,9 @@ public class SpendingAlertService {
       } else {
         List<Transaction> riskyExpenses =
             catExpenses.stream()
-                .filter(t -> aiClassifier.isRisky(categoryName, t.getDescription()))
+                .filter(
+                    t ->
+                        riskyByAi.contains(new ClassificationKey(categoryName, t.getDescription())))
                 .toList();
 
         if (!riskyExpenses.isEmpty()) {

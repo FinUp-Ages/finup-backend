@@ -2,7 +2,10 @@ package br.com.finup.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -18,12 +21,14 @@ import br.com.finup.model.User;
 import br.com.finup.repository.CategoryRepository;
 import br.com.finup.repository.TransactionRepository;
 import br.com.finup.security.AuthenticatedIdentity;
+import br.com.finup.service.AiSpendingClassifier.ClassificationKey;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -81,7 +86,7 @@ class SpendingAlertServiceTest {
             createExpense(betsCatId, "500.00", TODAY.minusDays(20)));
 
     when(transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
-            userId, TODAY.minusDays(30), TODAY))
+            userId, TODAY.minusDays(29), TODAY))
         .thenReturn(transactions);
     when(categoryRepository.findByUserOrIsDefaultTrue(user)).thenReturn(List.of(betsCat));
 
@@ -118,7 +123,7 @@ class SpendingAlertServiceTest {
             createExpense(tobaccoCatId, "40.00", TODAY.minusDays(2)));
 
     when(transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
-            userId, TODAY.minusDays(30), TODAY))
+            userId, TODAY.minusDays(29), TODAY))
         .thenReturn(transactions);
     when(categoryRepository.findByUserOrIsDefaultTrue(user)).thenReturn(List.of(tobaccoCat));
 
@@ -147,13 +152,17 @@ class SpendingAlertServiceTest {
         createExpense(leisureCatId, "100.00", TODAY.minusDays(7), "Jogo do bicho milhar");
 
     when(transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
-            userId, TODAY.minusDays(30), TODAY))
+            userId, TODAY.minusDays(29), TODAY))
         .thenReturn(List.of(cinema, rifa, bicho));
     when(categoryRepository.findByUserOrIsDefaultTrue(user)).thenReturn(List.of(leisureCat));
 
-    when(aiClassifier.isRisky("Lazer", "Cinema com pipoca")).thenReturn(false);
-    when(aiClassifier.isRisky("Lazer", "Rifa de moto esportiva")).thenReturn(true);
-    when(aiClassifier.isRisky("Lazer", "Jogo do bicho milhar")).thenReturn(true);
+    when(aiClassifier.findRisky(
+            List.of(
+                key("Lazer", "Cinema com pipoca"),
+                key("Lazer", "Rifa de moto esportiva"),
+                key("Lazer", "Jogo do bicho milhar"))))
+        .thenReturn(
+            Set.of(key("Lazer", "Rifa de moto esportiva"), key("Lazer", "Jogo do bicho milhar")));
 
     SpendingAlertsResponse response = service.getSpendingAlerts(IDENTITY, 30);
 
@@ -183,13 +192,13 @@ class SpendingAlertServiceTest {
     Transaction unknownTx = createExpense(unknownCatId, "120.00", TODAY, "Compra duvidosa");
 
     when(transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
-            userId, TODAY.minusDays(30), TODAY))
+            userId, TODAY.minusDays(29), TODAY))
         .thenReturn(List.of(beer, unknownTx));
     when(categoryRepository.findByUserOrIsDefaultTrue(user))
         .thenReturn(List.of(alcoholCat, unknownCat));
 
     // Se o classificador da IA retornar false (como acontece no fallback de erro)
-    when(aiClassifier.isRisky("Outros", "Compra duvidosa")).thenReturn(false);
+    when(aiClassifier.findRisky(List.of(key("Outros", "Compra duvidosa")))).thenReturn(Set.of());
 
     SpendingAlertsResponse response = service.getSpendingAlerts(IDENTITY, 30);
 
@@ -217,7 +226,7 @@ class SpendingAlertServiceTest {
             null);
 
     when(transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
-            userId, TODAY.minusDays(30), TODAY))
+            userId, TODAY.minusDays(29), TODAY))
         .thenReturn(List.of(income));
 
     SpendingAlertsResponse response = service.getSpendingAlerts(IDENTITY, 30);
@@ -234,10 +243,11 @@ class SpendingAlertServiceTest {
     Transaction lunch = createExpense(foodCatId, "45.00", TODAY, "Almoço executivo");
 
     when(transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
-            userId, TODAY.minusDays(30), TODAY))
+            userId, TODAY.minusDays(29), TODAY))
         .thenReturn(List.of(lunch));
     when(categoryRepository.findByUserOrIsDefaultTrue(user)).thenReturn(List.of(foodCat));
-    when(aiClassifier.isRisky("Alimentação", "Almoço executivo")).thenReturn(false);
+    when(aiClassifier.findRisky(List.of(key("Alimentação", "Almoço executivo"))))
+        .thenReturn(Set.of());
 
     SpendingAlertsResponse response = service.getSpendingAlerts(IDENTITY, 30);
 
@@ -251,6 +261,36 @@ class SpendingAlertServiceTest {
   void throwsExceptionForInvalidDays(int invalidDays) {
     assertThatThrownBy(() -> service.getSpendingAlerts(IDENTITY, invalidDays))
         .isInstanceOf(InvalidSpendingAlertPeriodException.class);
+  }
+
+  @Test
+  @DisplayName("despesas de varias categorias fora da regra vao numa unica consulta a IA")
+  void classifiesAllCategoriesOutsideRulesInSingleCall() {
+    UUID foodCatId = UUID.randomUUID();
+    UUID leisureCatId = UUID.randomUUID();
+    Category foodCat = createCategory(foodCatId, "Alimentação", TransactionType.EXPENSE);
+    Category leisureCat = createCategory(leisureCatId, "Lazer", TransactionType.EXPENSE);
+
+    when(transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
+            userId, TODAY.minusDays(29), TODAY))
+        .thenReturn(
+            List.of(
+                createExpense(foodCatId, "45.00", TODAY, "Almoço"),
+                createExpense(leisureCatId, "200.00", TODAY, "Bingo")));
+    when(categoryRepository.findByUserOrIsDefaultTrue(user))
+        .thenReturn(List.of(foodCat, leisureCat));
+    when(aiClassifier.findRisky(anyCollection())).thenReturn(Set.of(key("Lazer", "Bingo")));
+
+    SpendingAlertsResponse response = service.getSpendingAlerts(IDENTITY, 30);
+
+    assertThat(response.alerts())
+        .extracting(SpendingAlertItemResponse::categoryName)
+        .containsExactly("Lazer");
+    verify(aiClassifier, times(1)).findRisky(anyCollection());
+  }
+
+  private static ClassificationKey key(String category, String description) {
+    return new ClassificationKey(category, description);
   }
 
   private Category createCategory(UUID id, String name, TransactionType type) {

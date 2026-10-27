@@ -47,7 +47,7 @@ public class SpendingAlertController {
         description = "Alertas de gastos de risco calculados com sucesso"),
     @ApiResponse(
         responseCode = "400",
-        description = "Parâmetro days inválido (menor ou igual a zero)",
+        description = "Parâmetro days inválido (fora do intervalo de 1 a 365)",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
     @ApiResponse(
         responseCode = "401",
