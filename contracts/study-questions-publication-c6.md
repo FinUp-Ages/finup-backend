@@ -1,6 +1,7 @@
 # C6 — Publicação de perguntas da trilha
 
-Task: Backend — Publicar, despublicar e descartar alterações da Trilha (ClickUp 86e3m95k1).
+Task: Backend — Publicar, despublicar e descartar alterações da Trilha. Relacionada à task de
+modelagem da trilha, [86e3m95k1](https://app.clickup.com/t/86e3m95k1) (PR #51).
 Base provisória: commit `799474c` (PR #54, API administrativa de perguntas), sobre a `develop`
 com o PR #51. O PR desta task passa a ser contra a `develop` quando o #54 for mesclado.
 

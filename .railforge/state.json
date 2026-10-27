@@ -1,6 +1,6 @@
 {
   "stage": "REVIEWING",
-  "task": "Publicar, despublicar e descartar alteracoes da Trilha (ClickUp 86e3m95k1, contrato C6)",
+  "task": "Publicar, despublicar e descartar alteracoes da Trilha (contrato C6; relacionada a task de modelagem ClickUp 86e3m95k1)",
   "objective": "POST /questions/{id}/publish, POST /questions/{id}/unpublish e DELETE /questions/{id}/draft sob /api/v1/admin/study-tracks, com status derivado correto depois de cada acao e contagens da categoria refletindo as mudancas.",
   "decisions": [
     "Base provisoria: commit 799474c (PR #54, API administrativa de perguntas, ainda fora da develop) cherry-picked sobre a develop. A task reaproveita StudyQuestionValidator, StudyQuestionResponse e StudyQuestionMapper do #54 em vez de duplica-los. O PR passa a ser contra a develop quando o #54 for mesclado.",
