@@ -14,12 +14,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import br.com.finup.dto.DashboardWidgetsResponse;
 import br.com.finup.dto.MetricValueResponse;
 import br.com.finup.dto.MetricsSummaryResponse;
+import br.com.finup.dto.StudyCategoryResponse;
 import br.com.finup.dto.StudyQuestionResponse;
 import br.com.finup.dto.UserGrowthResponse;
 import br.com.finup.model.QuestionStatus;
 import br.com.finup.model.User;
 import br.com.finup.service.AdminMetricsService;
 import br.com.finup.service.DashboardWidgetService;
+import br.com.finup.service.StudyCategoryService;
 import br.com.finup.service.StudyQuestionPublicationService;
 import br.com.finup.service.StudyQuestionService;
 import br.com.finup.service.UserService;
@@ -112,7 +114,8 @@ class AdminRoutesSecurityIntegrationTests {
   /** Valor que entra no lugar de {@code {id}} nas rotas com variavel de caminho. */
   private static final String PATH_VARIABLE_VALUE = "00000000-0000-0000-0000-000000000001";
 
-  private static final String QUESTION_BODY = "{\"type\":\"FILL_BLANK\"}";
+  private static final String QUESTION_BODY =
+      "{\"type\":\"LEARNING\",\"title\":\"Reserva\",\"body\":\"## Reserva de emergencia\"}";
 
   private static final String WIDGETS_BODY =
       "{\"widgets\":[{\"id\":\"NEW_CLIENTS\",\"enabled\":true,\"position\":0}]}";
@@ -133,6 +136,17 @@ class AdminRoutesSecurityIntegrationTests {
               "PUT /api/v1/admin/dashboard/widgets", new SuccessCase(HttpStatus.OK, WIDGETS_BODY)),
           Map.entry("GET /api/v1/admin/metrics/summary", new SuccessCase(HttpStatus.OK, null)),
           Map.entry("GET /api/v1/admin/metrics/user-growth", new SuccessCase(HttpStatus.OK, null)),
+          Map.entry(
+              "GET /api/v1/admin/study-tracks/categories", new SuccessCase(HttpStatus.OK, null)),
+          Map.entry(
+              "POST /api/v1/admin/study-tracks/categories",
+              new SuccessCase(HttpStatus.CREATED, STUDY_CATEGORY_BODY)),
+          Map.entry(
+              "PUT /api/v1/admin/study-tracks/categories/{id}",
+              new SuccessCase(HttpStatus.OK, STUDY_CATEGORY_BODY)),
+          Map.entry(
+              "DELETE /api/v1/admin/study-tracks/categories/{id}",
+              new SuccessCase(HttpStatus.NO_CONTENT, null)),
           Map.entry(
               "POST /api/v1/admin/study-tracks/categories/{categoryId}/questions",
               new SuccessCase(HttpStatus.CREATED, QUESTION_BODY)),
@@ -170,6 +184,8 @@ class AdminRoutesSecurityIntegrationTests {
 
   @MockitoBean private AdminMetricsService adminMetricsService;
 
+  @MockitoBean private StudyCategoryService studyCategoryService;
+
   @MockitoBean private StudyQuestionService studyQuestionService;
 
   @MockitoBean private StudyQuestionPublicationService studyQuestionPublicationService;
@@ -184,14 +200,15 @@ class AdminRoutesSecurityIntegrationTests {
     MetricValueResponse zero = new MetricValueResponse(0.0, 0.0, 0.0);
     when(adminMetricsService.summary(any())).thenReturn(new MetricsSummaryResponse(zero, zero));
     when(adminMetricsService.userGrowth(any())).thenReturn(new UserGrowthResponse(0.0, List.of()));
+    StudyCategoryResponse category =
+        new StudyCategoryResponse(
+            UUID.randomUUID(), "CDB", "Renda fixa", 0, 0, Instant.now(), Instant.now());
+    when(studyCategoryService.listCategories()).thenReturn(List.of(category));
+    when(studyCategoryService.create(any())).thenReturn(category);
+    when(studyCategoryService.update(any(), any())).thenReturn(category);
     StudyQuestionResponse question =
         new StudyQuestionResponse(
-            UUID.fromString(PATH_VARIABLE_VALUE),
-            QuestionStatus.DRAFT,
-            Map.of(),
-            null,
-            Instant.now(),
-            null);
+            UUID.randomUUID(), QuestionStatus.DRAFT, Map.of(), null, Instant.now(), null);
     when(studyQuestionService.create(any(), any())).thenReturn(question);
     when(studyQuestionService.findByCategory(any())).thenReturn(List.of(question));
     when(studyQuestionService.update(any(), any())).thenReturn(question);
@@ -239,7 +256,8 @@ class AdminRoutesSecurityIntegrationTests {
         dashboardWidgetService,
         adminMetricsService,
         studyCategoryService,
-        studyQuestionService);
+        studyQuestionService,
+        studyQuestionPublicationService);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -260,7 +278,8 @@ class AdminRoutesSecurityIntegrationTests {
         dashboardWidgetService,
         adminMetricsService,
         studyCategoryService,
-        studyQuestionService);
+        studyQuestionService,
+        studyQuestionPublicationService);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -287,7 +306,8 @@ class AdminRoutesSecurityIntegrationTests {
         dashboardWidgetService,
         adminMetricsService,
         studyCategoryService,
-        studyQuestionService);
+        studyQuestionService,
+        studyQuestionPublicationService);
   }
 
   @ParameterizedTest(name = "{0} | cognito:groups = {1}")
@@ -308,7 +328,8 @@ class AdminRoutesSecurityIntegrationTests {
         dashboardWidgetService,
         adminMetricsService,
         studyCategoryService,
-        studyQuestionService);
+        studyQuestionService,
+        studyQuestionPublicationService);
   }
 
   @ParameterizedTest(name = "{0}")

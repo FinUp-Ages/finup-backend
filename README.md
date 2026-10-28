@@ -153,6 +153,10 @@ consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o b
 | `GET /api/v1/admin/me` | **só grupo `admin`.** Devolve o administrador autenticado: `{"id", "name", "email", "role": "ADMIN"}` |
 | `GET /api/v1/admin/metrics/summary?period=7d\|30d\|90d` | **só grupo `admin`.** Usuários ativos e novos no período, com o período anterior e a variação em % |
 | `GET /api/v1/admin/metrics/user-growth?months=6` | **só grupo `admin`.** Cadastros por mês (1 a 24 meses, padrão 6), com o acumulado e o crescimento em % |
+| `GET /api/v1/admin/study-tracks/categories` | **só grupo `admin`.** Lista categorias da trilha com contagens de perguntas em rascunho e publicadas |
+| `POST /api/v1/admin/study-tracks/categories` | **só grupo `admin`.** Cria categoria com `name` obrigatório e `description` opcional |
+| `PUT /api/v1/admin/study-tracks/categories/{id}` | **só grupo `admin`.** Atualiza categoria; inexistente devolve `404` |
+| `DELETE /api/v1/admin/study-tracks/categories/{id}` | **só grupo `admin`.** Remove categoria sem perguntas; com perguntas devolve `409` |
 | `POST /api/v1/admin/study-tracks/questions/{id}/publish` | **só grupo `admin`.** Valida o rascunho da pergunta da trilha e o copia para a versão publicada. Rascunho inválido: `400` |
 | `POST /api/v1/admin/study-tracks/questions/{id}/unpublish` | **só grupo `admin`.** Zera a versão publicada, e a pergunta volta a `DRAFT` |
 | `DELETE /api/v1/admin/study-tracks/questions/{id}/draft` | **só grupo `admin`.** Descarta as edições pendentes, restaurando o rascunho a partir da versão publicada. Pergunta nunca publicada: `409` |
