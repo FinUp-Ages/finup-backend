@@ -10,3 +10,6 @@ target/
 .project
 
 .DS_Store
+
+# Token gerado pelos scripts locais do Cognito
+.finup-token.txt

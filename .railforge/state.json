@@ -1,6 +1,6 @@
 {
   "stage": "REVIEWING",
-  "task": "CRUD administrativo de categorias da trilha de estudos",
+  "task": "CRUD administrativo de categorias da trilha de estudos (ClickUp 86e3m9600, contrato C6, PR #55)",
   "objective": "Criar, listar, editar e remover categorias de estudo em /api/v1/admin/study-tracks/categories, com acesso ADMIN, contagens de perguntas por status derivado e contrato compatível com o front.",
   "decisions": [
     "PUT devolve 200 com a categoria atualizada e DELETE devolve 204 sem corpo, conforme o contrato de integração do front",
@@ -8,15 +8,15 @@
     "Limites de name e description seguem o schema existente: 100 e 255 caracteres; name não é único porque o C6 não definiu unicidade",
     "description ausente ou nula é serializada como string vazia no response",
     "draftCount conta DRAFT e PUBLISHED_WITH_CHANGES; publishedCount conta PUBLISHED e PUBLISHED_WITH_CHANGES",
-    "DELETE verifica perguntas vinculadas antes da remoção e responde 409 em vez de permitir o ON DELETE CASCADE",
-    "A autorização administrativa existente em /api/v1/admin/** será reutilizada, exigindo o grupo Cognito admin"
+    "GET calcula as contagens numa única consulta JPQL agrupada por categoria, sem N+1; PUT usa a contagem nativa de uma categoria; POST devolve zero sem consultar",
+    "DELETE verifica perguntas vinculadas antes da remoção e responde 409; a FK não tem ON DELETE, então uma pergunta criada entre a verificação e a remoção também vira 409, e não 500",
+    "A autorização administrativa existente em /api/v1/admin/** é reutilizada, exigindo o grupo Cognito admin",
+    "develop 3b6168b mesclada na branch: conflitos em StudyQuestionRepository (mantidos os dois lados), AdminRoutesSecurityIntegrationTests (rotas de categorias e de perguntas juntas, com Map.ofEntries porque Map.of aceita no máximo 10 pares) e neste arquivo"
   ],
   "files_in_scope": [
     "src/main/java/br/com/finup/controller/AdminStudyCategoryController.java",
     "src/main/java/br/com/finup/dto/StudyCategoryRequest.java",
-    "src/main/java/br/com/finup/dto/StudyCategoryResponse.java",
     "src/main/java/br/com/finup/mapper/StudyCategoryMapper.java",
-    "src/main/java/br/com/finup/repository/StudyCategoryRepository.java",
     "src/main/java/br/com/finup/repository/StudyQuestionRepository.java",
     "src/main/java/br/com/finup/service/StudyCategoryService.java",
     "src/test/java/br/com/finup/controller/AdminStudyCategoryControllerTest.java",
@@ -28,24 +28,21 @@
     ".railforge/state.json"
   ],
   "plan": [
-    "Inspecionar as classes da modelagem C6 e padrões de controllers admin, erros e testes.",
     "Implementar request/response, CRUD administrativo, contagens agregadas no banco e conflito de remoção.",
-    "Adicionar testes de integração/web para CRUD, validação, 404, 409 e segurança ADMIN.",
-    "Atualizar Swagger/documentação, executar validação Maven e revisar o diff final."
+    "Adicionar testes de integração com H2 real para CRUD, contagens, validação, 404 e 409, e a matriz de segurança ADMIN.",
+    "Mesclar a develop, resolver conflitos, atualizar Swagger/documentação e executar Maven verify."
   ],
   "validation": {
-    "focused tests": "passed: AdminStudyCategoryControllerTest (7), StudyCategoryServiceTest (7), StudyCategoryMapperTest, StudyCategoryTest, StudyQuestionTest",
-    "integration CRUD tests": "passed: AdminStudyCategoryIntegrationTests (4), cobrindo CRUD, 400, 404 e 409",
-    "security and OpenAPI tests": "passed: AdminAuthIntegrationTests (14), incluindo 403 em GET/POST/PUT/DELETE, e OpenApiIntegrationTests",
-    "admin route security matrix": "passed: AdminRoutesSecurityIntegrationTests (82), incluindo sucesso e 401/403 para as quatro rotas de categorias",
-    "mvn clean verify": "passed em 2026-10-25; 507 testes, 0 falhas, 0 erros, Spotless limpo e build success",
-    "diff check": "passed: git diff --check",
-    "not validated": "CI remoto, aprovação de code review e merge na branch principal dependem do PR"
+    "maven_verify": "BUILD SUCCESS em 2026-10-27 com a develop 3b6168b mesclada: 679 testes, zero falhas ou erros; Spotless aprovado.",
+    "integracao": "AdminStudyCategoryIntegrationTests (H2 em modo PostgreSQL, HTTP, segurança e persistência reais, JWT simulado do grupo admin): contagens com DRAFT, PUBLISHED e PUBLISHED_WITH_CHANGES no GET e no PUT, trim e Location no POST, PUT, DELETE 204 removendo do banco, 409 mantendo a categoria, 404, 400 para name ausente, vazio ou longo e para id fora do formato UUID.",
+    "seguranca": "AdminRoutesSecurityIntegrationTests cobre 401, 403 e sucesso nas quatro rotas de categorias e nas quatro de perguntas; AdminAuthIntegrationTests cobre 403 nas rotas de categorias.",
+    "limits": "Não validado manualmente com Postgres nesta rodada; CI remoto depende do push."
   },
-  "review": "Implementação revisada localmente após rebase sobre develop: controller admin, validação, 404, 409, 204, contagens agregadas, normalização de description, Swagger, documentação e matriz centralizada de segurança conferidos.",
+  "review": "Review do PR #55 em 2026-10-27: branch desatualizada com conflitos, testes de integração com repositories mockados, fallback morto nas contagens, N+1 no GET, 500 em corrida no DELETE e Swagger incompleto no PUT/DELETE. Correções aplicadas localmente, sem commit. Pendente: commit do merge, push, CI verde, aprovação e merge.",
   "open_questions": [
+    "Cache da classificacao da IA e em memoria e sem limite de tamanho; cresce com as descricoes distintas de todos os usuarios ate o restart.",
     "Herdado de origin/develop: isActive() e lastSeenAt ainda não têm consumidor; entram no GET /admin/users.",
     "Herdado de origin/develop: metrics/summary usa transações no período, enquanto isActive() usa acesso ao app nos últimos 7 dias; alinhar nomes ou regra com o time."
   ],
-  "updated_at": "2026-10-25"
+  "updated_at": "2026-10-27"
 }
