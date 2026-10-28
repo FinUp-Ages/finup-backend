@@ -1,36 +1,40 @@
 {
   "stage": "REVIEWING",
-  "task": "Modelagem da Trilha de Estudos (ClickUp 86e3m95k1, contrato C6, PR #51)",
-  "objective": "Tabelas, entidades, status derivado e contagens de categoria e pergunta da trilha, com contrato e seed no mesmo formato de conteudo usado pela API de escrita e pelo painel",
+  "task": "Alerta de gastos de risco (ClickUp 86e3m95k7, contrato C1, PR #52)",
+  "objective": "GET /api/v1/insights/spending-alerts?days=30 no formato do C1: regras de RiskySpending (com TOBACCO) mais classificacao por IA com cache, projecao valor x 1,10^5, so EXPENSE do usuario autenticado",
   "decisions": [
-    "Schema JSON de draft/published alinhado a task 86e3m95y3 (PR #54) e ao finup-web: FILL_BLANK {type,title,statement,answers,explanation}, MULTIPLE_CHOICE {type,statement,options[{text,correct}],explanation}, LEARNING {type,title,body}. O formato anterior (textWithBlanks, correctOptionId, content) nao tinha consumidor.",
-    "FK study_questions.category_id sem ON DELETE, como as demais FKs do schema: o banco recusa remover categoria com perguntas, reforcando o 409 da task 86e3m9600.",
-    "Classes Java da modelagem mantidas sem alteracao: StudyCategoryService, StudyQuestionRepository, StudyCategoryMapper e StudyCategoryServiceTest sao alterados pelos PRs #53, #54 e #55, que dependem desta base. O uso da query agregada no service fica com o #55.",
-    "Sem ferramenta de migration (issue #15): database/migrations documenta a mudanca e o rollback; database/init continua sendo o que o compose executa."
+    "Classificacao da IA em lote: as despesas fora das regras ainda nao cacheadas vao numa unica chamada ao Bedrock (lotes de ate 50), resposta {\"risky\":[numeros]}. Antes era uma chamada sequencial por transacao: 40 despesas distintas = 40 chamadas na primeira requisicao, e com o Bedrock falhando nada ia para o cache e toda requisicao repetia todas.",
+    "Falha ou resposta fora do formato: o lote conta como nao arriscado, nao entra no cache e os lotes seguintes nao sao tentados; o endpoint devolve so os alertas por regra.",
+    "Log de falha da IA sem a descricao da transacao (texto livre do usuario), so a quantidade de despesas.",
+    "Janela de dias inclusiva com hoje: days=30 cobre today-29..today (antes eram 31 datas)."
   ],
   "files_in_scope": [
-    "contracts/study-track-c6.md",
-    "database/init/01-schema.sql",
-    "database/init/03-test-data.sql",
-    "database/migrations/04-study-tracks-schema.sql",
-    "database/migrations/04-study-tracks-schema-rollback.sql",
-    "database/migrations/05-study-tracks-seed.sql",
-    "src/test/java/br/com/finup/AdminRoutesSecurityIntegrationTests.java",
-    ".railforge/state.json"
+    "src/main/java/br/com/finup/controller/SpendingAlertController.java",
+    "src/main/java/br/com/finup/service/SpendingAlertService.java",
+    "src/main/java/br/com/finup/service/AiSpendingClassifier.java",
+    "src/main/java/br/com/finup/service/RiskySpending.java",
+    "src/main/java/br/com/finup/dto/SpendingAlert*.java",
+    "src/main/java/br/com/finup/model/RiskKind.java",
+    "src/main/java/br/com/finup/model/AlertSource.java",
+    "src/main/java/br/com/finup/exception/InvalidSpendingAlertPeriodException.java",
+    "src/test/java/br/com/finup/SpendingAlertIntegrationTests.java",
+    "src/test/java/br/com/finup/service/AiSpendingClassifierTest.java",
+    "src/test/java/br/com/finup/service/SpendingAlertServiceTest.java"
   ],
   "plan": [
-    "Alinhar secao 4 do contrato e os dois seeds ao formato gravado pela API de escrita.",
-    "Remover ON DELETE CASCADE da FK e o BOM dos arquivos SQL e do contrato.",
-    "Validar Maven verify, schema e seed do zero em Postgres 16, rollback e migrations, e aplicacao dos commits dos PRs dependentes."
+    "Mesclar a develop na branch do PR (sem reescrever historico).",
+    "Trocar a classificacao por transacao por classificacao em lote e corrigir a janela de dias.",
+    "Adicionar teste de integracao do endpoint (DoD) e rodar Maven verify."
   ],
   "validation": {
-    "maven_verify": "BUILD SUCCESS em 2026-10-27 apos o merge com a develop: 573 testes, zero falhas ou erros; Spotless aprovado. AdminRoutesSecurityIntegrationTests ganhou os 4 casos de sucesso das rotas de perguntas (#54) e o mock de StudyQuestionService.",
-    "postgres": "postgres:16-alpine isolado em 2026-10-23, com a develop mesclada: database/init sobe do zero (inclui users.last_seen_at do #45); seed com os 3 tipos e os 3 status derivados; contagens 1/1 por categoria; DELETE de categoria com perguntas recusado pela FK (NO ACTION); rollback, 04 e 05 via psql sem erro.",
-    "dependentes": "Commits proprios dos PRs #53, #54 e #55 (0d236ba..head) aplicam sem conflito sobre esta mudanca, exceto o state.json, que cada PR reescreve.",
-    "limits": "Testes de integracao usam H2 com create-drop a partir das entidades; os scripts SQL so foram validados no Postgres manualmente."
+    "maven_verify": "BUILD SUCCESS em 2026-10-27 com a develop 1e6565d mesclada: 617 testes, zero falhas ou erros; Spotless aprovado.",
+    "sonda": "SpendingAlertService com BedrockLlmService simulado (200 ms por chamada), 40 despesas distintas fora das regras: antes 40 chamadas e 8,2 s; depois 1 chamada e 0,46 s. Bedrock falhando, 2 requisicoes: antes 80 chamadas, depois 2.",
+    "integracao": "SpendingAlertIntegrationTests (H2, HTTP e seguranca reais, JWT e Bedrock simulados): formato C1, EXPENSE apenas, janela de 30 datas, isolamento entre usuarios, cache entre requisicoes, falha da IA e 400 para days invalido.",
+    "limits": "Sem chamada real ao Bedrock: o formato {\"risky\":[...]} da resposta do modelo AMAZON_LITE nao foi validado contra a AWS."
   },
-  "review": "Review do PR #51 apontou divergencia entre o schema JSON documentado/seed e os consumidores (task 86e3m95y3, PR #54, finup-web fillBlankContract.ts). Correcao aplicada sem alterar codigo Java, num commit novo sobre 0d236ba; a develop (8b21dfc, #45) foi mesclada na branch em 2026-10-23, sem conflito e sem reescrever historico, porque o #54 usa esta branch como base e o #53/#55 levam o 0d236ba. Pendente: aprovacao e merge. Mergear com merge commit (nao squash) para o 0d236ba virar ancestral da develop: assim #53 e #55 nao precisam de rebase, e o #54 so troca a base para develop.",
+  "review": "Review do PR #52 em 2026-10-27: contrato C1 e DoD conferidos com a task 86e3m95k7. Correcoes aplicadas em commit novo sobre a branch do autor. Pendente: aprovacao de outro revisor e merge.",
   "open_questions": [
+    "Cache da classificacao da IA e em memoria e sem limite de tamanho; cresce com as descricoes distintas de todos os usuarios ate o restart.",
     "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): isActive() e lastSeenAt ainda nao tem consumidor: entram no GET /admin/users (86e3m95y6). O web tipa lastSeenAt como string obrigatoria, mas no back ele e nulo para quem nunca abriu o app",
     "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): Duas definicoes de usuario ativo: metrics/summary (#47) usa transacao no periodo; isActive() usa acesso ao app nos ultimos 7 dias. Alinhar nomes ou regra com o time"
   ],
