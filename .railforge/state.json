@@ -1,38 +1,36 @@
 {
   "stage": "REVIEWING",
-  "task": "Alerta de gastos de risco (ClickUp 86e3m95k7, contrato C1, PR #52)",
-  "objective": "GET /api/v1/insights/spending-alerts?days=30 no formato do C1: regras de RiskySpending (com TOBACCO) mais classificacao por IA com cache, projecao valor x 1,10^5, so EXPENSE do usuario autenticado",
+  "task": "Leitura da Trilha para o app (ClickUp 86e3m95y4, contrato C6, PR #53)",
+  "objective": "GET /api/v1/study-tracks/categories e GET /api/v1/study-tracks/categories/{id}/questions para usuario comum autenticado, devolvendo so perguntas publicadas e so o conteudo published (com a resposta correta)",
   "decisions": [
-    "Classificacao da IA em lote: as despesas fora das regras ainda nao cacheadas vao numa unica chamada ao Bedrock (lotes de ate 50), resposta {\"risky\":[numeros]}. Antes era uma chamada sequencial por transacao: 40 despesas distintas = 40 chamadas na primeira requisicao, e com o Bedrock falhando nada ia para o cache e toda requisicao repetia todas.",
-    "Falha ou resposta fora do formato: o lote conta como nao arriscado, nao entra no cache e os lotes seguintes nao sao tentados; o endpoint devolve so os alertas por regra.",
-    "Log de falha da IA sem a descricao da transacao (texto livre do usuario), so a quantidade de despesas.",
-    "Janela de dias inclusiva com hoje: days=30 cobre today-29..today (antes eram 31 datas)."
+    "StudyTrackQueryService era um stub (lista vazia e 404 fixo); passou a ler StudyCategoryRepository e StudyQuestionRepository.",
+    "Categorias: todas, ordenadas por nome, com publishedCount (published IS NOT NULL) calculado numa unica query agrupada, sem N+1. Categoria sem perguntas publicadas aparece com publishedCount 0; o app decide se exibe.",
+    "Perguntas: published IS NOT NULL ordenadas por created_at; o payload e {id, published}. DRAFT nunca aparece e PUBLISHED_WITH_CHANGES devolve a versao publicada.",
+    "Categoria inexistente usa o ResourceNotFoundException existente (404 ProblemDetail); o CategoryNotFoundException duplicado foi removido e o StudyCategoryService voltou ao original do #51.",
+    "Removidos do PR o .finup-token.txt (access token do Cognito commitado) e o scripts/message.py (fora do escopo); .finup-token.txt entrou no .gitignore."
   ],
   "files_in_scope": [
-    "src/main/java/br/com/finup/controller/SpendingAlertController.java",
-    "src/main/java/br/com/finup/service/SpendingAlertService.java",
-    "src/main/java/br/com/finup/service/AiSpendingClassifier.java",
-    "src/main/java/br/com/finup/service/RiskySpending.java",
-    "src/main/java/br/com/finup/dto/SpendingAlert*.java",
-    "src/main/java/br/com/finup/model/RiskKind.java",
-    "src/main/java/br/com/finup/model/AlertSource.java",
-    "src/main/java/br/com/finup/exception/InvalidSpendingAlertPeriodException.java",
-    "src/test/java/br/com/finup/SpendingAlertIntegrationTests.java",
-    "src/test/java/br/com/finup/service/AiSpendingClassifierTest.java",
-    "src/test/java/br/com/finup/service/SpendingAlertServiceTest.java"
+    "src/main/java/br/com/finup/controller/StudyTrackController.java",
+    "src/main/java/br/com/finup/service/StudyTrackQueryService.java",
+    "src/main/java/br/com/finup/dto/StudyTrackCategoryResponse.java",
+    "src/main/java/br/com/finup/dto/StudyTrackQuestionResponse.java",
+    "src/main/java/br/com/finup/repository/StudyQuestionRepository.java",
+    "src/test/java/br/com/finup/controller/StudyTrackControllerTest.java",
+    "src/test/java/br/com/finup/StudyTrackIntegrationTests.java",
+    ".gitignore",
+    ".railforge/state.json"
   ],
   "plan": [
-    "Mesclar a develop na branch do PR (sem reescrever historico).",
-    "Trocar a classificacao por transacao por classificacao em lote e corrigir a janela de dias.",
-    "Adicionar teste de integracao do endpoint (DoD) e rodar Maven verify."
+    "Implementar o service com as consultas de categorias e perguntas publicadas.",
+    "Remover token, script e excecao duplicada; ignorar o arquivo de token.",
+    "Adicionar teste de integracao com usuario comum e rodar Maven verify na branch e com a develop mesclada."
   ],
   "validation": {
-    "maven_verify": "BUILD SUCCESS em 2026-10-27 com a develop 1e6565d mesclada: 617 testes, zero falhas ou erros; Spotless aprovado.",
-    "sonda": "SpendingAlertService com BedrockLlmService simulado (200 ms por chamada), 40 despesas distintas fora das regras: antes 40 chamadas e 8,2 s; depois 1 chamada e 0,46 s. Bedrock falhando, 2 requisicoes: antes 80 chamadas, depois 2.",
-    "integracao": "SpendingAlertIntegrationTests (H2, HTTP e seguranca reais, JWT e Bedrock simulados): formato C1, EXPENSE apenas, janela de 30 datas, isolamento entre usuarios, cache entre requisicoes, falha da IA e 400 para days invalido.",
-    "limits": "Sem chamada real ao Bedrock: o formato {\"risky\":[...]} da resposta do modelo AMAZON_LITE nao foi validado contra a AWS."
+    "maven_verify": "BUILD SUCCESS em 2026-10-27 na branch (464 testes) e com a develop d2004f6 mesclada (625 testes), zero falhas ou erros; Spotless aprovado.",
+    "integracao": "StudyTrackIntegrationTests (H2, HTTP e seguranca reais, JWT simulado sem grupo admin): ordem e publishedCount das categorias, so PUBLISHED e PUBLISHED_WITH_CHANGES com o conteudo published e a resposta correta, sem draft/status, lista vazia para categoria so com DRAFT, 404 e 401.",
+    "limits": "Validado manualmente com Postgres 16 local e o seed da trilha; nao validado com o app mobile, que consome na proxima sprint."
   },
-  "review": "Review do PR #52 em 2026-10-27: contrato C1 e DoD conferidos com a task 86e3m95k7. Correcoes aplicadas em commit novo sobre a branch do autor. Pendente: aprovacao de outro revisor e merge.",
+  "review": "Review do PR #53 em 2026-10-27: service stub, token commitado e falta de teste de integracao. Correcoes commitadas na branch e develop d2004f6 mesclada pelo GitHub (conflito so no state.json). Pendente: CI verde, aprovacao e merge.",
   "open_questions": [
     "Cache da classificacao da IA e em memoria e sem limite de tamanho; cresce com as descricoes distintas de todos os usuarios ate o restart.",
     "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): isActive() e lastSeenAt ainda nao tem consumidor: entram no GET /admin/users (86e3m95y6). O web tipa lastSeenAt como string obrigatoria, mas no back ele e nulo para quem nunca abriu o app",

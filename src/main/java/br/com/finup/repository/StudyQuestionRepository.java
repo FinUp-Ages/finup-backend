@@ -13,6 +13,17 @@ public interface StudyQuestionRepository extends JpaRepository<StudyQuestion, UU
 
   List<StudyQuestion> findByCategoryIdOrderByCreatedAtAsc(UUID categoryId);
 
+  List<StudyQuestion> findByCategoryIdAndPublishedIsNotNullOrderByCreatedAtAsc(UUID categoryId);
+
+  @Query(
+      """
+      SELECT q.category.id AS categoryId, COUNT(q) AS publishedCount
+      FROM StudyQuestion q
+      WHERE q.published IS NOT NULL
+      GROUP BY q.category.id
+      """)
+  List<PublishedCountProjection> countPublishedGroupedByCategory();
+
   @Query(
       value =
           """
@@ -29,5 +40,11 @@ public interface StudyQuestionRepository extends JpaRepository<StudyQuestion, UU
     long getPublishedCount();
 
     long getDraftCount();
+  }
+
+  public interface PublishedCountProjection {
+    UUID getCategoryId();
+
+    long getPublishedCount();
   }
 }
