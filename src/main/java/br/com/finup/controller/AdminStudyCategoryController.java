@@ -99,7 +99,21 @@ public class AdminStudyCategoryController {
     @ApiResponse(responseCode = "200", description = "Categoria atualizada"),
     @ApiResponse(
         responseCode = "400",
-        description = "Nome ausente, vazio ou campos inválidos",
+        description = "Nome ausente, vazio, campos inválidos ou id fora do formato UUID",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "Token ausente, inválido ou expirado",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "Usuário fora do grupo admin",
         content =
             @Content(
                 mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
@@ -121,6 +135,27 @@ public class AdminStudyCategoryController {
   @Operation(summary = "Remove uma categoria sem perguntas")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Categoria removida"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Id fora do formato UUID",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "Token ausente, inválido ou expirado",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "Usuário fora do grupo admin",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                schema = @Schema(implementation = ProblemDetail.class))),
     @ApiResponse(
         responseCode = "404",
         description = "Categoria não encontrada",
