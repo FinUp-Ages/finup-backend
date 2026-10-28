@@ -54,11 +54,12 @@ public class AdminUserService {
     int page = parsePage(pageParam);
     int size = parseSize(sizeParam);
     Boolean active = parseStatus(statusParam);
-    String search = normalizeSearch(searchParam);
+    String searchPattern = likePattern(normalizeSearch(searchParam));
     Instant now = clock.instant();
 
     Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-    Page<User> result = userRepository.search(search, active, User.activeSince(now), pageable);
+    Page<User> result =
+        userRepository.search(searchPattern, active, User.activeSince(now), pageable);
 
     return PageResponse.from(result.map(user -> UserMapper.toAdminUserResponse(user, now)));
   }
@@ -121,6 +122,15 @@ public class AdminUserService {
     }
     String trimmed = search.strip();
     return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  /**
+   * Minusculo e com {@code %} nas pontas, pronto para o {@code LIKE} — montado aqui, nao no SQL: um
+   * {@code lower(concat(...))} sobre parametro nulo faz o driver do Postgres recusar a query (nao
+   * consegue inferir o tipo do parametro).
+   */
+  private static String likePattern(String search) {
+    return search == null ? null : "%" + search.toLowerCase() + "%";
   }
 
   /** O valor volta na mensagem de erro; corta o que for longo para nao inflar a resposta. */

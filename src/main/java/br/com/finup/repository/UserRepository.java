@@ -50,19 +50,21 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * <p>{@code active} segue a regra de {@link User#isActive}, mas calculada aqui via {@code
    * activeSince} ({@link User#activeSince}) para virar comparacao de data no SQL: {@code null} nao
    * filtra por status, {@code true} e {@code lastSeenAt} dentro da janela, {@code false} e nulo ou
-   * fora dela. {@code search} casa parcialmente contra nome ou e-mail, sem diferenciar maiusculas
-   * de minusculas; {@code null} nao filtra.
+   * fora dela. {@code searchPattern} ja vem pronto para o {@code LIKE} (minusculo, com {@code %}
+   * nas pontas; {@code null} nao filtra) — quem chama monta o padrao, nao o SQL: um {@code
+   * lower(concat(...))} sobre parametro nulo faz o driver do Postgres falhar com {@code function
+   * lower(bytea) does not exist}, por nao conseguir inferir o tipo.
    */
   @Query(
       "select u from User u where"
-          + " (:search is null"
-          + "   or lower(u.name) like lower(concat('%', :search, '%'))"
-          + "   or lower(u.email) like lower(concat('%', :search, '%')))"
+          + " (:searchPattern is null"
+          + "   or lower(u.name) like :searchPattern"
+          + "   or lower(u.email) like :searchPattern)"
           + " and (:active is null"
           + "   or (:active = true and u.lastSeenAt is not null and u.lastSeenAt >= :activeSince)"
           + "   or (:active = false and (u.lastSeenAt is null or u.lastSeenAt < :activeSince)))")
   Page<User> search(
-      @Param("search") String search,
+      @Param("searchPattern") String searchPattern,
       @Param("active") Boolean active,
       @Param("activeSince") Instant activeSince,
       Pageable pageable);

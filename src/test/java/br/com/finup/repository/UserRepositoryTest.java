@@ -239,7 +239,7 @@ class UserRepositoryTest {
 
     Page<User> found =
         userRepository.search(
-            "CARLOS", null, Instant.parse("2026-10-09T12:00:00Z"), PageRequest.of(0, 20));
+            "%carlos%", null, Instant.parse("2026-10-09T12:00:00Z"), PageRequest.of(0, 20));
 
     assertThat(found.getContent()).extracting(User::getCognitoId).containsExactly("carlos");
   }
@@ -252,7 +252,7 @@ class UserRepositoryTest {
 
     Page<User> found =
         userRepository.search(
-            "ANA@EXEMPLO", null, Instant.parse("2026-10-09T12:00:00Z"), PageRequest.of(0, 20));
+            "%ana@exemplo%", null, Instant.parse("2026-10-09T12:00:00Z"), PageRequest.of(0, 20));
 
     assertThat(found.getContent()).extracting(User::getCognitoId).containsExactly("ana");
   }
@@ -266,7 +266,7 @@ class UserRepositoryTest {
     saveUserWithLastSeen("carlos-inativo", "Carlos Pereira", null);
     saveUserWithLastSeen("ana-ativa", "Ana Souza", now.minus(1, ChronoUnit.DAYS).toString());
 
-    Page<User> found = userRepository.search("carlos", true, activeSince, PageRequest.of(0, 20));
+    Page<User> found = userRepository.search("%carlos%", true, activeSince, PageRequest.of(0, 20));
 
     assertThat(found.getContent()).extracting(User::getCognitoId).containsExactly("carlos-ativo");
   }
