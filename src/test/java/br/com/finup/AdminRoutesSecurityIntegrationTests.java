@@ -14,10 +14,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import br.com.finup.dto.DashboardWidgetsResponse;
 import br.com.finup.dto.MetricValueResponse;
 import br.com.finup.dto.MetricsSummaryResponse;
+import br.com.finup.dto.StudyQuestionResponse;
 import br.com.finup.dto.UserGrowthResponse;
+import br.com.finup.model.QuestionStatus;
 import br.com.finup.model.User;
 import br.com.finup.service.AdminMetricsService;
 import br.com.finup.service.DashboardWidgetService;
+import br.com.finup.service.StudyQuestionService;
 import br.com.finup.service.UserService;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -26,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -107,6 +111,9 @@ class AdminRoutesSecurityIntegrationTests {
   /** Valor que entra no lugar de {@code {id}} nas rotas com variavel de caminho. */
   private static final String PATH_VARIABLE_VALUE = "00000000-0000-0000-0000-000000000001";
 
+  private static final String QUESTION_BODY =
+      "{\"type\":\"LEARNING\",\"title\":\"Reserva\",\"body\":\"## Reserva de emergencia\"}";
+
   private static final String WIDGETS_BODY =
       "{\"widgets\":[{\"id\":\"NEW_CLIENTS\",\"enabled\":true,\"position\":0}]}";
 
@@ -120,7 +127,15 @@ class AdminRoutesSecurityIntegrationTests {
           "GET /api/v1/admin/dashboard/widgets", new SuccessCase(HttpStatus.OK, null),
           "PUT /api/v1/admin/dashboard/widgets", new SuccessCase(HttpStatus.OK, WIDGETS_BODY),
           "GET /api/v1/admin/metrics/summary", new SuccessCase(HttpStatus.OK, null),
-          "GET /api/v1/admin/metrics/user-growth", new SuccessCase(HttpStatus.OK, null));
+          "GET /api/v1/admin/metrics/user-growth", new SuccessCase(HttpStatus.OK, null),
+          "POST /api/v1/admin/study-tracks/categories/{categoryId}/questions",
+              new SuccessCase(HttpStatus.CREATED, QUESTION_BODY),
+          "GET /api/v1/admin/study-tracks/categories/{categoryId}/questions",
+              new SuccessCase(HttpStatus.OK, null),
+          "PUT /api/v1/admin/study-tracks/questions/{id}",
+              new SuccessCase(HttpStatus.OK, QUESTION_BODY),
+          "DELETE /api/v1/admin/study-tracks/questions/{id}",
+              new SuccessCase(HttpStatus.NO_CONTENT, null));
 
   @Autowired private MockMvc mockMvc;
 
@@ -137,6 +152,8 @@ class AdminRoutesSecurityIntegrationTests {
 
   @MockitoBean private AdminMetricsService adminMetricsService;
 
+  @MockitoBean private StudyQuestionService studyQuestionService;
+
   @BeforeEach
   void stubServices() {
     when(userService.findByAuthenticatedIdentity(any()))
@@ -147,6 +164,12 @@ class AdminRoutesSecurityIntegrationTests {
     MetricValueResponse zero = new MetricValueResponse(0.0, 0.0, 0.0);
     when(adminMetricsService.summary(any())).thenReturn(new MetricsSummaryResponse(zero, zero));
     when(adminMetricsService.userGrowth(any())).thenReturn(new UserGrowthResponse(0.0, List.of()));
+    StudyQuestionResponse question =
+        new StudyQuestionResponse(
+            UUID.randomUUID(), QuestionStatus.DRAFT, Map.of(), null, Instant.now(), null);
+    when(studyQuestionService.create(any(), any())).thenReturn(question);
+    when(studyQuestionService.findByCategory(any())).thenReturn(List.of(question));
+    when(studyQuestionService.update(any(), any())).thenReturn(question);
   }
 
   @Test
@@ -182,7 +205,8 @@ class AdminRoutesSecurityIntegrationTests {
         .andExpect(jsonPath("$.status").value(401))
         .andExpect(jsonPath("$.detail").value(UNAUTHORIZED_DETAIL));
 
-    verifyNoInteractions(jwtDecoder, userService, dashboardWidgetService, adminMetricsService);
+    verifyNoInteractions(
+        jwtDecoder, userService, dashboardWidgetService, adminMetricsService, studyQuestionService);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -198,7 +222,8 @@ class AdminRoutesSecurityIntegrationTests {
         .andExpect(jsonPath("$.status").value(401))
         .andExpect(jsonPath("$.detail").value(UNAUTHORIZED_DETAIL));
 
-    verifyNoInteractions(userService, dashboardWidgetService, adminMetricsService);
+    verifyNoInteractions(
+        userService, dashboardWidgetService, adminMetricsService, studyQuestionService);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -220,7 +245,8 @@ class AdminRoutesSecurityIntegrationTests {
         .andExpect(jsonPath("$.status").value(401))
         .andExpect(jsonPath("$.detail").value(UNAUTHORIZED_DETAIL));
 
-    verifyNoInteractions(userService, dashboardWidgetService, adminMetricsService);
+    verifyNoInteractions(
+        userService, dashboardWidgetService, adminMetricsService, studyQuestionService);
   }
 
   @ParameterizedTest(name = "{0} | cognito:groups = {1}")
@@ -236,7 +262,8 @@ class AdminRoutesSecurityIntegrationTests {
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(jsonPath("$.status").value(403));
 
-    verifyNoInteractions(userService, dashboardWidgetService, adminMetricsService);
+    verifyNoInteractions(
+        userService, dashboardWidgetService, adminMetricsService, studyQuestionService);
   }
 
   @ParameterizedTest(name = "{0}")

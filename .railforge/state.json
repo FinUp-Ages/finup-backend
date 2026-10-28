@@ -28,10 +28,11 @@
   "validation": {
     "maven_verify": "BUILD SUCCESS em 2026-10-27 na branch (464 testes) e com a develop d2004f6 mesclada (625 testes), zero falhas ou erros; Spotless aprovado.",
     "integracao": "StudyTrackIntegrationTests (H2, HTTP e seguranca reais, JWT simulado sem grupo admin): ordem e publishedCount das categorias, so PUBLISHED e PUBLISHED_WITH_CHANGES com o conteudo published e a resposta correta, sem draft/status, lista vazia para categoria so com DRAFT, 404 e 401.",
-    "limits": "Nao validado contra Postgres real nem com o app mobile, que consome na proxima sprint."
+    "limits": "Validado manualmente com Postgres 16 local e o seed da trilha; nao validado com o app mobile, que consome na proxima sprint."
   },
-  "review": "Review do PR #53 em 2026-10-27: service stub, token commitado e falta de teste de integracao. Correcoes feitas localmente na branch, sem commit. Pendente: commit, atualizar a branch com a develop, aprovacao e merge.",
+  "review": "Review do PR #53 em 2026-10-27: service stub, token commitado e falta de teste de integracao. Correcoes commitadas na branch e develop d2004f6 mesclada pelo GitHub (conflito so no state.json). Pendente: CI verde, aprovacao e merge.",
   "open_questions": [
+    "Cache da classificacao da IA e em memoria e sem limite de tamanho; cresce com as descricoes distintas de todos os usuarios ate o restart.",
     "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): isActive() e lastSeenAt ainda nao tem consumidor: entram no GET /admin/users (86e3m95y6). O web tipa lastSeenAt como string obrigatoria, mas no back ele e nulo para quem nunca abriu o app",
     "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): Duas definicoes de usuario ativo: metrics/summary (#47) usa transacao no periodo; isActive() usa acesso ao app nos ultimos 7 dias. Alinhar nomes ou regra com o time"
   ],
