@@ -117,9 +117,13 @@ class AdminRoutesSecurityIntegrationTests {
   private static final String WIDGETS_BODY =
       "{\"widgets\":[{\"id\":\"NEW_CLIENTS\",\"enabled\":true,\"position\":0}]}";
 
+  private static final String STUDY_CATEGORY_BODY =
+      "{\"name\":\"CDB\",\"description\":\"Renda fixa\"}";
+
   /**
    * O que o admin recebe em cada rota: {@code "METODO /caminho"} para o status de sucesso e o corpo
-   * da requisicao ({@code null} quando nao ha). Rota admin nova precisa de uma linha aqui.
+   * da requisicao ({@code null} quando nao ha). Rota admin nova precisa de uma linha aqui. Usa
+   * {@code Map.ofEntries} porque {@code Map.of} aceita no maximo 10 pares.
    */
   private static final Map<String, SuccessCase> SUCCESS_CASES =
       Map.ofEntries(
@@ -229,7 +233,13 @@ class AdminRoutesSecurityIntegrationTests {
         .andExpect(jsonPath("$.status").value(401))
         .andExpect(jsonPath("$.detail").value(UNAUTHORIZED_DETAIL));
 
-    verifyNoInteractions(jwtDecoder, userService, dashboardWidgetService, adminMetricsService);
+    verifyNoInteractions(
+        jwtDecoder,
+        userService,
+        dashboardWidgetService,
+        adminMetricsService,
+        studyCategoryService,
+        studyQuestionService);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -245,7 +255,12 @@ class AdminRoutesSecurityIntegrationTests {
         .andExpect(jsonPath("$.status").value(401))
         .andExpect(jsonPath("$.detail").value(UNAUTHORIZED_DETAIL));
 
-    verifyNoInteractions(userService, dashboardWidgetService, adminMetricsService);
+    verifyNoInteractions(
+        userService,
+        dashboardWidgetService,
+        adminMetricsService,
+        studyCategoryService,
+        studyQuestionService);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -267,7 +282,12 @@ class AdminRoutesSecurityIntegrationTests {
         .andExpect(jsonPath("$.status").value(401))
         .andExpect(jsonPath("$.detail").value(UNAUTHORIZED_DETAIL));
 
-    verifyNoInteractions(userService, dashboardWidgetService, adminMetricsService);
+    verifyNoInteractions(
+        userService,
+        dashboardWidgetService,
+        adminMetricsService,
+        studyCategoryService,
+        studyQuestionService);
   }
 
   @ParameterizedTest(name = "{0} | cognito:groups = {1}")
@@ -283,7 +303,12 @@ class AdminRoutesSecurityIntegrationTests {
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(jsonPath("$.status").value(403));
 
-    verifyNoInteractions(userService, dashboardWidgetService, adminMetricsService);
+    verifyNoInteractions(
+        userService,
+        dashboardWidgetService,
+        adminMetricsService,
+        studyCategoryService,
+        studyQuestionService);
   }
 
   @ParameterizedTest(name = "{0}")
