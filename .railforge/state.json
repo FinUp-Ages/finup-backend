@@ -1,48 +1,38 @@
 {
   "stage": "REVIEWING",
-  "task": "CRUD administrativo de categorias da trilha de estudos (ClickUp 86e3m9600, contrato C6, PR #55)",
-  "objective": "Criar, listar, editar e remover categorias de estudo em /api/v1/admin/study-tracks/categories, com acesso ADMIN, contagens de perguntas por status derivado e contrato compatível com o front.",
+  "task": "[Backend] Persistir exibicao e dispensa do popup de alerta de gastos (ClickUp)",
+  "objective": "Guardar por usuario e categoria que o alerta de gastos foi dispensado: POST /api/v1/insights/spending-alerts/dismiss e campo dismissedAt em cada item de alerts do C1, sem quebrar o contrato atual.",
   "decisions": [
-    "PUT devolve 200 com a categoria atualizada e DELETE devolve 204 sem corpo, conforme o contrato de integração do front",
-    "GET ordena por nome ascendente, reutilizando o repository existente",
-    "Limites de name e description seguem o schema existente: 100 e 255 caracteres; name não é único porque o C6 não definiu unicidade",
-    "description ausente ou nula é serializada como string vazia no response",
-    "draftCount conta DRAFT e PUBLISHED_WITH_CHANGES; publishedCount conta PUBLISHED e PUBLISHED_WITH_CHANGES",
-    "GET calcula as contagens numa única consulta JPQL agrupada por categoria, sem N+1; PUT usa a contagem nativa de uma categoria; POST devolve zero sem consultar",
-    "DELETE verifica perguntas vinculadas antes da remoção e responde 409; a FK não tem ON DELETE, então uma pergunta criada entre a verificação e a remoção também vira 409, e não 500",
-    "A autorização administrativa existente em /api/v1/admin/** é reutilizada, exigindo o grupo Cognito admin",
-    "develop 3b6168b mesclada na branch: conflitos em StudyQuestionRepository (mantidos os dois lados), AdminRoutesSecurityIntegrationTests (rotas de categorias e de perguntas juntas, com Map.ofEntries porque Map.of aceita no máximo 10 pares) e neste arquivo"
+    "Regra de 'nao repetir' fica no back so como dado: o back guarda e informa dismissedAt, o app decide o que fazer com ele. Nao ha expiracao nem filtragem do alerta dispensado na lista",
+    "Dispensa nao expira (os dois pontos a confirmar da task seguem em aberto, ver open_questions); tornar valida por N dias ou ate o total mudar exigiria so comparar dismissedAt no service",
+    "Nova tabela spending_alert_dismissals (user_id, category_id, dismissed_at) com UNIQUE (user_id, category_id) e FK da categoria com ON DELETE CASCADE, para nao bloquear a exclusao de categorias",
+    "Categoria precisa ser do usuario ou padrao do sistema; inexistente ou alheia da 404 (nao 403, para nao confirmar o id). Nao exige alerta ativo no momento da dispensa",
+    "dismissedAt usa @JsonInclude(ALWAYS) so nesse campo: a config global omite nulos, mas o contrato pede nulo explicito",
+    "403 nao se aplica: a rota nao tem papel; o isolamento e feito por usuario, e categoria alheia da 404",
+    "Idempotente: dispensar de novo renova dismissedAt"
   ],
   "files_in_scope": [
-    "src/main/java/br/com/finup/controller/AdminStudyCategoryController.java",
-    "src/main/java/br/com/finup/dto/StudyCategoryRequest.java",
-    "src/main/java/br/com/finup/mapper/StudyCategoryMapper.java",
-    "src/main/java/br/com/finup/repository/StudyQuestionRepository.java",
-    "src/main/java/br/com/finup/service/StudyCategoryService.java",
-    "src/test/java/br/com/finup/controller/AdminStudyCategoryControllerTest.java",
-    "src/test/java/br/com/finup/controller/AdminStudyCategoryIntegrationTests.java",
-    "src/test/java/br/com/finup/service/StudyCategoryServiceTest.java",
-    "src/test/java/br/com/finup/AdminAuthIntegrationTests.java",
-    "src/test/java/br/com/finup/AdminRoutesSecurityIntegrationTests.java",
-    "README.md",
-    ".railforge/state.json"
-  ],
-  "plan": [
-    "Implementar request/response, CRUD administrativo, contagens agregadas no banco e conflito de remoção.",
-    "Adicionar testes de integração com H2 real para CRUD, contagens, validação, 404 e 409, e a matriz de segurança ADMIN.",
-    "Mesclar a develop, resolver conflitos, atualizar Swagger/documentação e executar Maven verify."
+    "database/init/01-schema.sql",
+    "src/main/java/br/com/finup/model/SpendingAlertDismissal.java",
+    "src/main/java/br/com/finup/repository/SpendingAlertDismissalRepository.java",
+    "src/main/java/br/com/finup/dto/DismissSpendingAlertRequest.java",
+    "src/main/java/br/com/finup/dto/DismissSpendingAlertResponse.java",
+    "src/main/java/br/com/finup/dto/SpendingAlertItemResponse.java",
+    "src/main/java/br/com/finup/service/SpendingAlertService.java",
+    "src/main/java/br/com/finup/controller/SpendingAlertController.java",
+    "src/test/java/br/com/finup/service/SpendingAlertServiceTest.java",
+    "src/test/java/br/com/finup/controller/SpendingAlertControllerTest.java",
+    "src/test/java/br/com/finup/SpendingAlertIntegrationTests.java"
   ],
   "validation": {
-    "maven_verify": "BUILD SUCCESS em 2026-10-27 com a develop 3b6168b mesclada: 679 testes, zero falhas ou erros; Spotless aprovado.",
-    "integracao": "AdminStudyCategoryIntegrationTests (H2 em modo PostgreSQL, HTTP, segurança e persistência reais, JWT simulado do grupo admin): contagens com DRAFT, PUBLISHED e PUBLISHED_WITH_CHANGES no GET e no PUT, trim e Location no POST, PUT, DELETE 204 removendo do banco, 409 mantendo a categoria, 404, 400 para name ausente, vazio ou longo e para id fora do formato UUID.",
-    "seguranca": "AdminRoutesSecurityIntegrationTests cobre 401, 403 e sucesso nas quatro rotas de categorias e nas quatro de perguntas; AdminAuthIntegrationTests cobre 403 nas rotas de categorias.",
-    "limits": "Não validado manualmente com Postgres nesta rodada; CI remoto depende do push."
+    "mvn clean verify": "passed (697 testes, 0 falhas, spotless ok)",
+    "postgres real": "validado em 2026-10-28: 01-schema.sql aplicado em postgres:16 (tabela, FKs, UNIQUE e ON DELETE CASCADE ok); API com mock-auth e collection Postman com 13 requisicoes e 15 assercoes passando (PATCH, GET por id, dismiss, 404, 400); isolamento entre usuarios confirmado (outra usuaria nao ve a dispensa, 404 ao dispensar categoria alheia, 401 sem identidade)"
   },
-  "review": "Review do PR #55 em 2026-10-27: branch desatualizada com conflitos, testes de integração com repositories mockados, fallback morto nas contagens, N+1 no GET, 500 em corrida no DELETE e Swagger incompleto no PUT/DELETE. Correções aplicadas localmente, sem commit. Pendente: commit do merge, push, CI verde, aprovação e merge.",
+  "review": "pendente: revisao humana do diff",
+  "updated_at": "2026-10-28",
   "open_questions": [
-    "Cache da classificacao da IA e em memoria e sem limite de tamanho; cresce com as descricoes distintas de todos os usuarios ate o restart.",
-    "Herdado de origin/develop: isActive() e lastSeenAt ainda não têm consumidor; entram no GET /admin/users.",
-    "Herdado de origin/develop: metrics/summary usa transações no período, enquanto isActive() usa acesso ao app nos últimos 7 dias; alinhar nomes ou regra com o time."
-  ],
-  "updated_at": "2026-10-27"
+    "Confirmar com o App se a regra de 'nao repetir' fica no back (esta task) ou so no app; se for so no app, esta task pode ser descartada",
+    "Por quanto tempo a dispensa vale (ate o total da categoria mudar, ou por N dias). Hoje nao expira",
+    "Banco local existente precisa de docker compose down -v (ou aplicar o CREATE TABLE a mao): os scripts de database/init so rodam na criacao do volume"
+  ]
 }

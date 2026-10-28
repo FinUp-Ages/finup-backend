@@ -1,12 +1,14 @@
 package br.com.finup;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -17,6 +19,7 @@ import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
 import br.com.finup.model.User;
 import br.com.finup.repository.CategoryRepository;
+import br.com.finup.repository.SpendingAlertDismissalRepository;
 import br.com.finup.repository.TransactionRepository;
 import br.com.finup.repository.UserRepository;
 import br.com.finup.service.BedrockLlmService;
@@ -61,12 +64,14 @@ import org.springframework.transaction.annotation.Transactional;
 class SpendingAlertIntegrationTests {
 
   private static final String ALERTS = "/api/v1/insights/spending-alerts";
+  private static final String DISMISS = ALERTS + "/dismiss";
 
   @Autowired private MockMvc mvc;
   @Autowired private UserRepository users;
   @Autowired private CategoryRepository categories;
   @Autowired private TransactionRepository transactions;
   @Autowired private Clock clock;
+  @Autowired private SpendingAlertDismissalRepository dismissals;
   @MockitoBean private JwtDecoder jwtDecoder;
   @MockitoBean private BedrockLlmService llmService;
 
@@ -159,6 +164,95 @@ class SpendingAlertIntegrationTests {
     mvc.perform(user(get(ALERTS).param("days", "abc"))).andExpect(status().isBadRequest());
   }
 
+  @Test
+  void dismissedAlertIsReportedWithDismissedAtAndKeepsCurrentFields() throws Exception {
+    expense(bets, "Bet365", "1000.00", today);
+    when(llmService.invoke(any(), any(), any())).thenReturn("{\"risky\": []}");
+
+    mvc.perform(user(get(ALERTS)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.alerts[0].dismissedAt", nullValue()));
+
+    mvc.perform(user(dismiss(bets.getId().toString())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.categoryId").value(bets.getId().toString()))
+        .andExpect(jsonPath("$.dismissedAt").isNotEmpty());
+
+    String stored = dismissals.findByUserId(user.getId()).get(0).getDismissedAt().toString();
+
+    mvc.perform(user(get(ALERTS)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.alerts", hasSize(1)))
+        .andExpect(jsonPath("$.alerts[0].categoryId").value(bets.getId().toString()))
+        .andExpect(jsonPath("$.alerts[0].totalAmount").value(1000.00))
+        .andExpect(jsonPath("$.alerts[0].source").value("RULE"))
+        .andExpect(jsonPath("$.alerts[0].dismissedAt").value(stored));
+  }
+
+  @Test
+  void dismissingTwiceKeepsASingleRecord() throws Exception {
+    mvc.perform(user(dismiss(bets.getId().toString()))).andExpect(status().isOk());
+    mvc.perform(user(dismiss(bets.getId().toString()))).andExpect(status().isOk());
+
+    org.assertj.core.api.Assertions.assertThat(dismissals.findByUserId(user.getId())).hasSize(1);
+  }
+
+  @Test
+  void dismissalIsIsolatedBetweenUsers() throws Exception {
+    User other = users.saveAndFlush(User.createFromCognitoIdentity("sub-other", "Bia", "b@x.com"));
+    Category otherBets =
+        categories.saveAndFlush(Category.createForUser(other, "Apostas", TransactionType.EXPENSE));
+    save(other, otherBets, TransactionType.EXPENSE, "Bet365", "700.00", today);
+    expense(bets, "Bet365", "1000.00", today);
+    when(llmService.invoke(any(), any(), any())).thenReturn("{\"risky\": []}");
+    when(jwtDecoder.decode("other")).thenReturn(token("other", "sub-other"));
+
+    mvc.perform(user(dismiss(bets.getId().toString()))).andExpect(status().isOk());
+
+    mvc.perform(get(ALERTS).header("Authorization", "Bearer other"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.alerts", hasSize(1)))
+        .andExpect(jsonPath("$.alerts[0].categoryId").value(otherBets.getId().toString()))
+        .andExpect(jsonPath("$.alerts[0].dismissedAt", nullValue()));
+    org.assertj.core.api.Assertions.assertThat(dismissals.findByUserId(other.getId())).isEmpty();
+  }
+
+  @Test
+  void dismissingAnotherUsersCategoryReturns404AndWritesNothing() throws Exception {
+    User other = users.saveAndFlush(User.createFromCognitoIdentity("sub-other", "Bia", "b@x.com"));
+    Category otherBets =
+        categories.saveAndFlush(Category.createForUser(other, "Apostas", TransactionType.EXPENSE));
+
+    mvc.perform(user(dismiss(otherBets.getId().toString())))
+        .andExpect(status().isNotFound())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+
+    org.assertj.core.api.Assertions.assertThat(dismissals.findAll()).isEmpty();
+  }
+
+  @Test
+  void dismissingUnknownCategoryReturns404() throws Exception {
+    mvc.perform(user(dismiss(java.util.UUID.randomUUID().toString())))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void dismissWithoutTokenReturns401() throws Exception {
+    mvc.perform(dismiss(bets.getId().toString())).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void dismissWithInvalidBodyReturns400() throws Exception {
+    mvc.perform(user(post(DISMISS).contentType(MediaType.APPLICATION_JSON).content("{}")))
+        .andExpect(status().isBadRequest());
+  }
+
+  private static MockHttpServletRequestBuilder dismiss(String categoryId) {
+    return post(DISMISS)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"categoryId\":\"" + categoryId + "\"}");
+  }
+
   private void expense(Category category, String description, String amount, LocalDate date) {
     save(user, category, TransactionType.EXPENSE, description, amount, date);
   }
@@ -198,8 +292,12 @@ class SpendingAlertIntegrationTests {
   }
 
   private static Jwt token(String subject) {
+    return token("user", subject);
+  }
+
+  private static Jwt token(String value, String subject) {
     Instant now = Instant.now();
-    return Jwt.withTokenValue("user")
+    return Jwt.withTokenValue(value)
         .header("alg", "RS256")
         .subject(subject)
         .issuedAt(now.minusSeconds(60))
