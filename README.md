@@ -153,6 +153,10 @@ consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o b
 | `GET /api/v1/admin/me` | **só grupo `admin`.** Devolve o administrador autenticado: `{"id", "name", "email", "role": "ADMIN"}` |
 | `GET /api/v1/admin/metrics/summary?period=7d\|30d\|90d` | **só grupo `admin`.** Usuários ativos e novos no período, com o período anterior e a variação em % |
 | `GET /api/v1/admin/metrics/user-growth?months=6` | **só grupo `admin`.** Cadastros por mês (1 a 24 meses, padrão 6), com o acumulado e o crescimento em % |
+| `GET /api/v1/admin/study-tracks/categories` | **só grupo `admin`.** Lista categorias da trilha com contagens de perguntas em rascunho e publicadas |
+| `POST /api/v1/admin/study-tracks/categories` | **só grupo `admin`.** Cria categoria com `name` obrigatório e `description` opcional |
+| `PUT /api/v1/admin/study-tracks/categories/{id}` | **só grupo `admin`.** Atualiza categoria; inexistente devolve `404` |
+| `DELETE /api/v1/admin/study-tracks/categories/{id}` | **só grupo `admin`.** Remove categoria sem perguntas; com perguntas devolve `409` |
 
 Tudo sob `/api/v1/admin/**` — o `GET /api/v1/admin/me`, as métricas e os widgets do dashboard — exige
 que o usuário esteja no grupo `admin` do Cognito. Token válido de quem não está no grupo responde

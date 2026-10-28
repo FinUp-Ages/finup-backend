@@ -1,40 +1,48 @@
 {
   "stage": "REVIEWING",
-  "task": "Leitura da Trilha para o app (ClickUp 86e3m95y4, contrato C6, PR #53)",
-  "objective": "GET /api/v1/study-tracks/categories e GET /api/v1/study-tracks/categories/{id}/questions para usuario comum autenticado, devolvendo so perguntas publicadas e so o conteudo published (com a resposta correta)",
+  "task": "CRUD administrativo de categorias da trilha de estudos (ClickUp 86e3m9600, contrato C6, PR #55)",
+  "objective": "Criar, listar, editar e remover categorias de estudo em /api/v1/admin/study-tracks/categories, com acesso ADMIN, contagens de perguntas por status derivado e contrato compatível com o front.",
   "decisions": [
-    "StudyTrackQueryService era um stub (lista vazia e 404 fixo); passou a ler StudyCategoryRepository e StudyQuestionRepository.",
-    "Categorias: todas, ordenadas por nome, com publishedCount (published IS NOT NULL) calculado numa unica query agrupada, sem N+1. Categoria sem perguntas publicadas aparece com publishedCount 0; o app decide se exibe.",
-    "Perguntas: published IS NOT NULL ordenadas por created_at; o payload e {id, published}. DRAFT nunca aparece e PUBLISHED_WITH_CHANGES devolve a versao publicada.",
-    "Categoria inexistente usa o ResourceNotFoundException existente (404 ProblemDetail); o CategoryNotFoundException duplicado foi removido e o StudyCategoryService voltou ao original do #51.",
-    "Removidos do PR o .finup-token.txt (access token do Cognito commitado) e o scripts/message.py (fora do escopo); .finup-token.txt entrou no .gitignore."
+    "PUT devolve 200 com a categoria atualizada e DELETE devolve 204 sem corpo, conforme o contrato de integração do front",
+    "GET ordena por nome ascendente, reutilizando o repository existente",
+    "Limites de name e description seguem o schema existente: 100 e 255 caracteres; name não é único porque o C6 não definiu unicidade",
+    "description ausente ou nula é serializada como string vazia no response",
+    "draftCount conta DRAFT e PUBLISHED_WITH_CHANGES; publishedCount conta PUBLISHED e PUBLISHED_WITH_CHANGES",
+    "GET calcula as contagens numa única consulta JPQL agrupada por categoria, sem N+1; PUT usa a contagem nativa de uma categoria; POST devolve zero sem consultar",
+    "DELETE verifica perguntas vinculadas antes da remoção e responde 409; a FK não tem ON DELETE, então uma pergunta criada entre a verificação e a remoção também vira 409, e não 500",
+    "A autorização administrativa existente em /api/v1/admin/** é reutilizada, exigindo o grupo Cognito admin",
+    "develop 3b6168b mesclada na branch: conflitos em StudyQuestionRepository (mantidos os dois lados), AdminRoutesSecurityIntegrationTests (rotas de categorias e de perguntas juntas, com Map.ofEntries porque Map.of aceita no máximo 10 pares) e neste arquivo"
   ],
   "files_in_scope": [
-    "src/main/java/br/com/finup/controller/StudyTrackController.java",
-    "src/main/java/br/com/finup/service/StudyTrackQueryService.java",
-    "src/main/java/br/com/finup/dto/StudyTrackCategoryResponse.java",
-    "src/main/java/br/com/finup/dto/StudyTrackQuestionResponse.java",
+    "src/main/java/br/com/finup/controller/AdminStudyCategoryController.java",
+    "src/main/java/br/com/finup/dto/StudyCategoryRequest.java",
+    "src/main/java/br/com/finup/mapper/StudyCategoryMapper.java",
     "src/main/java/br/com/finup/repository/StudyQuestionRepository.java",
-    "src/test/java/br/com/finup/controller/StudyTrackControllerTest.java",
-    "src/test/java/br/com/finup/StudyTrackIntegrationTests.java",
-    ".gitignore",
+    "src/main/java/br/com/finup/service/StudyCategoryService.java",
+    "src/test/java/br/com/finup/controller/AdminStudyCategoryControllerTest.java",
+    "src/test/java/br/com/finup/controller/AdminStudyCategoryIntegrationTests.java",
+    "src/test/java/br/com/finup/service/StudyCategoryServiceTest.java",
+    "src/test/java/br/com/finup/AdminAuthIntegrationTests.java",
+    "src/test/java/br/com/finup/AdminRoutesSecurityIntegrationTests.java",
+    "README.md",
     ".railforge/state.json"
   ],
   "plan": [
-    "Implementar o service com as consultas de categorias e perguntas publicadas.",
-    "Remover token, script e excecao duplicada; ignorar o arquivo de token.",
-    "Adicionar teste de integracao com usuario comum e rodar Maven verify na branch e com a develop mesclada."
+    "Implementar request/response, CRUD administrativo, contagens agregadas no banco e conflito de remoção.",
+    "Adicionar testes de integração com H2 real para CRUD, contagens, validação, 404 e 409, e a matriz de segurança ADMIN.",
+    "Mesclar a develop, resolver conflitos, atualizar Swagger/documentação e executar Maven verify."
   ],
   "validation": {
-    "maven_verify": "BUILD SUCCESS em 2026-10-27 na branch (464 testes) e com a develop d2004f6 mesclada (625 testes), zero falhas ou erros; Spotless aprovado.",
-    "integracao": "StudyTrackIntegrationTests (H2, HTTP e seguranca reais, JWT simulado sem grupo admin): ordem e publishedCount das categorias, so PUBLISHED e PUBLISHED_WITH_CHANGES com o conteudo published e a resposta correta, sem draft/status, lista vazia para categoria so com DRAFT, 404 e 401.",
-    "limits": "Validado manualmente com Postgres 16 local e o seed da trilha; nao validado com o app mobile, que consome na proxima sprint."
+    "maven_verify": "BUILD SUCCESS em 2026-10-27 com a develop 3b6168b mesclada: 679 testes, zero falhas ou erros; Spotless aprovado.",
+    "integracao": "AdminStudyCategoryIntegrationTests (H2 em modo PostgreSQL, HTTP, segurança e persistência reais, JWT simulado do grupo admin): contagens com DRAFT, PUBLISHED e PUBLISHED_WITH_CHANGES no GET e no PUT, trim e Location no POST, PUT, DELETE 204 removendo do banco, 409 mantendo a categoria, 404, 400 para name ausente, vazio ou longo e para id fora do formato UUID.",
+    "seguranca": "AdminRoutesSecurityIntegrationTests cobre 401, 403 e sucesso nas quatro rotas de categorias e nas quatro de perguntas; AdminAuthIntegrationTests cobre 403 nas rotas de categorias.",
+    "limits": "Não validado manualmente com Postgres nesta rodada; CI remoto depende do push."
   },
-  "review": "Review do PR #53 em 2026-10-27: service stub, token commitado e falta de teste de integracao. Correcoes commitadas na branch e develop d2004f6 mesclada pelo GitHub (conflito so no state.json). Pendente: CI verde, aprovacao e merge.",
+  "review": "Review do PR #55 em 2026-10-27: branch desatualizada com conflitos, testes de integração com repositories mockados, fallback morto nas contagens, N+1 no GET, 500 em corrida no DELETE e Swagger incompleto no PUT/DELETE. Correções aplicadas localmente, sem commit. Pendente: commit do merge, push, CI verde, aprovação e merge.",
   "open_questions": [
     "Cache da classificacao da IA e em memoria e sem limite de tamanho; cresce com as descricoes distintas de todos os usuarios ate o restart.",
-    "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): isActive() e lastSeenAt ainda nao tem consumidor: entram no GET /admin/users (86e3m95y6). O web tipa lastSeenAt como string obrigatoria, mas no back ele e nulo para quem nunca abriu o app",
-    "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): Duas definicoes de usuario ativo: metrics/summary (#47) usa transacao no periodo; isActive() usa acesso ao app nos ultimos 7 dias. Alinhar nomes ou regra com o time"
+    "Herdado de origin/develop: isActive() e lastSeenAt ainda não têm consumidor; entram no GET /admin/users.",
+    "Herdado de origin/develop: metrics/summary usa transações no período, enquanto isActive() usa acesso ao app nos últimos 7 dias; alinhar nomes ou regra com o time."
   ],
   "updated_at": "2026-10-27"
 }

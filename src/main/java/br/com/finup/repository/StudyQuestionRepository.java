@@ -13,6 +13,8 @@ public interface StudyQuestionRepository extends JpaRepository<StudyQuestion, UU
 
   List<StudyQuestion> findByCategoryIdOrderByCreatedAtAsc(UUID categoryId);
 
+  boolean existsByCategoryId(UUID categoryId);
+
   List<StudyQuestion> findByCategoryIdAndPublishedIsNotNullOrderByCreatedAtAsc(UUID categoryId);
 
   @Query(
@@ -36,10 +38,32 @@ public interface StudyQuestionRepository extends JpaRepository<StudyQuestion, UU
       nativeQuery = true)
   CategoryCountProjection countAggregatedByCategoryId(@Param("categoryId") UUID categoryId);
 
+  /**
+   * Mesmas contagens de {@link #countAggregatedByCategoryId(UUID)}, para todas as categorias numa
+   * única consulta. Categoria sem perguntas não aparece no resultado. É JPQL, e não SQL nativo,
+   * para o id vir tipado como {@link UUID} em qualquer banco (no H2 o nativo devolve {@code
+   * byte[]}).
+   */
+  @Query(
+      """
+      SELECT
+        q.category.id AS categoryId,
+        SUM(CASE WHEN q.published IS NOT NULL THEN 1 ELSE 0 END) AS publishedCount,
+        SUM(CASE WHEN q.published IS NULL OR q.draft <> q.published THEN 1 ELSE 0 END)
+          AS draftCount
+      FROM StudyQuestion q
+      GROUP BY q.category.id
+      """)
+  List<CategoryIdCountProjection> countAggregatedGroupedByCategory();
+
   public interface CategoryCountProjection {
     long getPublishedCount();
 
     long getDraftCount();
+  }
+
+  public interface CategoryIdCountProjection extends CategoryCountProjection {
+    UUID getCategoryId();
   }
 
   public interface PublishedCountProjection {
