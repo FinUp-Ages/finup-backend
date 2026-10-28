@@ -1,37 +1,39 @@
 {
   "stage": "REVIEWING",
-  "task": "Modelagem da Trilha de Estudos (ClickUp 86e3m95k1, contrato C6, PR #51)",
-  "objective": "Tabelas, entidades, status derivado e contagens de categoria e pergunta da trilha, com contrato e seed no mesmo formato de conteudo usado pela API de escrita e pelo painel",
+  "task": "Leitura da Trilha para o app (ClickUp 86e3m95y4, contrato C6, PR #53)",
+  "objective": "GET /api/v1/study-tracks/categories e GET /api/v1/study-tracks/categories/{id}/questions para usuario comum autenticado, devolvendo so perguntas publicadas e so o conteudo published (com a resposta correta)",
   "decisions": [
-    "Schema JSON de draft/published alinhado a task 86e3m95y3 (PR #54) e ao finup-web: FILL_BLANK {type,title,statement,answers,explanation}, MULTIPLE_CHOICE {type,statement,options[{text,correct}],explanation}, LEARNING {type,title,body}. O formato anterior (textWithBlanks, correctOptionId, content) nao tinha consumidor.",
-    "FK study_questions.category_id sem ON DELETE, como as demais FKs do schema: o banco recusa remover categoria com perguntas, reforcando o 409 da task 86e3m9600.",
-    "Classes Java da modelagem mantidas sem alteracao: StudyCategoryService, StudyQuestionRepository, StudyCategoryMapper e StudyCategoryServiceTest sao alterados pelos PRs #53, #54 e #55, que dependem desta base. O uso da query agregada no service fica com o #55.",
-    "Sem ferramenta de migration (issue #15): database/migrations documenta a mudanca e o rollback; database/init continua sendo o que o compose executa."
+    "StudyTrackQueryService era um stub (lista vazia e 404 fixo); passou a ler StudyCategoryRepository e StudyQuestionRepository.",
+    "Categorias: todas, ordenadas por nome, com publishedCount (published IS NOT NULL) calculado numa unica query agrupada, sem N+1. Categoria sem perguntas publicadas aparece com publishedCount 0; o app decide se exibe.",
+    "Perguntas: published IS NOT NULL ordenadas por created_at; o payload e {id, published}. DRAFT nunca aparece e PUBLISHED_WITH_CHANGES devolve a versao publicada.",
+    "Categoria inexistente usa o ResourceNotFoundException existente (404 ProblemDetail); o CategoryNotFoundException duplicado foi removido e o StudyCategoryService voltou ao original do #51.",
+    "Removidos do PR o .finup-token.txt (access token do Cognito commitado) e o scripts/message.py (fora do escopo); .finup-token.txt entrou no .gitignore."
   ],
   "files_in_scope": [
-    "contracts/study-track-c6.md",
-    "database/init/01-schema.sql",
-    "database/init/03-test-data.sql",
-    "database/migrations/04-study-tracks-schema.sql",
-    "database/migrations/04-study-tracks-schema-rollback.sql",
-    "database/migrations/05-study-tracks-seed.sql",
+    "src/main/java/br/com/finup/controller/StudyTrackController.java",
+    "src/main/java/br/com/finup/service/StudyTrackQueryService.java",
+    "src/main/java/br/com/finup/dto/StudyTrackCategoryResponse.java",
+    "src/main/java/br/com/finup/dto/StudyTrackQuestionResponse.java",
+    "src/main/java/br/com/finup/repository/StudyQuestionRepository.java",
+    "src/test/java/br/com/finup/controller/StudyTrackControllerTest.java",
+    "src/test/java/br/com/finup/StudyTrackIntegrationTests.java",
+    ".gitignore",
     ".railforge/state.json"
   ],
   "plan": [
-    "Alinhar secao 4 do contrato e os dois seeds ao formato gravado pela API de escrita.",
-    "Remover ON DELETE CASCADE da FK e o BOM dos arquivos SQL e do contrato.",
-    "Validar Maven verify, schema e seed do zero em Postgres 16, rollback e migrations, e aplicacao dos commits dos PRs dependentes."
+    "Implementar o service com as consultas de categorias e perguntas publicadas.",
+    "Remover token, script e excecao duplicada; ignorar o arquivo de token.",
+    "Adicionar teste de integracao com usuario comum e rodar Maven verify na branch e com a develop mesclada."
   ],
   "validation": {
-    "maven_verify": "BUILD SUCCESS em 2026-10-23 com a develop 8b21dfc mesclada: 456 testes, zero falhas ou erros; Spotless aprovado.",
-    "postgres": "postgres:16-alpine isolado em 2026-10-23, com a develop mesclada: database/init sobe do zero (inclui users.last_seen_at do #45); seed com os 3 tipos e os 3 status derivados; contagens 1/1 por categoria; DELETE de categoria com perguntas recusado pela FK (NO ACTION); rollback, 04 e 05 via psql sem erro.",
-    "dependentes": "Commits proprios dos PRs #53, #54 e #55 (0d236ba..head) aplicam sem conflito sobre esta mudanca, exceto o state.json, que cada PR reescreve.",
-    "limits": "Testes de integracao usam H2 com create-drop a partir das entidades; os scripts SQL so foram validados no Postgres manualmente."
+    "maven_verify": "BUILD SUCCESS em 2026-10-27 na branch (464 testes) e com a develop d2004f6 mesclada (625 testes), zero falhas ou erros; Spotless aprovado.",
+    "integracao": "StudyTrackIntegrationTests (H2, HTTP e seguranca reais, JWT simulado sem grupo admin): ordem e publishedCount das categorias, so PUBLISHED e PUBLISHED_WITH_CHANGES com o conteudo published e a resposta correta, sem draft/status, lista vazia para categoria so com DRAFT, 404 e 401.",
+    "limits": "Nao validado contra Postgres real nem com o app mobile, que consome na proxima sprint."
   },
-  "review": "Review do PR #51 apontou divergencia entre o schema JSON documentado/seed e os consumidores (task 86e3m95y3, PR #54, finup-web fillBlankContract.ts). Correcao aplicada sem alterar codigo Java, num commit novo sobre 0d236ba; a develop (8b21dfc, #45) foi mesclada na branch em 2026-10-23, sem conflito e sem reescrever historico, porque o #54 usa esta branch como base e o #53/#55 levam o 0d236ba. Pendente: aprovacao e merge. Mergear com merge commit (nao squash) para o 0d236ba virar ancestral da develop: assim #53 e #55 nao precisam de rebase, e o #54 so troca a base para develop.",
+  "review": "Review do PR #53 em 2026-10-27: service stub, token commitado e falta de teste de integracao. Correcoes feitas localmente na branch, sem commit. Pendente: commit, atualizar a branch com a develop, aprovacao e merge.",
   "open_questions": [
     "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): isActive() e lastSeenAt ainda nao tem consumidor: entram no GET /admin/users (86e3m95y6). O web tipa lastSeenAt como string obrigatoria, mas no back ele e nulo para quem nunca abriu o app",
     "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): Duas definicoes de usuario ativo: metrics/summary (#47) usa transacao no periodo; isActive() usa acesso ao app nos ultimos 7 dias. Alinhar nomes ou regra com o time"
   ],
-  "updated_at": "2026-10-23"
+  "updated_at": "2026-10-27"
 }

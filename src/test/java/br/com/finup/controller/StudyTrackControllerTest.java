@@ -7,10 +7,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.finup.dto.StudyTrackCategoryResponse;
 import br.com.finup.dto.StudyTrackQuestionResponse;
-import br.com.finup.exception.CategoryNotFoundException;
+import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.service.StudyTrackQueryService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,8 +27,6 @@ class StudyTrackControllerTest {
 
   @Autowired private MockMvc mockMvc;
 
-  @Autowired private ObjectMapper objectMapper;
-
   @MockitoBean private StudyTrackQueryService studyTrackQueryService;
 
   @Test
@@ -36,13 +34,18 @@ class StudyTrackControllerTest {
   void findCategoriesReturns200() throws Exception {
     UUID categoryId = UUID.randomUUID();
     when(studyTrackQueryService.findCategories())
-        .thenReturn(List.of(new StudyTrackCategoryResponse(categoryId, "Investimentos")));
+        .thenReturn(
+            List.of(
+                new StudyTrackCategoryResponse(
+                    categoryId, "Reserva de Emergência", "Conceitos de reserva", 2)));
 
     mockMvc
         .perform(get("/api/v1/study-tracks/categories"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].id").value(categoryId.toString()))
-        .andExpect(jsonPath("$[0].name").value("Investimentos"));
+        .andExpect(jsonPath("$[0].name").value("Reserva de Emergência"))
+        .andExpect(jsonPath("$[0].description").value("Conceitos de reserva"))
+        .andExpect(jsonPath("$[0].publishedCount").value(2));
   }
 
   @Test
@@ -50,16 +53,25 @@ class StudyTrackControllerTest {
   void findQuestionsReturnsPublishedContentOnly() throws Exception {
     UUID categoryId = UUID.randomUUID();
     UUID questionId = UUID.randomUUID();
-    StudyTrackQuestionResponse question =
-        new StudyTrackQuestionResponse(
-            questionId, objectMapper.readTree("{\"prompt\":\"O que é uma ação?\"}"));
-    when(studyTrackQueryService.findPublishedQuestions(categoryId)).thenReturn(List.of(question));
+    Map<String, Object> published =
+        Map.of(
+            "type",
+            "MULTIPLE_CHOICE",
+            "statement",
+            "O que é uma ação?",
+            "options",
+            List.of(
+                Map.of("text", "Parte de uma empresa", "correct", true),
+                Map.of("text", "Um empréstimo", "correct", false)));
+    when(studyTrackQueryService.findPublishedQuestions(categoryId))
+        .thenReturn(List.of(new StudyTrackQuestionResponse(questionId, published)));
 
     mockMvc
         .perform(get("/api/v1/study-tracks/categories/{id}/questions", categoryId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].id").value(questionId.toString()))
-        .andExpect(jsonPath("$[0].published.prompt").value("O que é uma ação?"))
+        .andExpect(jsonPath("$[0].published.statement").value("O que é uma ação?"))
+        .andExpect(jsonPath("$[0].published.options[0].correct").value(true))
         .andExpect(jsonPath("$[0].draft").doesNotExist());
   }
 
@@ -69,7 +81,7 @@ class StudyTrackControllerTest {
     UUID categoryId = UUID.randomUUID();
     when(studyTrackQueryService.findPublishedQuestions(categoryId))
         .thenThrow(
-            new CategoryNotFoundException("Categoria da trilha não encontrada: " + categoryId));
+            new ResourceNotFoundException("Categoria da trilha não encontrada: " + categoryId));
 
     mockMvc
         .perform(

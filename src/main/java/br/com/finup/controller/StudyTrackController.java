@@ -33,7 +33,9 @@ public class StudyTrackController {
   @GetMapping("/categories")
   @Operation(
       summary = "Lista as categorias da trilha de estudos",
-      description = "Retorna as categorias da trilha de estudos do usuário autenticado")
+      description =
+          "Retorna as categorias da trilha, ordenadas por nome, com a quantidade de perguntas"
+              + " publicadas de cada uma.")
   @ApiResponse(responseCode = "200", description = "Categorias retornadas com sucesso")
   public ResponseEntity<List<StudyTrackCategoryResponse>> findCategories() {
     return ResponseEntity.ok(studyTrackQueryService.findCategories());
@@ -43,7 +45,8 @@ public class StudyTrackController {
   @Operation(
       summary = "Lista as perguntas publicadas de uma categoria",
       description =
-          "Retorna somente o conteúdo publicado de cada pergunta; conteúdo draft não é exposto.")
+          "Retorna somente o conteúdo publicado de cada pergunta, com a resposta correta para o"
+              + " app validar. Perguntas nunca publicadas e conteúdo draft não são expostos.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Perguntas publicadas retornadas com sucesso"),
     @ApiResponse(
