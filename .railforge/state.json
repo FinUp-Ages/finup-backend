@@ -1,48 +1,41 @@
 {
   "stage": "REVIEWING",
-  "task": "CRUD administrativo de categorias da trilha de estudos (ClickUp 86e3m9600, contrato C6, PR #55)",
-  "objective": "Criar, listar, editar e remover categorias de estudo em /api/v1/admin/study-tracks/categories, com acesso ADMIN, contagens de perguntas por status derivado e contrato compatível com o front.",
+  "task": "Publicar, despublicar e descartar alteracoes da Trilha (contrato C6; relacionada a task de modelagem ClickUp 86e3m95k1)",
+  "objective": "POST /questions/{id}/publish, POST /questions/{id}/unpublish e DELETE /questions/{id}/draft sob /api/v1/admin/study-tracks, com status derivado correto depois de cada acao e contagens da categoria refletindo as mudancas.",
   "decisions": [
-    "PUT devolve 200 com a categoria atualizada e DELETE devolve 204 sem corpo, conforme o contrato de integração do front",
-    "GET ordena por nome ascendente, reutilizando o repository existente",
-    "Limites de name e description seguem o schema existente: 100 e 255 caracteres; name não é único porque o C6 não definiu unicidade",
-    "description ausente ou nula é serializada como string vazia no response",
-    "draftCount conta DRAFT e PUBLISHED_WITH_CHANGES; publishedCount conta PUBLISHED e PUBLISHED_WITH_CHANGES",
-    "GET calcula as contagens numa única consulta JPQL agrupada por categoria, sem N+1; PUT usa a contagem nativa de uma categoria; POST devolve zero sem consultar",
-    "DELETE verifica perguntas vinculadas antes da remoção e responde 409; a FK não tem ON DELETE, então uma pergunta criada entre a verificação e a remoção também vira 409, e não 500",
-    "A autorização administrativa existente em /api/v1/admin/** é reutilizada, exigindo o grupo Cognito admin",
-    "develop 3b6168b mesclada na branch: conflitos em StudyQuestionRepository (mantidos os dois lados), AdminRoutesSecurityIntegrationTests (rotas de categorias e de perguntas juntas, com Map.ofEntries porque Map.of aceita no máximo 10 pares) e neste arquivo"
+    "Base provisoria: commit 799474c (PR #54, API administrativa de perguntas, ainda fora da develop) cherry-picked sobre a develop. A task reaproveita StudyQuestionValidator, StudyQuestionResponse e StudyQuestionMapper do #54 em vez de duplica-los. O PR passa a ser contra a develop quando o #54 for mesclado.",
+    "Service e controller novos (StudyQuestionPublicationService e AdminStudyQuestionPublicationController) no mesmo prefixo do #54, para nao editar os arquivos dele e evitar conflito de merge. Nenhuma coluna ou tabela nova: o status continua derivado.",
+    "O rascunho gravado passa pelo mesmo StudyQuestionValidator do POST e do PUT (lido como StudyQuestionRequest); invalido responde 400 com 'Rascunho invalido, nao foi publicado: <motivo>' e nada e gravado. Tipo do rascunho diferente do tipo da pergunta tambem e 400.",
+    "Descartar sem versao publicada responde 409 (o enunciado deixava 409 ou 400 para o contrato): a requisicao e valida e so conflita com o estado, o mesmo criterio da remocao de categoria com perguntas.",
+    "O descarte devolve 200 com a pergunta restaurada, e nao 204, para o painel atualizar a tela e porque o criterio pede conferir o status depois de cada acao.",
+    "Sem efeito sao idempotentes e nao gravam nada (nem updatedAt nem publishedAt): publicar o que ja esta PUBLISHED (nem valida), despublicar o que esta DRAFT, descartar o que esta PUBLISHED. Decisao minha; o enunciado nao cobre esses casos.",
+    "Despublicar preserva o rascunho, inclusive com edicao pendente.",
+    "Lock pessimista (SELECT FOR UPDATE) na linha em cada acao, para acoes simultaneas na mesma pergunta nao se desfazerem. publishedAt truncado para microssegundos, a precisao da coluna, para a resposta ser igual as leituras seguintes.",
+    "Autorizacao: nenhuma regra nova. /api/v1/admin/** ja exige o grupo admin no SecurityConfig, entao as tres rotas exigem ADMIN."
   ],
   "files_in_scope": [
-    "src/main/java/br/com/finup/controller/AdminStudyCategoryController.java",
-    "src/main/java/br/com/finup/dto/StudyCategoryRequest.java",
-    "src/main/java/br/com/finup/mapper/StudyCategoryMapper.java",
-    "src/main/java/br/com/finup/repository/StudyQuestionRepository.java",
-    "src/main/java/br/com/finup/service/StudyCategoryService.java",
-    "src/test/java/br/com/finup/controller/AdminStudyCategoryControllerTest.java",
-    "src/test/java/br/com/finup/controller/AdminStudyCategoryIntegrationTests.java",
-    "src/test/java/br/com/finup/service/StudyCategoryServiceTest.java",
-    "src/test/java/br/com/finup/AdminAuthIntegrationTests.java",
+    "src/main/java/br/com/finup/service/StudyQuestionPublicationService.java",
+    "src/main/java/br/com/finup/controller/AdminStudyQuestionPublicationController.java",
+    "src/test/java/br/com/finup/service/StudyQuestionPublicationServiceTest.java",
+    "src/test/java/br/com/finup/StudyQuestionPublicationIntegrationTests.java",
     "src/test/java/br/com/finup/AdminRoutesSecurityIntegrationTests.java",
+    "contracts/study-questions-publication-c6.md",
     "README.md",
     ".railforge/state.json"
   ],
-  "plan": [
-    "Implementar request/response, CRUD administrativo, contagens agregadas no banco e conflito de remoção.",
-    "Adicionar testes de integração com H2 real para CRUD, contagens, validação, 404 e 409, e a matriz de segurança ADMIN.",
-    "Mesclar a develop, resolver conflitos, atualizar Swagger/documentação e executar Maven verify."
-  ],
   "validation": {
-    "maven_verify": "BUILD SUCCESS em 2026-10-27 com a develop 3b6168b mesclada: 679 testes, zero falhas ou erros; Spotless aprovado.",
-    "integracao": "AdminStudyCategoryIntegrationTests (H2 em modo PostgreSQL, HTTP, segurança e persistência reais, JWT simulado do grupo admin): contagens com DRAFT, PUBLISHED e PUBLISHED_WITH_CHANGES no GET e no PUT, trim e Location no POST, PUT, DELETE 204 removendo do banco, 409 mantendo a categoria, 404, 400 para name ausente, vazio ou longo e para id fora do formato UUID.",
-    "seguranca": "AdminRoutesSecurityIntegrationTests cobre 401, 403 e sucesso nas quatro rotas de categorias e nas quatro de perguntas; AdminAuthIntegrationTests cobre 403 nas rotas de categorias.",
-    "limits": "Não validado manualmente com Postgres nesta rodada; CI remoto depende do push."
+    "mvn clean verify": "passed em 2026-10-26: 654 testes, 0 falhas, spotless ok (inclui o commit 799474c do #54)",
+    "testes novos": "StudyQuestionPublicationServiceTest (29): transicoes, rascunho invalido por tipo, no-ops, copia profunda, 404, truncamento do publishedAt. StudyQuestionPublicationIntegrationTests (25): ciclo completo com contagens da categoria a cada passo, os tres tipos, 400/404/409, 401/403 sem alterar a pergunta, Swagger. AdminRoutesSecurityIntegrationTests: as 4 rotas do #54 e as 3 novas entraram em SUCCESS_CASES.",
+    "postgres real + cognito real": "validado em 2026-10-26 com access token real do grupo admin, API no profile dev, Postgres 16 local com as migrations 04 e 05 aplicadas: 41 verificacoes OK, incluindo jsonb draft = published conferido no banco apos cada acao, contagens da categoria no jsonb, 400 de rascunho invalido sem nada publicado, 409 do descarte, 404, 400 de UUID, 401 (sem token e assinatura adulterada) e 24 acoes simultaneas na mesma pergunta sem nenhum 500 e com estado final coerente. Rotas antigas (admin/me, metrics, widgets, users/me, categories) seguem 200.",
+    "lacunas fechadas ao vivo (2026-10-27)": "mesmo token real e Postgres real: despublicar com edicao pendente mantem o rascunho editado (resposta e banco); descartar sem edicao pendente responde 200 sem gravar (updated_at e published_at identicos antes e depois); publicar sem edicao pendente, despublicar DRAFT e descartar DRAFT (409) tambem nao gravam nada; o Swagger vivo documenta 200/401/403/404 nas tres rotas, 400 no publish e 409 no descarte. Bateria completa repetida: 41 de 41.",
+    "nao validado": "403 com token real de usuario fora do grupo admin (fora do escopo pedido; coberto por teste com decoder simulado); payload com o painel (finup-web)"
   },
-  "review": "Review do PR #55 em 2026-10-27: branch desatualizada com conflitos, testes de integração com repositories mockados, fallback morto nas contagens, N+1 no GET, 500 em corrida no DELETE e Swagger incompleto no PUT/DELETE. Correções aplicadas localmente, sem commit. Pendente: commit do merge, push, CI verde, aprovação e merge.",
+  "review": "Implementacao e validacao concluidas em 2026-10-26. Nenhum commit feito. Pendente: autorizacao do solicitante para commit e PR, aprovacao e merge, e o PR #54 entrar na develop (esta branch carrega o commit dele).",
+  "updated_at": "2026-10-26",
   "open_questions": [
-    "Cache da classificacao da IA e em memoria e sem limite de tamanho; cresce com as descricoes distintas de todos os usuarios ate o restart.",
-    "Herdado de origin/develop: isActive() e lastSeenAt ainda não têm consumidor; entram no GET /admin/users.",
-    "Herdado de origin/develop: metrics/summary usa transações no período, enquanto isActive() usa acesso ao app nos últimos 7 dias; alinhar nomes ou regra com o time."
-  ],
-  "updated_at": "2026-10-27"
+    "PUT /questions/{id} (#54) le e regrava a linha inteira sem lock. Se rodar junto de uma publicacao, o ultimo a gravar pode desfazer o outro (por exemplo voltar published a nulo). Correcao natural: @DynamicUpdate em StudyQuestion ou o mesmo lock no PUT; fora desta task por tocar codigo do #51 e do #54.",
+    "Confirmar com o front (finup-web) que o descarte devolver a pergunta (200) e nao 204 atende, e que 409 para 'sem versao publicada' e o esperado.",
+    "README: a tabela de endpoints ganhou as tres rotas (3 linhas). A edicao chegou a ser gravada mesmo tendo sido interrompida, e fica a criterio do solicitante manter ou reverter.",
+    "Banco local: foram aplicadas as migrations 04 e 05 e users.last_seen_at (aditivas). Quem ja tem volume do Postgres precisa fazer o mesmo ou recriar o volume."
+  ]
 }

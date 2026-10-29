@@ -22,6 +22,7 @@ import br.com.finup.model.User;
 import br.com.finup.service.AdminMetricsService;
 import br.com.finup.service.DashboardWidgetService;
 import br.com.finup.service.StudyCategoryService;
+import br.com.finup.service.StudyQuestionPublicationService;
 import br.com.finup.service.StudyQuestionService;
 import br.com.finup.service.UserService;
 import java.time.Instant;
@@ -157,7 +158,16 @@ class AdminRoutesSecurityIntegrationTests {
               new SuccessCase(HttpStatus.OK, QUESTION_BODY)),
           Map.entry(
               "DELETE /api/v1/admin/study-tracks/questions/{id}",
-              new SuccessCase(HttpStatus.NO_CONTENT, null)));
+              new SuccessCase(HttpStatus.NO_CONTENT, null)),
+          Map.entry(
+              "POST /api/v1/admin/study-tracks/questions/{id}/publish",
+              new SuccessCase(HttpStatus.OK, null)),
+          Map.entry(
+              "POST /api/v1/admin/study-tracks/questions/{id}/unpublish",
+              new SuccessCase(HttpStatus.OK, null)),
+          Map.entry(
+              "DELETE /api/v1/admin/study-tracks/questions/{id}/draft",
+              new SuccessCase(HttpStatus.OK, null)));
 
   @Autowired private MockMvc mockMvc;
 
@@ -177,6 +187,8 @@ class AdminRoutesSecurityIntegrationTests {
   @MockitoBean private StudyCategoryService studyCategoryService;
 
   @MockitoBean private StudyQuestionService studyQuestionService;
+
+  @MockitoBean private StudyQuestionPublicationService studyQuestionPublicationService;
 
   @BeforeEach
   void stubServices() {
@@ -200,6 +212,9 @@ class AdminRoutesSecurityIntegrationTests {
     when(studyQuestionService.create(any(), any())).thenReturn(question);
     when(studyQuestionService.findByCategory(any())).thenReturn(List.of(question));
     when(studyQuestionService.update(any(), any())).thenReturn(question);
+    when(studyQuestionPublicationService.publish(any())).thenReturn(question);
+    when(studyQuestionPublicationService.unpublish(any())).thenReturn(question);
+    when(studyQuestionPublicationService.discardDraft(any())).thenReturn(question);
   }
 
   @Test
@@ -241,7 +256,8 @@ class AdminRoutesSecurityIntegrationTests {
         dashboardWidgetService,
         adminMetricsService,
         studyCategoryService,
-        studyQuestionService);
+        studyQuestionService,
+        studyQuestionPublicationService);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -262,7 +278,8 @@ class AdminRoutesSecurityIntegrationTests {
         dashboardWidgetService,
         adminMetricsService,
         studyCategoryService,
-        studyQuestionService);
+        studyQuestionService,
+        studyQuestionPublicationService);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -289,7 +306,8 @@ class AdminRoutesSecurityIntegrationTests {
         dashboardWidgetService,
         adminMetricsService,
         studyCategoryService,
-        studyQuestionService);
+        studyQuestionService,
+        studyQuestionPublicationService);
   }
 
   @ParameterizedTest(name = "{0} | cognito:groups = {1}")
@@ -310,7 +328,8 @@ class AdminRoutesSecurityIntegrationTests {
         dashboardWidgetService,
         adminMetricsService,
         studyCategoryService,
-        studyQuestionService);
+        studyQuestionService,
+        studyQuestionPublicationService);
   }
 
   @ParameterizedTest(name = "{0}")
