@@ -2,23 +2,30 @@ package br.com.finup.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import br.com.finup.dto.DismissSpendingAlertResponse;
 import br.com.finup.dto.SpendingAlertItemResponse;
 import br.com.finup.dto.SpendingAlertsResponse;
 import br.com.finup.exception.InvalidSpendingAlertPeriodException;
+import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.AlertSource;
 import br.com.finup.model.Category;
 import br.com.finup.model.RiskKind;
+import br.com.finup.model.SpendingAlertDismissal;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
 import br.com.finup.model.User;
 import br.com.finup.repository.CategoryRepository;
+import br.com.finup.repository.SpendingAlertDismissalRepository;
 import br.com.finup.repository.TransactionRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.service.AiSpendingClassifier.ClassificationKey;
@@ -28,6 +35,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +61,7 @@ class SpendingAlertServiceTest {
 
   @Mock private TransactionRepository transactionRepository;
   @Mock private CategoryRepository categoryRepository;
+  @Mock private SpendingAlertDismissalRepository dismissalRepository;
   @Mock private UserService userService;
   @Mock private AiSpendingClassifier aiClassifier;
 
@@ -69,7 +78,12 @@ class SpendingAlertServiceTest {
 
     service =
         new SpendingAlertService(
-            transactionRepository, categoryRepository, userService, aiClassifier, CLOCK);
+            transactionRepository,
+            categoryRepository,
+            dismissalRepository,
+            userService,
+            aiClassifier,
+            CLOCK);
   }
 
   @Test
@@ -287,6 +301,76 @@ class SpendingAlertServiceTest {
         .extracting(SpendingAlertItemResponse::categoryName)
         .containsExactly("Lazer");
     verify(aiClassifier, times(1)).findRisky(anyCollection());
+  }
+
+  @Test
+  @DisplayName("alerta devolve dismissedAt da categoria dispensada e nulo nas demais")
+  void alertsCarryDismissedAtPerCategory() {
+    UUID betsCatId = UUID.randomUUID();
+    UUID drugsCatId = UUID.randomUUID();
+    when(transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
+            userId, TODAY.minusDays(29), TODAY))
+        .thenReturn(
+            List.of(
+                createExpense(betsCatId, "900.00", TODAY),
+                createExpense(drugsCatId, "10.00", TODAY)));
+    when(categoryRepository.findByUserOrIsDefaultTrue(user))
+        .thenReturn(
+            List.of(
+                createCategory(betsCatId, "Apostas", TransactionType.EXPENSE),
+                createCategory(drugsCatId, "Drogas", TransactionType.EXPENSE)));
+    Instant dismissedAt = Instant.parse("2026-10-20T10:00:00Z");
+    when(dismissalRepository.findByUserId(userId))
+        .thenReturn(List.of(SpendingAlertDismissal.dismiss(userId, betsCatId, dismissedAt)));
+
+    SpendingAlertsResponse response = service.getSpendingAlerts(IDENTITY, 30);
+
+    assertThat(response.alerts())
+        .extracting(SpendingAlertItemResponse::categoryName, SpendingAlertItemResponse::dismissedAt)
+        .containsExactly(tuple("Apostas", dismissedAt), tuple("Drogas", null));
+  }
+
+  @Test
+  @DisplayName("dispensa grava o instante do relogio para o usuario e a categoria")
+  void dismissCreatesRecord() {
+    UUID categoryId = UUID.randomUUID();
+    when(categoryRepository.findByUserOrIsDefaultTrue(user))
+        .thenReturn(List.of(createCategory(categoryId, "Apostas", TransactionType.EXPENSE)));
+    when(dismissalRepository.findByUserIdAndCategoryId(userId, categoryId))
+        .thenReturn(Optional.empty());
+    when(dismissalRepository.save(any(SpendingAlertDismissal.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    DismissSpendingAlertResponse response = service.dismissAlert(IDENTITY, categoryId);
+
+    assertThat(response.categoryId()).isEqualTo(categoryId);
+    assertThat(response.dismissedAt()).isEqualTo(FIXED_INSTANT);
+  }
+
+  @Test
+  @DisplayName("dispensar de novo renova o instante do registro existente")
+  void dismissAgainRenewsInstant() {
+    UUID categoryId = UUID.randomUUID();
+    SpendingAlertDismissal existing =
+        SpendingAlertDismissal.dismiss(userId, categoryId, Instant.parse("2026-10-01T00:00:00Z"));
+    when(categoryRepository.findByUserOrIsDefaultTrue(user))
+        .thenReturn(List.of(createCategory(categoryId, "Apostas", TransactionType.EXPENSE)));
+    when(dismissalRepository.findByUserIdAndCategoryId(userId, categoryId))
+        .thenReturn(Optional.of(existing));
+    when(dismissalRepository.save(existing)).thenReturn(existing);
+
+    assertThat(service.dismissAlert(IDENTITY, categoryId).dismissedAt()).isEqualTo(FIXED_INSTANT);
+  }
+
+  @Test
+  @DisplayName("dispensa de categoria que nao e do usuario nem padrao devolve 404 sem gravar")
+  void dismissUnavailableCategoryIsNotFound() {
+    when(categoryRepository.findByUserOrIsDefaultTrue(user)).thenReturn(List.of());
+
+    assertThatThrownBy(() -> service.dismissAlert(IDENTITY, UUID.randomUUID()))
+        .isInstanceOf(ResourceNotFoundException.class);
+
+    verify(dismissalRepository, never()).save(any());
   }
 
   private static ClassificationKey key(String category, String description) {

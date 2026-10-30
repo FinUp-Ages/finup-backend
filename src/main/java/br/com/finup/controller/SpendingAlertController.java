@@ -1,5 +1,7 @@
 package br.com.finup.controller;
 
+import br.com.finup.dto.DismissSpendingAlertRequest;
+import br.com.finup.dto.DismissSpendingAlertResponse;
 import br.com.finup.dto.SpendingAlertsResponse;
 import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
@@ -11,9 +13,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -40,7 +45,10 @@ public class SpendingAlertController {
       description =
           "Analisa as transações EXPENSE dos últimos N dias (padrão: 30) do usuário autenticado,"
               + " identificando gastos de risco por regras determinísticas e inteligência artificial,"
-              + " calculando projeções caso o montante fosse investido a 10% a.a. por 5 anos.")
+              + " calculando projeções caso o montante fosse investido a 10% a.a. por 5 anos. Cada"
+              + " alerta traz dismissedAt: o instante em que o usuário o dispensou, ou nulo se"
+              + " nunca dispensou. A dispensa não expira nem some da lista; o app decide o que"
+              + " fazer com ela.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -65,5 +73,33 @@ public class SpendingAlertController {
     AuthenticatedIdentity identity = authenticatedIdentityResolver.resolveCurrent();
     SpendingAlertsResponse response = spendingAlertService.getSpendingAlerts(identity, days);
     return ResponseEntity.ok(response);
+  }
+
+  @PostMapping("/spending-alerts/dismiss")
+  @Operation(
+      summary = "Registra que o usuário dispensou o alerta de gastos de uma categoria",
+      description =
+          "Grava a dispensa para o usuário autenticado e a categoria informada. Idempotente:"
+              + " dispensar de novo renova dismissedAt. A categoria precisa ser do usuário ou"
+              + " padrão do sistema.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Alerta dispensado"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "categoryId ausente ou que não é um UUID",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "Identidade autenticada ausente ou inválida",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "Categoria inexistente ou de outro usuário, ou usuário sem cadastro local",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  })
+  public ResponseEntity<DismissSpendingAlertResponse> dismissSpendingAlert(
+      @Valid @RequestBody DismissSpendingAlertRequest request) {
+    AuthenticatedIdentity identity = authenticatedIdentityResolver.resolveCurrent();
+    return ResponseEntity.ok(spendingAlertService.dismissAlert(identity, request.categoryId()));
   }
 }
