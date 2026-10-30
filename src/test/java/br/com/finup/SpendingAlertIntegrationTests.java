@@ -1,5 +1,6 @@
 package br.com.finup;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
@@ -27,6 +28,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -194,7 +196,7 @@ class SpendingAlertIntegrationTests {
     mvc.perform(user(dismiss(bets.getId().toString()))).andExpect(status().isOk());
     mvc.perform(user(dismiss(bets.getId().toString()))).andExpect(status().isOk());
 
-    org.assertj.core.api.Assertions.assertThat(dismissals.findByUserId(user.getId())).hasSize(1);
+    assertThat(dismissals.findByUserId(user.getId())).hasSize(1);
   }
 
   @Test
@@ -214,7 +216,7 @@ class SpendingAlertIntegrationTests {
         .andExpect(jsonPath("$.alerts", hasSize(1)))
         .andExpect(jsonPath("$.alerts[0].categoryId").value(otherBets.getId().toString()))
         .andExpect(jsonPath("$.alerts[0].dismissedAt", nullValue()));
-    org.assertj.core.api.Assertions.assertThat(dismissals.findByUserId(other.getId())).isEmpty();
+    assertThat(dismissals.findByUserId(other.getId())).isEmpty();
   }
 
   @Test
@@ -227,13 +229,12 @@ class SpendingAlertIntegrationTests {
         .andExpect(status().isNotFound())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
 
-    org.assertj.core.api.Assertions.assertThat(dismissals.findAll()).isEmpty();
+    assertThat(dismissals.findAll()).isEmpty();
   }
 
   @Test
   void dismissingUnknownCategoryReturns404() throws Exception {
-    mvc.perform(user(dismiss(java.util.UUID.randomUUID().toString())))
-        .andExpect(status().isNotFound());
+    mvc.perform(user(dismiss(UUID.randomUUID().toString()))).andExpect(status().isNotFound());
   }
 
   @Test
