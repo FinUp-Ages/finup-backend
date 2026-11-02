@@ -1,41 +1,38 @@
 {
   "stage": "REVIEWING",
-  "task": "Publicar, despublicar e descartar alteracoes da Trilha (contrato C6; relacionada a task de modelagem ClickUp 86e3m95k1)",
-  "objective": "POST /questions/{id}/publish, POST /questions/{id}/unpublish e DELETE /questions/{id}/draft sob /api/v1/admin/study-tracks, com status derivado correto depois de cada acao e contagens da categoria refletindo as mudancas.",
+  "task": "[Backend] Persistir exibicao e dispensa do popup de alerta de gastos (ClickUp)",
+  "objective": "Guardar por usuario e categoria que o alerta de gastos foi dispensado: POST /api/v1/insights/spending-alerts/dismiss e campo dismissedAt em cada item de alerts do C1, sem quebrar o contrato atual.",
   "decisions": [
-    "Base provisoria: commit 799474c (PR #54, API administrativa de perguntas, ainda fora da develop) cherry-picked sobre a develop. A task reaproveita StudyQuestionValidator, StudyQuestionResponse e StudyQuestionMapper do #54 em vez de duplica-los. O PR passa a ser contra a develop quando o #54 for mesclado.",
-    "Service e controller novos (StudyQuestionPublicationService e AdminStudyQuestionPublicationController) no mesmo prefixo do #54, para nao editar os arquivos dele e evitar conflito de merge. Nenhuma coluna ou tabela nova: o status continua derivado.",
-    "O rascunho gravado passa pelo mesmo StudyQuestionValidator do POST e do PUT (lido como StudyQuestionRequest); invalido responde 400 com 'Rascunho invalido, nao foi publicado: <motivo>' e nada e gravado. Tipo do rascunho diferente do tipo da pergunta tambem e 400.",
-    "Descartar sem versao publicada responde 409 (o enunciado deixava 409 ou 400 para o contrato): a requisicao e valida e so conflita com o estado, o mesmo criterio da remocao de categoria com perguntas.",
-    "O descarte devolve 200 com a pergunta restaurada, e nao 204, para o painel atualizar a tela e porque o criterio pede conferir o status depois de cada acao.",
-    "Sem efeito sao idempotentes e nao gravam nada (nem updatedAt nem publishedAt): publicar o que ja esta PUBLISHED (nem valida), despublicar o que esta DRAFT, descartar o que esta PUBLISHED. Decisao minha; o enunciado nao cobre esses casos.",
-    "Despublicar preserva o rascunho, inclusive com edicao pendente.",
-    "Lock pessimista (SELECT FOR UPDATE) na linha em cada acao, para acoes simultaneas na mesma pergunta nao se desfazerem. publishedAt truncado para microssegundos, a precisao da coluna, para a resposta ser igual as leituras seguintes.",
-    "Autorizacao: nenhuma regra nova. /api/v1/admin/** ja exige o grupo admin no SecurityConfig, entao as tres rotas exigem ADMIN."
+    "Regra de 'nao repetir' fica no back so como dado: o back guarda e informa dismissedAt, o app decide o que fazer com ele. Nao ha expiracao nem filtragem do alerta dispensado na lista",
+    "Dispensa nao expira (os dois pontos a confirmar da task seguem em aberto, ver open_questions); tornar valida por N dias ou ate o total mudar exigiria so comparar dismissedAt no service",
+    "Nova tabela spending_alert_dismissals (user_id, category_id, dismissed_at) com UNIQUE (user_id, category_id) e FK da categoria com ON DELETE CASCADE, para nao bloquear a exclusao de categorias",
+    "Categoria precisa ser do usuario ou padrao do sistema; inexistente ou alheia da 404 (nao 403, para nao confirmar o id). Nao exige alerta ativo no momento da dispensa",
+    "dismissedAt usa @JsonInclude(ALWAYS) so nesse campo: a config global omite nulos, mas o contrato pede nulo explicito",
+    "403 nao se aplica: a rota nao tem papel; o isolamento e feito por usuario, e categoria alheia da 404",
+    "Idempotente: dispensar de novo renova dismissedAt"
   ],
   "files_in_scope": [
-    "src/main/java/br/com/finup/service/StudyQuestionPublicationService.java",
-    "src/main/java/br/com/finup/controller/AdminStudyQuestionPublicationController.java",
-    "src/test/java/br/com/finup/service/StudyQuestionPublicationServiceTest.java",
-    "src/test/java/br/com/finup/StudyQuestionPublicationIntegrationTests.java",
-    "src/test/java/br/com/finup/AdminRoutesSecurityIntegrationTests.java",
-    "contracts/study-questions-publication-c6.md",
-    "README.md",
-    ".railforge/state.json"
+    "database/init/01-schema.sql",
+    "src/main/java/br/com/finup/model/SpendingAlertDismissal.java",
+    "src/main/java/br/com/finup/repository/SpendingAlertDismissalRepository.java",
+    "src/main/java/br/com/finup/dto/DismissSpendingAlertRequest.java",
+    "src/main/java/br/com/finup/dto/DismissSpendingAlertResponse.java",
+    "src/main/java/br/com/finup/dto/SpendingAlertItemResponse.java",
+    "src/main/java/br/com/finup/service/SpendingAlertService.java",
+    "src/main/java/br/com/finup/controller/SpendingAlertController.java",
+    "src/test/java/br/com/finup/service/SpendingAlertServiceTest.java",
+    "src/test/java/br/com/finup/controller/SpendingAlertControllerTest.java",
+    "src/test/java/br/com/finup/SpendingAlertIntegrationTests.java"
   ],
   "validation": {
-    "mvn clean verify": "passed em 2026-10-26: 654 testes, 0 falhas, spotless ok (inclui o commit 799474c do #54)",
-    "testes novos": "StudyQuestionPublicationServiceTest (29): transicoes, rascunho invalido por tipo, no-ops, copia profunda, 404, truncamento do publishedAt. StudyQuestionPublicationIntegrationTests (25): ciclo completo com contagens da categoria a cada passo, os tres tipos, 400/404/409, 401/403 sem alterar a pergunta, Swagger. AdminRoutesSecurityIntegrationTests: as 4 rotas do #54 e as 3 novas entraram em SUCCESS_CASES.",
-    "postgres real + cognito real": "validado em 2026-10-26 com access token real do grupo admin, API no profile dev, Postgres 16 local com as migrations 04 e 05 aplicadas: 41 verificacoes OK, incluindo jsonb draft = published conferido no banco apos cada acao, contagens da categoria no jsonb, 400 de rascunho invalido sem nada publicado, 409 do descarte, 404, 400 de UUID, 401 (sem token e assinatura adulterada) e 24 acoes simultaneas na mesma pergunta sem nenhum 500 e com estado final coerente. Rotas antigas (admin/me, metrics, widgets, users/me, categories) seguem 200.",
-    "lacunas fechadas ao vivo (2026-10-27)": "mesmo token real e Postgres real: despublicar com edicao pendente mantem o rascunho editado (resposta e banco); descartar sem edicao pendente responde 200 sem gravar (updated_at e published_at identicos antes e depois); publicar sem edicao pendente, despublicar DRAFT e descartar DRAFT (409) tambem nao gravam nada; o Swagger vivo documenta 200/401/403/404 nas tres rotas, 400 no publish e 409 no descarte. Bateria completa repetida: 41 de 41.",
-    "nao validado": "403 com token real de usuario fora do grupo admin (fora do escopo pedido; coberto por teste com decoder simulado); payload com o painel (finup-web)"
+    "mvn clean verify": "passed (697 testes, 0 falhas, spotless ok)",
+    "postgres real": "validado em 2026-10-28: 01-schema.sql aplicado em postgres:16 (tabela, FKs, UNIQUE e ON DELETE CASCADE ok); API com mock-auth e collection Postman com 13 requisicoes e 15 assercoes passando (PATCH, GET por id, dismiss, 404, 400); isolamento entre usuarios confirmado (outra usuaria nao ve a dispensa, 404 ao dispensar categoria alheia, 401 sem identidade)"
   },
-  "review": "Implementacao e validacao concluidas em 2026-10-26. Nenhum commit feito. Pendente: autorizacao do solicitante para commit e PR, aprovacao e merge, e o PR #54 entrar na develop (esta branch carrega o commit dele).",
-  "updated_at": "2026-10-26",
+  "review": "pendente: revisao humana do diff",
+  "updated_at": "2026-10-28",
   "open_questions": [
-    "PUT /questions/{id} (#54) le e regrava a linha inteira sem lock. Se rodar junto de uma publicacao, o ultimo a gravar pode desfazer o outro (por exemplo voltar published a nulo). Correcao natural: @DynamicUpdate em StudyQuestion ou o mesmo lock no PUT; fora desta task por tocar codigo do #51 e do #54.",
-    "Confirmar com o front (finup-web) que o descarte devolver a pergunta (200) e nao 204 atende, e que 409 para 'sem versao publicada' e o esperado.",
-    "README: a tabela de endpoints ganhou as tres rotas (3 linhas). A edicao chegou a ser gravada mesmo tendo sido interrompida, e fica a criterio do solicitante manter ou reverter.",
-    "Banco local: foram aplicadas as migrations 04 e 05 e users.last_seen_at (aditivas). Quem ja tem volume do Postgres precisa fazer o mesmo ou recriar o volume."
+    "Confirmar com o App se a regra de 'nao repetir' fica no back (esta task) ou so no app; se for so no app, esta task pode ser descartada",
+    "Por quanto tempo a dispensa vale (ate o total da categoria mudar, ou por N dias). Hoje nao expira",
+    "Banco local existente precisa de docker compose down -v (ou aplicar o CREATE TABLE a mao): os scripts de database/init so rodam na criacao do volume"
   ]
 }

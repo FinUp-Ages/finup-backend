@@ -1,13 +1,17 @@
 package br.com.finup.controller;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.finup.dto.DismissSpendingAlertResponse;
 import br.com.finup.dto.SpendingAlertItemResponse;
 import br.com.finup.dto.SpendingAlertProjectionResponse;
 import br.com.finup.dto.SpendingAlertsResponse;
@@ -19,11 +23,14 @@ import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.security.AuthenticatedIdentityResolver;
 import br.com.finup.service.SpendingAlertService;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -37,6 +44,8 @@ class SpendingAlertControllerTest {
 
   private static final AuthenticatedIdentity IDENTITY =
       new AuthenticatedIdentity("mock-sub", "Gabriel", "gabriel@exemplo.com");
+
+  private static final Instant DISMISSED_AT = Instant.parse("2026-10-21T12:00:00Z");
 
   @Autowired private MockMvc mockMvc;
 
@@ -61,7 +70,8 @@ class SpendingAlertControllerTest {
             4,
             "R$ 3.000,00 em apostas nos últimos 30 dias.",
             new SpendingAlertProjectionResponse(5, 10, new BigDecimal("4831.53")),
-            AlertSource.RULE);
+            AlertSource.RULE,
+            DISMISSED_AT);
 
     SpendingAlertsResponse response = new SpendingAlertsResponse(30, List.of(alert));
 
@@ -83,7 +93,8 @@ class SpendingAlertControllerTest {
         .andExpect(jsonPath("$.alerts[0].projection.years").value(5))
         .andExpect(jsonPath("$.alerts[0].projection.annualRatePct").value(10))
         .andExpect(jsonPath("$.alerts[0].projection.futureValue").value(4831.53))
-        .andExpect(jsonPath("$.alerts[0].source").value("RULE"));
+        .andExpect(jsonPath("$.alerts[0].source").value("RULE"))
+        .andExpect(jsonPath("$.alerts[0].dismissedAt").value("2026-10-21T12:00:00Z"));
 
     verify(spendingAlertService).getSpendingAlerts(IDENTITY, 30);
   }
@@ -129,5 +140,52 @@ class SpendingAlertControllerTest {
         .andExpect(status().isNotFound())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(jsonPath("$.status").value(404));
+  }
+
+  @Test
+  @DisplayName("POST dismiss devolve 200 com a categoria e o instante da dispensa")
+  void dismissReturns200() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+    when(spendingAlertService.dismissAlert(IDENTITY, categoryId))
+        .thenReturn(new DismissSpendingAlertResponse(categoryId, DISMISSED_AT));
+
+    mockMvc
+        .perform(
+            post("/api/v1/insights/spending-alerts/dismiss")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"categoryId\":\"" + categoryId + "\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.categoryId").value(categoryId.toString()))
+        .andExpect(jsonPath("$.dismissedAt").value("2026-10-21T12:00:00Z"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"{}", "{\"categoryId\":null}", "{\"categoryId\":\"nao-e-uuid\"}"})
+  @DisplayName("POST dismiss com categoryId ausente ou invalido devolve 400 sem chegar ao service")
+  void dismissWithInvalidBodyReturns400(String body) throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/insights/spending-alerts/dismiss")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isBadRequest());
+
+    verify(spendingAlertService, never()).dismissAlert(any(), any());
+  }
+
+  @Test
+  @DisplayName("POST dismiss de categoria inexistente ou alheia devolve 404")
+  void dismissUnknownCategoryReturns404() throws Exception {
+    UUID categoryId = UUID.randomUUID();
+    when(spendingAlertService.dismissAlert(IDENTITY, categoryId))
+        .thenThrow(new ResourceNotFoundException("Categoria não encontrada."));
+
+    mockMvc
+        .perform(
+            post("/api/v1/insights/spending-alerts/dismiss")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"categoryId\":\"" + categoryId + "\"}"))
+        .andExpect(status().isNotFound())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
   }
 }

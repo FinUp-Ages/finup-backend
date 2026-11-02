@@ -1,16 +1,20 @@
 package br.com.finup.service;
 
+import br.com.finup.dto.DismissSpendingAlertResponse;
 import br.com.finup.dto.SpendingAlertItemResponse;
 import br.com.finup.dto.SpendingAlertProjectionResponse;
 import br.com.finup.dto.SpendingAlertsResponse;
 import br.com.finup.exception.InvalidSpendingAlertPeriodException;
+import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.model.AlertSource;
 import br.com.finup.model.Category;
 import br.com.finup.model.RiskKind;
+import br.com.finup.model.SpendingAlertDismissal;
 import br.com.finup.model.Transaction;
 import br.com.finup.model.TransactionType;
 import br.com.finup.model.User;
 import br.com.finup.repository.CategoryRepository;
+import br.com.finup.repository.SpendingAlertDismissalRepository;
 import br.com.finup.repository.TransactionRepository;
 import br.com.finup.security.AuthenticatedIdentity;
 import br.com.finup.service.AiSpendingClassifier.ClassificationKey;
@@ -18,6 +22,7 @@ import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -48,6 +53,7 @@ public class SpendingAlertService {
 
   private final TransactionRepository transactionRepository;
   private final CategoryRepository categoryRepository;
+  private final SpendingAlertDismissalRepository dismissalRepository;
   private final UserService userService;
   private final AiSpendingClassifier aiClassifier;
   private final Clock clock;
@@ -55,11 +61,13 @@ public class SpendingAlertService {
   public SpendingAlertService(
       TransactionRepository transactionRepository,
       CategoryRepository categoryRepository,
+      SpendingAlertDismissalRepository dismissalRepository,
       UserService userService,
       AiSpendingClassifier aiClassifier,
       Clock clock) {
     this.transactionRepository = transactionRepository;
     this.categoryRepository = categoryRepository;
+    this.dismissalRepository = dismissalRepository;
     this.userService = userService;
     this.aiClassifier = aiClassifier;
     this.clock = clock;
@@ -127,6 +135,12 @@ public class SpendingAlertService {
     Set<ClassificationKey> riskyByAi =
         outsideRules.isEmpty() ? Set.of() : aiClassifier.findRisky(outsideRules);
 
+    Map<UUID, Instant> dismissedAtByCategory =
+        dismissalRepository.findByUserId(user.getId()).stream()
+            .collect(
+                Collectors.toMap(
+                    SpendingAlertDismissal::getCategoryId, SpendingAlertDismissal::getDismissedAt));
+
     List<SpendingAlertItemResponse> alerts = new ArrayList<>();
 
     for (Map.Entry<UUID, List<Transaction>> entry : expensesByCategory.entrySet()) {
@@ -156,7 +170,8 @@ public class SpendingAlertService {
                 transactionCount,
                 message,
                 projection,
-                AlertSource.RULE));
+                AlertSource.RULE,
+                dismissedAtByCategory.get(categoryId)));
       } else {
         List<Transaction> riskyExpenses =
             catExpenses.stream()
@@ -184,7 +199,8 @@ public class SpendingAlertService {
                   transactionCount,
                   message,
                   projection,
-                  AlertSource.AI));
+                  AlertSource.AI,
+                  dismissedAtByCategory.get(categoryId)));
         }
       }
     }
@@ -195,6 +211,39 @@ public class SpendingAlertService {
             .thenComparing(SpendingAlertItemResponse::categoryName));
 
     return new SpendingAlertsResponse(days, alerts);
+  }
+
+  /**
+   * Registra que o usuário autenticado dispensou o alerta da categoria. Idempotente: dispensar de
+   * novo renova o instante. A categoria precisa ser do usuário ou padrão do sistema; qualquer outra
+   * responde 404, igual a uma inexistente, para não confirmar o id de categorias alheias.
+   *
+   * @throws ResourceNotFoundException se a categoria não existir ou for de outro usuário
+   */
+  @Transactional
+  public DismissSpendingAlertResponse dismissAlert(
+      AuthenticatedIdentity identity, UUID categoryId) {
+    User user = userService.findByAuthenticatedIdentity(identity);
+    boolean available =
+        categoryRepository.findByUserOrIsDefaultTrue(user).stream()
+            .anyMatch(c -> c.getId().equals(categoryId));
+    if (!available) {
+      throw new ResourceNotFoundException("Categoria não encontrada.");
+    }
+
+    Instant now = Instant.now(clock);
+    SpendingAlertDismissal dismissal =
+        dismissalRepository
+            .findByUserIdAndCategoryId(user.getId(), categoryId)
+            .map(
+                existing -> {
+                  existing.dismissAgain(now);
+                  return existing;
+                })
+            .orElseGet(() -> SpendingAlertDismissal.dismiss(user.getId(), categoryId, now));
+    dismissal = dismissalRepository.save(dismissal);
+    log.info("Alerta de gastos dispensado: userId={}, categoryId={}", user.getId(), categoryId);
+    return new DismissSpendingAlertResponse(categoryId, dismissal.getDismissedAt());
   }
 
   private String formatMessage(BigDecimal totalAmount, String categoryName, int days) {

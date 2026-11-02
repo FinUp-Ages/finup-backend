@@ -2,8 +2,10 @@ package br.com.finup.dto;
 
 import br.com.finup.model.AlertSource;
 import br.com.finup.model.RiskKind;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 
 /** Alerta consolidado por categoria de gasto de risco. */
@@ -25,4 +27,11 @@ public record SpendingAlertItemResponse(
     @Schema(description = "Projeção de rendimento caso o montante fosse investido")
         SpendingAlertProjectionResponse projection,
     @Schema(description = "Origem da identificação (RULE ou AI)", example = "RULE")
-        AlertSource source) {}
+        AlertSource source,
+    @Schema(
+            description =
+                "Instante em que o usuário dispensou o alerta desta categoria, em UTC; nulo se"
+                    + " nunca dispensado",
+            nullable = true)
+        @JsonInclude(JsonInclude.Include.ALWAYS)
+        Instant dismissedAt) {}
