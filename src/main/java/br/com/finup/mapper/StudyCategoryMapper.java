@@ -29,7 +29,7 @@ public class StudyCategoryMapper {
     return new StudyCategoryResponse(
         category.getId(),
         category.getName(),
-        category.getDescription(),
+        category.getDescription() == null ? "" : category.getDescription(),
         draftCount,
         publishedCount,
         category.getCreatedAt(),

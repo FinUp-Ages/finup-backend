@@ -1,38 +1,38 @@
 {
   "stage": "REVIEWING",
-  "task": "Modelagem da Trilha de Estudos (ClickUp 86e3m95k1, contrato C6, PR #51)",
-  "objective": "Tabelas, entidades, status derivado e contagens de categoria e pergunta da trilha, com contrato e seed no mesmo formato de conteudo usado pela API de escrita e pelo painel",
+  "task": "[Backend] Persistir exibicao e dispensa do popup de alerta de gastos (ClickUp)",
+  "objective": "Guardar por usuario e categoria que o alerta de gastos foi dispensado: POST /api/v1/insights/spending-alerts/dismiss e campo dismissedAt em cada item de alerts do C1, sem quebrar o contrato atual.",
   "decisions": [
-    "Schema JSON de draft/published alinhado a task 86e3m95y3 (PR #54) e ao finup-web: FILL_BLANK {type,title,statement,answers,explanation}, MULTIPLE_CHOICE {type,statement,options[{text,correct}],explanation}, LEARNING {type,title,body}. O formato anterior (textWithBlanks, correctOptionId, content) nao tinha consumidor.",
-    "FK study_questions.category_id sem ON DELETE, como as demais FKs do schema: o banco recusa remover categoria com perguntas, reforcando o 409 da task 86e3m9600.",
-    "Classes Java da modelagem mantidas sem alteracao: StudyCategoryService, StudyQuestionRepository, StudyCategoryMapper e StudyCategoryServiceTest sao alterados pelos PRs #53, #54 e #55, que dependem desta base. O uso da query agregada no service fica com o #55.",
-    "Sem ferramenta de migration (issue #15): database/migrations documenta a mudanca e o rollback; database/init continua sendo o que o compose executa."
+    "Regra de 'nao repetir' fica no back so como dado: o back guarda e informa dismissedAt, o app decide o que fazer com ele. Nao ha expiracao nem filtragem do alerta dispensado na lista",
+    "Dispensa nao expira (os dois pontos a confirmar da task seguem em aberto, ver open_questions); tornar valida por N dias ou ate o total mudar exigiria so comparar dismissedAt no service",
+    "Nova tabela spending_alert_dismissals (user_id, category_id, dismissed_at) com UNIQUE (user_id, category_id) e FK da categoria com ON DELETE CASCADE, para nao bloquear a exclusao de categorias",
+    "Categoria precisa ser do usuario ou padrao do sistema; inexistente ou alheia da 404 (nao 403, para nao confirmar o id). Nao exige alerta ativo no momento da dispensa",
+    "dismissedAt usa @JsonInclude(ALWAYS) so nesse campo: a config global omite nulos, mas o contrato pede nulo explicito",
+    "403 nao se aplica: a rota nao tem papel; o isolamento e feito por usuario, e categoria alheia da 404",
+    "Idempotente: dispensar de novo renova dismissedAt"
   ],
   "files_in_scope": [
-    "contracts/study-track-c6.md",
     "database/init/01-schema.sql",
-    "database/init/03-test-data.sql",
-    "database/migrations/04-study-tracks-schema.sql",
-    "database/migrations/04-study-tracks-schema-rollback.sql",
-    "database/migrations/05-study-tracks-seed.sql",
-    "src/test/java/br/com/finup/AdminRoutesSecurityIntegrationTests.java",
-    ".railforge/state.json"
-  ],
-  "plan": [
-    "Alinhar secao 4 do contrato e os dois seeds ao formato gravado pela API de escrita.",
-    "Remover ON DELETE CASCADE da FK e o BOM dos arquivos SQL e do contrato.",
-    "Validar Maven verify, schema e seed do zero em Postgres 16, rollback e migrations, e aplicacao dos commits dos PRs dependentes."
+    "src/main/java/br/com/finup/model/SpendingAlertDismissal.java",
+    "src/main/java/br/com/finup/repository/SpendingAlertDismissalRepository.java",
+    "src/main/java/br/com/finup/dto/DismissSpendingAlertRequest.java",
+    "src/main/java/br/com/finup/dto/DismissSpendingAlertResponse.java",
+    "src/main/java/br/com/finup/dto/SpendingAlertItemResponse.java",
+    "src/main/java/br/com/finup/service/SpendingAlertService.java",
+    "src/main/java/br/com/finup/controller/SpendingAlertController.java",
+    "src/test/java/br/com/finup/service/SpendingAlertServiceTest.java",
+    "src/test/java/br/com/finup/controller/SpendingAlertControllerTest.java",
+    "src/test/java/br/com/finup/SpendingAlertIntegrationTests.java"
   ],
   "validation": {
-    "maven_verify": "BUILD SUCCESS em 2026-10-27 apos o merge com a develop: 573 testes, zero falhas ou erros; Spotless aprovado. AdminRoutesSecurityIntegrationTests ganhou os 4 casos de sucesso das rotas de perguntas (#54) e o mock de StudyQuestionService.",
-    "postgres": "postgres:16-alpine isolado em 2026-10-23, com a develop mesclada: database/init sobe do zero (inclui users.last_seen_at do #45); seed com os 3 tipos e os 3 status derivados; contagens 1/1 por categoria; DELETE de categoria com perguntas recusado pela FK (NO ACTION); rollback, 04 e 05 via psql sem erro.",
-    "dependentes": "Commits proprios dos PRs #53, #54 e #55 (0d236ba..head) aplicam sem conflito sobre esta mudanca, exceto o state.json, que cada PR reescreve.",
-    "limits": "Testes de integracao usam H2 com create-drop a partir das entidades; os scripts SQL so foram validados no Postgres manualmente."
+    "mvn clean verify": "passed (697 testes, 0 falhas, spotless ok)",
+    "postgres real": "validado em 2026-10-28: 01-schema.sql aplicado em postgres:16 (tabela, FKs, UNIQUE e ON DELETE CASCADE ok); API com mock-auth e collection Postman com 13 requisicoes e 15 assercoes passando (PATCH, GET por id, dismiss, 404, 400); isolamento entre usuarios confirmado (outra usuaria nao ve a dispensa, 404 ao dispensar categoria alheia, 401 sem identidade)"
   },
-  "review": "Review do PR #51 apontou divergencia entre o schema JSON documentado/seed e os consumidores (task 86e3m95y3, PR #54, finup-web fillBlankContract.ts). Correcao aplicada sem alterar codigo Java, num commit novo sobre 0d236ba; a develop (8b21dfc, #45) foi mesclada na branch em 2026-10-23, sem conflito e sem reescrever historico, porque o #54 usa esta branch como base e o #53/#55 levam o 0d236ba. Pendente: aprovacao e merge. Mergear com merge commit (nao squash) para o 0d236ba virar ancestral da develop: assim #53 e #55 nao precisam de rebase, e o #54 so troca a base para develop.",
+  "review": "pendente: revisao humana do diff",
+  "updated_at": "2026-10-28",
   "open_questions": [
-    "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): isActive() e lastSeenAt ainda nao tem consumidor: entram no GET /admin/users (86e3m95y6). O web tipa lastSeenAt como string obrigatoria, mas no back ele e nulo para quem nunca abriu o app",
-    "Herdado de origin/develop 8b21dfc (ultimo acesso, fora do escopo desta task): Duas definicoes de usuario ativo: metrics/summary (#47) usa transacao no periodo; isActive() usa acesso ao app nos ultimos 7 dias. Alinhar nomes ou regra com o time"
-  ],
-  "updated_at": "2026-10-27"
+    "Confirmar com o App se a regra de 'nao repetir' fica no back (esta task) ou so no app; se for so no app, esta task pode ser descartada",
+    "Por quanto tempo a dispensa vale (ate o total da categoria mudar, ou por N dias). Hoje nao expira",
+    "Banco local existente precisa de docker compose down -v (ou aplicar o CREATE TABLE a mao): os scripts de database/init so rodam na criacao do volume"
+  ]
 }

@@ -161,6 +161,18 @@ CREATE TABLE IF NOT EXISTS conversations (
   CONSTRAINT fk_conversations_user FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
+-- Estado do popup de alerta de gastos: um registro por usuário e categoria dispensada.
+-- ON DELETE CASCADE na categoria para que apagar uma categoria não seja bloqueado por dispensas.
+CREATE TABLE IF NOT EXISTS spending_alert_dismissals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  category_id UUID NOT NULL,
+  dismissed_at TIMESTAMPTZ NOT NULL,
+  CONSTRAINT fk_spending_alert_dismissals_user FOREIGN KEY (user_id) REFERENCES users (id),
+  CONSTRAINT fk_spending_alert_dismissals_category FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE,
+  CONSTRAINT uq_spending_alert_dismissals_user_category UNIQUE (user_id, category_id)
+);
+
 CREATE TABLE IF NOT EXISTS debts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,

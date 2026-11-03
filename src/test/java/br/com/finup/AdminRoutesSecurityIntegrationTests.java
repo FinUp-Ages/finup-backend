@@ -16,6 +16,7 @@ import br.com.finup.dto.DashboardWidgetsResponse;
 import br.com.finup.dto.MetricValueResponse;
 import br.com.finup.dto.MetricsSummaryResponse;
 import br.com.finup.dto.PageResponse;
+import br.com.finup.dto.StudyCategoryResponse;
 import br.com.finup.dto.StudyQuestionResponse;
 import br.com.finup.dto.UserGrowthResponse;
 import br.com.finup.model.QuestionStatus;
@@ -23,6 +24,8 @@ import br.com.finup.model.User;
 import br.com.finup.service.AdminMetricsService;
 import br.com.finup.service.AdminUserService;
 import br.com.finup.service.DashboardWidgetService;
+import br.com.finup.service.StudyCategoryService;
+import br.com.finup.service.StudyQuestionPublicationService;
 import br.com.finup.service.StudyQuestionService;
 import br.com.finup.service.UserService;
 import java.time.Instant;
@@ -120,26 +123,55 @@ class AdminRoutesSecurityIntegrationTests {
   private static final String WIDGETS_BODY =
       "{\"widgets\":[{\"id\":\"NEW_CLIENTS\",\"enabled\":true,\"position\":0}]}";
 
+  private static final String STUDY_CATEGORY_BODY =
+      "{\"name\":\"CDB\",\"description\":\"Renda fixa\"}";
+
   /**
    * O que o admin recebe em cada rota: {@code "METODO /caminho"} para o status de sucesso e o corpo
-   * da requisicao ({@code null} quando nao ha). Rota admin nova precisa de uma linha aqui.
+   * da requisicao ({@code null} quando nao ha). Rota admin nova precisa de uma linha aqui. Usa
+   * {@code Map.ofEntries} porque {@code Map.of} aceita no maximo 10 pares.
    */
   private static final Map<String, SuccessCase> SUCCESS_CASES =
-      Map.of(
-          "GET /api/v1/admin/me", new SuccessCase(HttpStatus.OK, null),
-          "GET /api/v1/admin/dashboard/widgets", new SuccessCase(HttpStatus.OK, null),
-          "PUT /api/v1/admin/dashboard/widgets", new SuccessCase(HttpStatus.OK, WIDGETS_BODY),
-          "GET /api/v1/admin/metrics/summary", new SuccessCase(HttpStatus.OK, null),
-          "GET /api/v1/admin/metrics/user-growth", new SuccessCase(HttpStatus.OK, null),
-          "GET /api/v1/admin/users", new SuccessCase(HttpStatus.OK, null),
-          "POST /api/v1/admin/study-tracks/categories/{categoryId}/questions",
-              new SuccessCase(HttpStatus.CREATED, QUESTION_BODY),
-          "GET /api/v1/admin/study-tracks/categories/{categoryId}/questions",
-              new SuccessCase(HttpStatus.OK, null),
-          "PUT /api/v1/admin/study-tracks/questions/{id}",
-              new SuccessCase(HttpStatus.OK, QUESTION_BODY),
-          "DELETE /api/v1/admin/study-tracks/questions/{id}",
-              new SuccessCase(HttpStatus.NO_CONTENT, null));
+      Map.ofEntries(
+          Map.entry("GET /api/v1/admin/me", new SuccessCase(HttpStatus.OK, null)),
+          Map.entry("GET /api/v1/admin/dashboard/widgets", new SuccessCase(HttpStatus.OK, null)),
+          Map.entry(
+              "PUT /api/v1/admin/dashboard/widgets", new SuccessCase(HttpStatus.OK, WIDGETS_BODY)),
+          Map.entry("GET /api/v1/admin/metrics/summary", new SuccessCase(HttpStatus.OK, null)),
+          Map.entry("GET /api/v1/admin/metrics/user-growth", new SuccessCase(HttpStatus.OK, null)),
+          Map.entry("GET /api/v1/admin/users", new SuccessCase(HttpStatus.OK, null)),
+          Map.entry(
+              "GET /api/v1/admin/study-tracks/categories", new SuccessCase(HttpStatus.OK, null)),
+          Map.entry(
+              "POST /api/v1/admin/study-tracks/categories",
+              new SuccessCase(HttpStatus.CREATED, STUDY_CATEGORY_BODY)),
+          Map.entry(
+              "PUT /api/v1/admin/study-tracks/categories/{id}",
+              new SuccessCase(HttpStatus.OK, STUDY_CATEGORY_BODY)),
+          Map.entry(
+              "DELETE /api/v1/admin/study-tracks/categories/{id}",
+              new SuccessCase(HttpStatus.NO_CONTENT, null)),
+          Map.entry(
+              "POST /api/v1/admin/study-tracks/categories/{categoryId}/questions",
+              new SuccessCase(HttpStatus.CREATED, QUESTION_BODY)),
+          Map.entry(
+              "GET /api/v1/admin/study-tracks/categories/{categoryId}/questions",
+              new SuccessCase(HttpStatus.OK, null)),
+          Map.entry(
+              "PUT /api/v1/admin/study-tracks/questions/{id}",
+              new SuccessCase(HttpStatus.OK, QUESTION_BODY)),
+          Map.entry(
+              "DELETE /api/v1/admin/study-tracks/questions/{id}",
+              new SuccessCase(HttpStatus.NO_CONTENT, null)),
+          Map.entry(
+              "POST /api/v1/admin/study-tracks/questions/{id}/publish",
+              new SuccessCase(HttpStatus.OK, null)),
+          Map.entry(
+              "POST /api/v1/admin/study-tracks/questions/{id}/unpublish",
+              new SuccessCase(HttpStatus.OK, null)),
+          Map.entry(
+              "DELETE /api/v1/admin/study-tracks/questions/{id}/draft",
+              new SuccessCase(HttpStatus.OK, null)));
 
   @Autowired private MockMvc mockMvc;
 
@@ -158,7 +190,11 @@ class AdminRoutesSecurityIntegrationTests {
 
   @MockitoBean private AdminUserService adminUserService;
 
+  @MockitoBean private StudyCategoryService studyCategoryService;
+
   @MockitoBean private StudyQuestionService studyQuestionService;
+
+  @MockitoBean private StudyQuestionPublicationService studyQuestionPublicationService;
 
   @BeforeEach
   void stubServices() {
@@ -172,12 +208,21 @@ class AdminRoutesSecurityIntegrationTests {
     when(adminMetricsService.userGrowth(any())).thenReturn(new UserGrowthResponse(0.0, List.of()));
     when(adminUserService.listUsers(any(), any(), any(), any()))
         .thenReturn(new PageResponse<AdminUserResponse>(List.of(), 0, 20, 0, 0));
+    StudyCategoryResponse category =
+        new StudyCategoryResponse(
+            UUID.randomUUID(), "CDB", "Renda fixa", 0, 0, Instant.now(), Instant.now());
+    when(studyCategoryService.listCategories()).thenReturn(List.of(category));
+    when(studyCategoryService.create(any())).thenReturn(category);
+    when(studyCategoryService.update(any(), any())).thenReturn(category);
     StudyQuestionResponse question =
         new StudyQuestionResponse(
             UUID.randomUUID(), QuestionStatus.DRAFT, Map.of(), null, Instant.now(), null);
     when(studyQuestionService.create(any(), any())).thenReturn(question);
     when(studyQuestionService.findByCategory(any())).thenReturn(List.of(question));
     when(studyQuestionService.update(any(), any())).thenReturn(question);
+    when(studyQuestionPublicationService.publish(any())).thenReturn(question);
+    when(studyQuestionPublicationService.unpublish(any())).thenReturn(question);
+    when(studyQuestionPublicationService.discardDraft(any())).thenReturn(question);
   }
 
   @Test
@@ -219,7 +264,9 @@ class AdminRoutesSecurityIntegrationTests {
         dashboardWidgetService,
         adminMetricsService,
         adminUserService,
-        studyQuestionService);
+        studyCategoryService,
+        studyQuestionService,
+        studyQuestionPublicationService);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -240,7 +287,9 @@ class AdminRoutesSecurityIntegrationTests {
         dashboardWidgetService,
         adminMetricsService,
         adminUserService,
-        studyQuestionService);
+        studyCategoryService,
+        studyQuestionService,
+        studyQuestionPublicationService);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -267,7 +316,9 @@ class AdminRoutesSecurityIntegrationTests {
         dashboardWidgetService,
         adminMetricsService,
         adminUserService,
-        studyQuestionService);
+        studyCategoryService,
+        studyQuestionService,
+        studyQuestionPublicationService);
   }
 
   @ParameterizedTest(name = "{0} | cognito:groups = {1}")
@@ -288,7 +339,9 @@ class AdminRoutesSecurityIntegrationTests {
         dashboardWidgetService,
         adminMetricsService,
         adminUserService,
-        studyQuestionService);
+        studyCategoryService,
+        studyQuestionService,
+        studyQuestionPublicationService);
   }
 
   @ParameterizedTest(name = "{0}")

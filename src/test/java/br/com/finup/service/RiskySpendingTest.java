@@ -23,7 +23,15 @@ class RiskySpendingTest {
     "bebida alcoolica, ALCOHOL",
     "Cerveja, ALCOHOL",
     "Drogas, DRUGS",
-    "DROGA, DRUGS"
+    "DROGA, DRUGS",
+    "Cigarro, TOBACCO",
+    "cigarros, TOBACCO",
+    "Tabacaria, TOBACCO",
+    "Fumo, TOBACCO",
+    "Charuto, TOBACCO",
+    "Narguilé, TOBACCO",
+    "Vape, TOBACCO",
+    "Pod, TOBACCO"
   })
   @DisplayName("reconhece o tipo de gasto de risco pelo nome da categoria")
   void recognisesRiskyCategories(String name, RiskySpending expected) {

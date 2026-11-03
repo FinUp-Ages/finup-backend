@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import br.com.finup.controller.AiAssistantController;
 import br.com.finup.controller.CategoryController;
 import br.com.finup.controller.ConversationController;
+import br.com.finup.controller.SpendingAlertController;
 import br.com.finup.controller.TransactionController;
 import br.com.finup.controller.UserController;
 import br.com.finup.dto.AiAssistantRequest;
@@ -57,7 +58,8 @@ import org.springframework.test.web.servlet.MockMvc;
   CategoryController.class,
   ConversationController.class,
   TransactionController.class,
-  AiAssistantController.class
+  AiAssistantController.class,
+  SpendingAlertController.class
 })
 @Import({
   SecurityConfig.class,
@@ -87,6 +89,8 @@ class SecurityConfigTest {
   @MockitoBean private TransactionService transactionService;
 
   @MockitoBean private AiAssistantService aiAssistantService;
+
+  @MockitoBean private br.com.finup.service.SpendingAlertService spendingAlertService;
 
   @Test
   @DisplayName("sem token devolve 401 em RFC 7807, sem chegar ao controller")
@@ -128,6 +132,19 @@ class SecurityConfigTest {
         .andExpect(jsonPath("$.status").value(401));
 
     verifyNoInteractions(authenticatedIdentityResolver, userService, transactionService);
+  }
+
+  @Test
+  @DisplayName("alertas de gastos de risco sem access token do Cognito devolve 401")
+  void spendingAlertsWithoutTokenReturns401() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/insights/spending-alerts"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.status").value(401));
+
+    verifyNoInteractions(authenticatedIdentityResolver, spendingAlertService);
   }
 
   @Test
