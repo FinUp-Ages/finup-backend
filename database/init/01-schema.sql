@@ -56,6 +56,31 @@ CREATE TABLE IF NOT EXISTS user_investment_interests (
   CONSTRAINT fk_user_investment_interests_profile FOREIGN KEY (user_financial_profile_id) REFERENCES user_financial_profiles (id)
 );
 
+-- Perguntas de perfil financeiro do onboarding (GET /api/v1/financial-profile/questions).
+-- "code" e o identificador estavel de cada pergunta/opcao (ex.: SPENDING_HABIT, CONTROLLED),
+-- usado para casar com os enums Java e, no futuro, ligar o FinUpScoreCalculator ao "weight" em vez
+-- do valor hoje hardcoded (ver docs/finup-score.md). "weight" nulo = ainda nao usado no calculo.
+CREATE TABLE IF NOT EXISTS financial_profile_questions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code VARCHAR(50) NOT NULL UNIQUE,
+  text VARCHAR(255) NOT NULL,
+  order_index INTEGER,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS financial_profile_answer_options (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  question_id UUID NOT NULL,
+  code VARCHAR(50) NOT NULL,
+  text VARCHAR(255) NOT NULL,
+  weight DECIMAL(6, 2),
+  order_index INTEGER,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_financial_profile_answer_options_question FOREIGN KEY (question_id) REFERENCES financial_profile_questions (id),
+  CONSTRAINT uq_financial_profile_answer_options_code UNIQUE (question_id, code)
+);
+
 CREATE TABLE IF NOT EXISTS categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID,

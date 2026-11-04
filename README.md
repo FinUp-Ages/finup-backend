@@ -150,6 +150,7 @@ consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o b
 | `POST /api/v1/ai/assistant` | interpreta um texto livre e executa a ação financeira correspondente |
 | `GET /api/v1/assistant/conversations` | lista o histórico de conversas do usuário, ordenado pela atualização mais recente |
 | `GET /api/v1/assistant/conversations/{id}/messages` | lista as mensagens de uma conversa do usuário em ordem cronológica |
+| `GET /api/v1/financial-profile/questions` | perguntas de perfil financeiro do onboarding, com opções de resposta e o peso de cada uma na fórmula do FinUp Score (nulo quando a pergunta ainda não entra no cálculo) |
 | `GET /api/v1/admin/me` | **só grupo `admin`.** Devolve o administrador autenticado: `{"id", "name", "email", "role": "ADMIN"}` |
 | `GET /api/v1/admin/metrics/summary?period=7d\|30d\|90d` | **só grupo `admin`.** Usuários ativos e novos no período, com o período anterior e a variação em % |
 | `GET /api/v1/admin/metrics/user-growth?months=6` | **só grupo `admin`.** Cadastros por mês (1 a 24 meses, padrão 6), com o acumulado e o crescimento em % |
