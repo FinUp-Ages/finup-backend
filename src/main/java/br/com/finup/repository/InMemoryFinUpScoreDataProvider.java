@@ -87,12 +87,34 @@ public class InMemoryFinUpScoreDataProvider implements FinUpScoreDataProvider {
     if (fixture != null) {
       return fixture;
     }
-    BigDecimal monthlyIncome =
-        userFinancialProfileRepository
-            .findByUserId(user.getId())
-            .map(UserFinancialProfile::getMonthlyIncome)
-            .orElse(null);
+    return userFinancialProfileRepository
+        .findByUserId(user.getId())
+        .map(InMemoryFinUpScoreDataProvider::fromProfile)
+        .orElseGet(
+            () ->
+                new FinUpScoreInputs(
+                    null, null, null, null, BigDecimal.ZERO, false, BigDecimal.ZERO, null, null));
+  }
+
+  /**
+   * Pilares 1, 3 e 5 a partir do perfil financeiro (informacoes complementares e triagem). Divida,
+   * atraso e metas seguem sem fonte real, como no restante desta classe.
+   */
+  private static FinUpScoreInputs fromProfile(UserFinancialProfile profile) {
+    BigDecimal invested =
+        Boolean.TRUE.equals(profile.getHasInvestments())
+                && profile.getApproximateInvestedAmount() != null
+            ? profile.getApproximateInvestedAmount()
+            : BigDecimal.ZERO;
     return new FinUpScoreInputs(
-        monthlyIncome, null, null, null, BigDecimal.ZERO, false, BigDecimal.ZERO, null, null);
+        profile.getMonthlyIncome(),
+        null,
+        profile.getMonthlyExpensesEstimate(),
+        profile.getIncomeExpenseRelation(),
+        BigDecimal.ZERO,
+        false,
+        invested,
+        null,
+        profile.getSpendingHabit());
   }
 }

@@ -173,6 +173,34 @@ CREATE TABLE IF NOT EXISTS spending_alert_dismissals (
   CONSTRAINT uq_spending_alert_dismissals_user_category UNIQUE (user_id, category_id)
 );
 
+-- Triagem financeira: cada envio do questionário é uma linha (o mais recente vale) e gera uma
+-- avaliação de riscos. Respostas e riscos em JSONB; nunca são logados. Sem volume novo, aplique
+-- estes dois CREATE TABLE e o índice à mão. ON DELETE CASCADE: remover o usuário remove a triagem.
+CREATE TABLE IF NOT EXISTS triage_responses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  questionnaire_version INTEGER NOT NULL,
+  answers JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_triage_responses_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_triage_responses_user_created ON triage_responses (user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS risk_assessments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  triage_response_id UUID NOT NULL UNIQUE,
+  profile VARCHAR(50) NOT NULL,
+  summary TEXT NOT NULL,
+  risks JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_risk_assessments_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_risk_assessments_response FOREIGN KEY (triage_response_id) REFERENCES triage_responses (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_risk_assessments_user_created ON risk_assessments (user_id, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS debts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,
