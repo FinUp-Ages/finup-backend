@@ -125,6 +125,14 @@ public class User {
     return lastSeenAt != null && Duration.between(lastSeenAt, now).compareTo(ACTIVE_WINDOW) <= 0;
   }
 
+  /**
+   * Instante de corte da regra ACTIVE: quem acessou depois disso conta como ativo. Usado pelo
+   * {@code GET /api/v1/admin/users} para filtrar no banco, sem duplicar os 7 dias em outro lugar.
+   */
+  public static Instant activeSince(Instant now) {
+    return now.minus(ACTIVE_WINDOW);
+  }
+
   @PreUpdate
   void markAsUpdated() {
     updatedAt = Instant.now();

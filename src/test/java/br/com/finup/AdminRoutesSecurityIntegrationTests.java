@@ -11,15 +11,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.finup.dto.AdminUserResponse;
 import br.com.finup.dto.DashboardWidgetsResponse;
 import br.com.finup.dto.MetricValueResponse;
 import br.com.finup.dto.MetricsSummaryResponse;
+import br.com.finup.dto.PageResponse;
 import br.com.finup.dto.StudyCategoryResponse;
 import br.com.finup.dto.StudyQuestionResponse;
 import br.com.finup.dto.UserGrowthResponse;
 import br.com.finup.model.QuestionStatus;
 import br.com.finup.model.User;
 import br.com.finup.service.AdminMetricsService;
+import br.com.finup.service.AdminUserService;
 import br.com.finup.service.DashboardWidgetService;
 import br.com.finup.service.StudyCategoryService;
 import br.com.finup.service.StudyQuestionPublicationService;
@@ -136,6 +139,7 @@ class AdminRoutesSecurityIntegrationTests {
               "PUT /api/v1/admin/dashboard/widgets", new SuccessCase(HttpStatus.OK, WIDGETS_BODY)),
           Map.entry("GET /api/v1/admin/metrics/summary", new SuccessCase(HttpStatus.OK, null)),
           Map.entry("GET /api/v1/admin/metrics/user-growth", new SuccessCase(HttpStatus.OK, null)),
+          Map.entry("GET /api/v1/admin/users", new SuccessCase(HttpStatus.OK, null)),
           Map.entry(
               "GET /api/v1/admin/study-tracks/categories", new SuccessCase(HttpStatus.OK, null)),
           Map.entry(
@@ -184,6 +188,8 @@ class AdminRoutesSecurityIntegrationTests {
 
   @MockitoBean private AdminMetricsService adminMetricsService;
 
+  @MockitoBean private AdminUserService adminUserService;
+
   @MockitoBean private StudyCategoryService studyCategoryService;
 
   @MockitoBean private StudyQuestionService studyQuestionService;
@@ -200,6 +206,8 @@ class AdminRoutesSecurityIntegrationTests {
     MetricValueResponse zero = new MetricValueResponse(0.0, 0.0, 0.0);
     when(adminMetricsService.summary(any())).thenReturn(new MetricsSummaryResponse(zero, zero));
     when(adminMetricsService.userGrowth(any())).thenReturn(new UserGrowthResponse(0.0, List.of()));
+    when(adminUserService.listUsers(any(), any(), any(), any()))
+        .thenReturn(new PageResponse<AdminUserResponse>(List.of(), 0, 20, 0, 0));
     StudyCategoryResponse category =
         new StudyCategoryResponse(
             UUID.randomUUID(), "CDB", "Renda fixa", 0, 0, Instant.now(), Instant.now());
@@ -255,6 +263,7 @@ class AdminRoutesSecurityIntegrationTests {
         userService,
         dashboardWidgetService,
         adminMetricsService,
+        adminUserService,
         studyCategoryService,
         studyQuestionService,
         studyQuestionPublicationService);
@@ -277,6 +286,7 @@ class AdminRoutesSecurityIntegrationTests {
         userService,
         dashboardWidgetService,
         adminMetricsService,
+        adminUserService,
         studyCategoryService,
         studyQuestionService,
         studyQuestionPublicationService);
@@ -305,6 +315,7 @@ class AdminRoutesSecurityIntegrationTests {
         userService,
         dashboardWidgetService,
         adminMetricsService,
+        adminUserService,
         studyCategoryService,
         studyQuestionService,
         studyQuestionPublicationService);
@@ -327,6 +338,7 @@ class AdminRoutesSecurityIntegrationTests {
         userService,
         dashboardWidgetService,
         adminMetricsService,
+        adminUserService,
         studyCategoryService,
         studyQuestionService,
         studyQuestionPublicationService);

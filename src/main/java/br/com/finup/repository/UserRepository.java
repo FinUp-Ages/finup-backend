@@ -4,6 +4,8 @@ import br.com.finup.model.User;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -40,4 +42,30 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
   /** Cadastros anteriores a {@code to} (exclusive): o total acumulado ate esse instante. */
   long countByCreatedAtLessThan(Instant to);
+
+  /**
+   * Listagem paginada do {@code GET /api/v1/admin/users}: filtro de status e busca sao opcionais e
+   * combinaveis, tudo resolvido no banco (sem carregar usuarios em memoria para filtrar).
+   *
+   * <p>{@code active} segue a regra de {@link User#isActive}, mas calculada aqui via {@code
+   * activeSince} ({@link User#activeSince}) para virar comparacao de data no SQL: {@code null} nao
+   * filtra por status, {@code true} e {@code lastSeenAt} dentro da janela, {@code false} e nulo ou
+   * fora dela. {@code searchPattern} ja vem pronto para o {@code LIKE} (minusculo, com {@code %}
+   * nas pontas; {@code null} nao filtra) — quem chama monta o padrao, nao o SQL: um {@code
+   * lower(concat(...))} sobre parametro nulo faz o driver do Postgres falhar com {@code function
+   * lower(bytea) does not exist}, por nao conseguir inferir o tipo.
+   */
+  @Query(
+      "select u from User u where"
+          + " (:searchPattern is null"
+          + "   or lower(u.name) like :searchPattern"
+          + "   or lower(u.email) like :searchPattern)"
+          + " and (:active is null"
+          + "   or (:active = true and u.lastSeenAt is not null and u.lastSeenAt >= :activeSince)"
+          + "   or (:active = false and (u.lastSeenAt is null or u.lastSeenAt < :activeSince)))")
+  Page<User> search(
+      @Param("searchPattern") String searchPattern,
+      @Param("active") Boolean active,
+      @Param("activeSince") Instant activeSince,
+      Pageable pageable);
 }

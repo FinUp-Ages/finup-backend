@@ -1,7 +1,9 @@
 package br.com.finup.mapper;
 
 import br.com.finup.dto.AdminMeResponse;
+import br.com.finup.dto.AdminUserResponse;
 import br.com.finup.dto.UserResponse;
+import br.com.finup.dto.UserStatus;
 import br.com.finup.model.User;
 import br.com.finup.model.UserFinancialProfile;
 import br.com.finup.security.Role;
@@ -58,5 +60,16 @@ public final class UserMapper {
    */
   public static AdminMeResponse toAdminMeResponse(User user) {
     return new AdminMeResponse(user.getId(), user.getName(), user.getEmail(), Role.ADMIN);
+  }
+
+  /** {@code status} e derivado de {@code lastSeenAt} em relacao a {@code now}, nunca persistido. */
+  public static AdminUserResponse toAdminUserResponse(User user, Instant now) {
+    return new AdminUserResponse(
+        user.getId(),
+        user.getName(),
+        user.getEmail(),
+        user.getCreatedAt(),
+        user.getLastSeenAt(),
+        user.isActive(now) ? UserStatus.ACTIVE : UserStatus.INACTIVE);
   }
 }
