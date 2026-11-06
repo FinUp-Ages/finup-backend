@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import br.com.finup.model.FinUpScoreInputs;
 import br.com.finup.model.FinUpScoreResult;
+import br.com.finup.model.IncomeExpenseRelation;
+import br.com.finup.model.SpendingHabit;
 import br.com.finup.model.User;
 import br.com.finup.model.UserFinancialProfile;
 import br.com.finup.service.FinUpScoreCalculator;
@@ -65,6 +68,42 @@ class InMemoryFinUpScoreDataProviderTest {
     when(profileRepository.findByUserId(user.getId())).thenReturn(Optional.of(profile));
 
     assertThat(provider.loadInputs(user).monthlyIncome()).isEqualByComparingTo("3500.50");
+  }
+
+  @Test
+  @DisplayName(
+      "usuario sem fixture usa gastos, relacao, investimento e habito do perfil da triagem")
+  void unknownUserUsesTriageFieldsFromProfile() {
+    User user = User.createFromCognitoIdentity("mock-sub-novo", "Usuario Novo", "novo@exemplo.com");
+    UserFinancialProfile profile = UserFinancialProfile.createFor(user);
+    profile.apply(null, null, null, new BigDecimal("4000"));
+    profile.applyTriage(
+        new BigDecimal("2500"),
+        IncomeExpenseRelation.SPENDS_LESS,
+        SpendingHabit.IMPULSIVE,
+        true,
+        new BigDecimal("12000"),
+        "OVER_3_YEARS");
+    when(profileRepository.findByUserId(user.getId())).thenReturn(Optional.of(profile));
+
+    FinUpScoreInputs inputs = provider.loadInputs(user);
+
+    assertThat(inputs.monthlyIncome()).isEqualByComparingTo("4000");
+    assertThat(inputs.monthlyExpensesEstimate()).isEqualByComparingTo("2500");
+    assertThat(inputs.incomeExpenseRelation()).isEqualTo(IncomeExpenseRelation.SPENDS_LESS);
+    assertThat(inputs.totalInvestedAmount()).isEqualByComparingTo("12000");
+    assertThat(inputs.spendingHabit()).isEqualTo(SpendingHabit.IMPULSIVE);
+  }
+
+  @Test
+  @DisplayName("quem informou que nao investe tem investimento zero, mesmo com valor antigo")
+  void notInvestingMeansZeroInvested() {
+    User user = User.createFromCognitoIdentity("mock-sub-novo", "Usuario Novo", "novo@exemplo.com");
+    UserFinancialProfile profile = UserFinancialProfile.createFor(user);
+    profile.applyTriage(null, null, null, false, new BigDecimal("999"), "OVER_3_YEARS");
+    when(profileRepository.findByUserId(user.getId())).thenReturn(Optional.of(profile));
+
+    assertThat(provider.loadInputs(user).totalInvestedAmount()).isEqualByComparingTo("0");
   }
 
   private int scoreFor(String email, String monthlyIncome) {

@@ -2,6 +2,8 @@ package br.com.finup.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -48,6 +50,26 @@ public class UserFinancialProfile {
   @Column(name = "monthly_income", precision = 12, scale = 2)
   private BigDecimal monthlyIncome;
 
+  @Column(name = "monthly_expenses_estimate", precision = 12, scale = 2)
+  private BigDecimal monthlyExpensesEstimate;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "income_expense_relation", length = 50)
+  private IncomeExpenseRelation incomeExpenseRelation;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "spending_habit", length = 50)
+  private SpendingHabit spendingHabit;
+
+  @Column(name = "has_investments")
+  private Boolean hasInvestments;
+
+  @Column(name = "approximate_invested_amount", precision = 12, scale = 2)
+  private BigDecimal approximateInvestedAmount;
+
+  @Column(name = "investment_experience_time", length = 50)
+  private String investmentExperienceTime;
+
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
@@ -88,6 +110,30 @@ public class UserFinancialProfile {
     }
   }
 
+  /**
+   * Triagem: regrava os campos que o questionário cobre, inclusive limpando os de investimento
+   * quando a pessoa passou a responder que não investe. Diferente de {@link #apply}, aqui um envio
+   * é sempre completo, então {@code null} significa "não se aplica", não "não informado".
+   */
+  public void applyTriage(
+      BigDecimal expensesEstimate,
+      IncomeExpenseRelation relation,
+      SpendingHabit habit,
+      boolean invests,
+      BigDecimal investedAmount,
+      String investmentTime) {
+    this.monthlyExpensesEstimate = expensesEstimate;
+    this.incomeExpenseRelation = relation;
+    this.spendingHabit = habit;
+    this.hasInvestments = invests;
+    this.approximateInvestedAmount = invested(invests, investedAmount);
+    this.investmentExperienceTime = invests ? investmentTime : null;
+  }
+
+  private static BigDecimal invested(boolean invests, BigDecimal amount) {
+    return invests ? amount : null;
+  }
+
   @PreUpdate
   void markAsUpdated() {
     updatedAt = Instant.now();
@@ -115,6 +161,30 @@ public class UserFinancialProfile {
 
   public BigDecimal getMonthlyIncome() {
     return monthlyIncome;
+  }
+
+  public BigDecimal getMonthlyExpensesEstimate() {
+    return monthlyExpensesEstimate;
+  }
+
+  public IncomeExpenseRelation getIncomeExpenseRelation() {
+    return incomeExpenseRelation;
+  }
+
+  public SpendingHabit getSpendingHabit() {
+    return spendingHabit;
+  }
+
+  public Boolean getHasInvestments() {
+    return hasInvestments;
+  }
+
+  public BigDecimal getApproximateInvestedAmount() {
+    return approximateInvestedAmount;
+  }
+
+  public String getInvestmentExperienceTime() {
+    return investmentExperienceTime;
   }
 
   public Instant getCreatedAt() {

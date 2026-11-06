@@ -59,6 +59,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     return ResponseEntity.badRequest().headers(headers).body(problem);
   }
 
+  /** Respostas da triagem invalidas: 400 com o campo e o motivo de cada falha. */
+  @ExceptionHandler(InvalidTriageAnswersException.class)
+  public ProblemDetail handleInvalidTriageAnswers(InvalidTriageAnswersException ex) {
+    ProblemDetail problem = buildProblem(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setTitle("Requisicao invalida");
+    problem.setType(TYPE_VALIDATION);
+    problem.setProperty("fields", ex.getFields());
+    return problem;
+  }
+
   /** Regra de negocio violada. O status vem da propria excecao. */
   @ExceptionHandler(BusinessException.class)
   public ProblemDetail handleBusiness(BusinessException ex) {
