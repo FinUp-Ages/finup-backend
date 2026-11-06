@@ -40,25 +40,35 @@ public final class TriageQuestionnaire {
   public static final String MAIN_GOAL = "MAIN_GOAL";
   public static final String MARKET_DROP_REACTION = "MARKET_DROP_REACTION";
   public static final String RISKY_HABITS = "RISKY_HABITS";
+  public static final String HOUSING_TYPE = "HOUSING_TYPE";
+  public static final String EXTRA_INCOME = "EXTRA_INCOME";
+  public static final String MONTHLY_SAVINGS = "MONTHLY_SAVINGS";
+  public static final String BUDGET_TRACKING = "BUDGET_TRACKING";
+  public static final String USES_CREDIT_CARD = "USES_CREDIT_CARD";
+  public static final String CARD_BILL_PAYMENT = "CARD_BILL_PAYMENT";
+  public static final String HAS_INSURANCE = "HAS_INSURANCE";
+  public static final String GOAL_HORIZON = "GOAL_HORIZON";
+  public static final String FINANCIAL_KNOWLEDGE = "FINANCIAL_KNOWLEDGE";
 
   private static final BigDecimal MAX_COUNT = BigDecimal.valueOf(20);
   private static final BigDecimal MAX_MONEY = BigDecimal.valueOf(100_000_000);
 
   private static final RequiredWhen WHEN_HAS_DEBT = new RequiredWhen(HAS_DEBT, true);
   private static final RequiredWhen WHEN_INVESTS = new RequiredWhen(INVESTS, true);
+  private static final RequiredWhen WHEN_USES_CARD = new RequiredWhen(USES_CREDIT_CARD, true);
 
   private static final List<TriageQuestionResponse> QUESTIONS =
       List.of(
           choice(
               INCOME_TYPE,
-              "Como é a sua renda?",
+              "Como você classifica a sua renda?",
               Type.SINGLE_CHOICE,
               true,
               null,
-              opt("FIXED", "Fixa"),
-              opt("VARIABLE", "Variável"),
-              opt("MIXED", "Mista")),
-          number(CHILDREN_COUNT, "Quantos filhos você tem?", MAX_COUNT, 0, null),
+              opt("FIXED", "Fixa (salário ou benefício regular)"),
+              opt("VARIABLE", "Variável (autônomo ou comissionado)"),
+              opt("MIXED", "Mista (parte fixa e parte variável)")),
+          number(CHILDREN_COUNT, "Quantos filhos você possui?", MAX_COUNT, 0, null),
           number(
               DEPENDENTS_COUNT,
               "Quantas outras pessoas dependem financeiramente de você?",
@@ -66,28 +76,55 @@ public final class TriageQuestionnaire {
               0,
               null),
           choice(
-              INCOME_EXPENSE_RELATION,
-              "Você costuma gastar menos, o mesmo ou mais do que ganha?",
+              HOUSING_TYPE,
+              "Qual é a sua situação de moradia?",
               Type.SINGLE_CHOICE,
               true,
               null,
-              opt("SPENDS_LESS", "Menos do que ganho"),
-              opt("BALANCED", "O mesmo que ganho"),
-              opt("SPENDS_MORE", "Mais do que ganho")),
-          number(MONTHLY_EXPENSES, "Qual o seu gasto mensal médio?", MAX_MONEY, 2, null),
+              opt("OWNED", "Imóvel próprio quitado"),
+              opt("FINANCED", "Imóvel próprio financiado"),
+              opt("RENTED", "Imóvel alugado"),
+              opt("PROVIDED", "Imóvel cedido ou moro com familiares")),
+          bool(EXTRA_INCOME, "Você possui alguma fonte de renda além da principal?", null),
+          choice(
+              INCOME_EXPENSE_RELATION,
+              "Em geral, os seus gastos são menores, iguais ou maiores do que a sua renda?",
+              Type.SINGLE_CHOICE,
+              true,
+              null,
+              opt("SPENDS_LESS", "Menores do que a minha renda"),
+              opt("BALANCED", "Iguais à minha renda"),
+              opt("SPENDS_MORE", "Maiores do que a minha renda")),
+          number(
+              MONTHLY_EXPENSES, "Qual é, em média, o seu gasto mensal total?", MAX_MONEY, 2, null),
+          number(
+              MONTHLY_SAVINGS,
+              "Quanto você consegue poupar, em média, por mês?",
+              MAX_MONEY,
+              2,
+              null),
           choice(
               SPENDING_HABIT,
-              "Como você descreve o seu hábito de gastos?",
+              "Como você descreveria o seu comportamento de consumo?",
               Type.SINGLE_CHOICE,
               true,
               null,
-              opt("CONTROLLED", "Controlado"),
-              opt("MODERATE", "Moderado"),
-              opt("IMPULSIVE", "Impulsivo")),
-          bool(HAS_DEBT, "Você tem dívidas?", null),
+              opt("CONTROLLED", "Controlado: planejo antes de gastar"),
+              opt("MODERATE", "Moderado: planejo parte dos gastos"),
+              opt("IMPULSIVE", "Impulsivo: costumo comprar sem planejar")),
+          choice(
+              BUDGET_TRACKING,
+              "Com que frequência você acompanha as suas despesas?",
+              Type.SINGLE_CHOICE,
+              true,
+              null,
+              opt("ALWAYS", "Sempre"),
+              opt("SOMETIMES", "Às vezes"),
+              opt("NEVER", "Nunca")),
+          bool(HAS_DEBT, "Você possui dívidas em aberto?", null),
           choice(
               DEBT_TYPES,
-              "De que tipo são as suas dívidas?",
+              "Quais tipos de dívida você possui?",
               Type.MULTIPLE_CHOICE,
               true,
               WHEN_HAS_DEBT,
@@ -96,21 +133,47 @@ public final class TriageQuestionnaire {
               opt("PERSONAL_LOAN", "Empréstimo pessoal"),
               opt("FINANCING", "Financiamento"),
               opt("OTHER", "Outra")),
-          number(DEBT_TOTAL_AMOUNT, "Quanto você deve, no total?", MAX_MONEY, 2, WHEN_HAS_DEBT),
-          bool(LATE_PAYMENTS_6M, "Você atrasou alguma conta nos últimos 6 meses?", null),
+          number(
+              DEBT_TOTAL_AMOUNT,
+              "Qual é o valor total das suas dívidas?",
+              MAX_MONEY,
+              2,
+              WHEN_HAS_DEBT),
+          bool(
+              LATE_PAYMENTS_6M,
+              "Nos últimos 6 meses, você deixou de pagar alguma conta no vencimento?",
+              null),
+          bool(USES_CREDIT_CARD, "Você utiliza cartão de crédito?", null),
+          choice(
+              CARD_BILL_PAYMENT,
+              "Como você costuma pagar a fatura do cartão de crédito?",
+              Type.SINGLE_CHOICE,
+              true,
+              WHEN_USES_CARD,
+              opt("FULL", "Pago o valor integral"),
+              opt("PARTIAL", "Pago parte do valor"),
+              opt("MINIMUM", "Pago apenas o valor mínimo")),
           choice(
               EMERGENCY_RESERVE,
-              "Quanto você tem de reserva de emergência?",
+              "Quanto você possui de reserva de emergência?",
               Type.SINGLE_CHOICE,
               true,
               null,
-              opt("NONE", "Nenhuma"),
-              opt("UP_TO_3_MONTHS", "Até 3 meses de gastos"),
-              opt("FROM_3_TO_6_MONTHS", "De 3 a 6 meses de gastos"),
-              opt("OVER_6_MONTHS", "Mais de 6 meses de gastos")),
-          bool(INVESTS, "Você investe?", null),
+              opt("NONE", "Não possuo reserva"),
+              opt("UP_TO_3_MONTHS", "Até 3 meses de despesas"),
+              opt("FROM_3_TO_6_MONTHS", "De 3 a 6 meses de despesas"),
+              opt("OVER_6_MONTHS", "Mais de 6 meses de despesas")),
+          bool(
+              HAS_INSURANCE,
+              "Você possui algum tipo de seguro (saúde, vida ou patrimonial)?",
+              null),
+          bool(INVESTS, "Você realiza investimentos atualmente?", null),
           number(
-              INVESTED_AMOUNT, "Quanto você tem investido, no total?", MAX_MONEY, 2, WHEN_INVESTS),
+              INVESTED_AMOUNT,
+              "Qual é o valor total que você tem investido?",
+              MAX_MONEY,
+              2,
+              WHEN_INVESTS),
           choice(
               INVESTMENT_TIME,
               "Há quanto tempo você investe?",
@@ -122,44 +185,62 @@ public final class TriageQuestionnaire {
               opt("OVER_3_YEARS", "Mais de 3 anos")),
           choice(
               INVESTMENT_INTERESTS,
-              "Em que você tem interesse de investir?",
+              "Em quais tipos de investimento você tem interesse?",
               Type.MULTIPLE_CHOICE,
               false,
               null,
               opt("SAVINGS", "Poupança"),
               opt("CDB", "CDB"),
               opt("TREASURY", "Tesouro Direto"),
-              opt("FUNDS", "Fundos"),
+              opt("FUNDS", "Fundos de investimento"),
               opt("REAL_ESTATE_FUNDS", "Fundos imobiliários"),
               opt("STOCKS", "Ações"),
               opt("CRYPTO", "Criptomoedas")),
           choice(
               MAIN_GOAL,
-              "Qual o seu principal objetivo financeiro?",
+              "Qual é o seu principal objetivo financeiro no momento?",
               Type.SINGLE_CHOICE,
               true,
               null,
               opt("PAY_DEBTS", "Quitar dívidas"),
-              opt("EMERGENCY_FUND", "Montar uma reserva"),
-              opt("BUY_ASSET", "Comprar um bem"),
-              opt("RETIREMENT", "Aposentadoria")),
+              opt("EMERGENCY_FUND", "Constituir uma reserva de emergência"),
+              opt("BUY_ASSET", "Adquirir um bem"),
+              opt("RETIREMENT", "Planejar a aposentadoria")),
           choice(
-              MARKET_DROP_REACTION,
-              "Se um investimento seu caísse 20%, o que você faria?",
+              GOAL_HORIZON,
+              "Em quanto tempo você pretende alcançar esse objetivo?",
               Type.SINGLE_CHOICE,
               true,
               null,
-              opt("SELL_ALL", "Venderia tudo"),
-              opt("WAIT", "Esperaria se recuperar"),
-              opt("BUY_MORE", "Compraria mais")),
+              opt("SHORT_TERM", "Em até 1 ano"),
+              opt("MEDIUM_TERM", "De 1 a 5 anos"),
+              opt("LONG_TERM", "Em mais de 5 anos")),
+          choice(
+              MARKET_DROP_REACTION,
+              "Caso um investimento seu sofresse queda de 20%, qual seria a sua atitude?",
+              Type.SINGLE_CHOICE,
+              true,
+              null,
+              opt("SELL_ALL", "Venderia todo o investimento"),
+              opt("WAIT", "Aguardaria a recuperação"),
+              opt("BUY_MORE", "Investiria mais")),
+          choice(
+              FINANCIAL_KNOWLEDGE,
+              "Como você avalia o seu conhecimento sobre finanças?",
+              Type.SINGLE_CHOICE,
+              true,
+              null,
+              opt("BEGINNER", "Iniciante"),
+              opt("INTERMEDIATE", "Intermediário"),
+              opt("ADVANCED", "Avançado")),
           choice(
               RISKY_HABITS,
-              "Você gasta com algum destes?",
+              "Você possui gastos recorrentes com algum destes itens?",
               Type.MULTIPLE_CHOICE,
               false,
               null,
               opt("BETS", "Apostas"),
-              opt("ALCOHOL", "Bebida alcoólica"),
+              opt("ALCOHOL", "Bebidas alcoólicas"),
               opt("TOBACCO", "Cigarro")));
 
   private TriageQuestionnaire() {}

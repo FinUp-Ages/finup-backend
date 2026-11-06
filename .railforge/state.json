@@ -12,7 +12,8 @@
     "InMemoryFinUpScoreDataProvider passou a ler gastos, relacao renda/gasto, investimento e habito do perfil (pilares 1, 3 e 5): sem isso o recalculo apos a triagem nao enxergaria nada. Divida, atraso e metas seguem sem fonte real",
     "Limite do payload: no maximo 50 respostas (400 em fields) e 16 KB de corpo (413 por Content-Length; corpo sem tamanho declarado e cortado ao passar do teto). Respostas e valores nunca vao para log nem para mensagens de erro",
     "Admin: GET /admin/users ainda nao existe na develop (PR #60 aberto); nenhuma rota admin expoe respostas da triagem. O PR #60 precisa continuar sem incluir triagem",
-    "Cascade: FKs de triage_responses e risk_assessments com ON DELETE CASCADE em users. user_financial_profiles e user_investment_interests ja existentes seguem sem cascade (fora do escopo)"
+    "Cascade: FKs de triage_responses e risk_assessments com ON DELETE CASCADE em users. user_financial_profiles e user_investment_interests ja existentes seguem sem cascade (fora do escopo)",
+    "Questionario com 27 perguntas e tom levemente mais formal: alem das 18 originais, entraram HOUSING_TYPE, EXTRA_INCOME, MONTHLY_SAVINGS, BUDGET_TRACKING, USES_CREDIT_CARD, CARD_BILL_PAYMENT (so se usa cartao), HAS_INSURANCE, GOAL_HORIZON e FINANCIAL_KNOWLEDGE. Sao validadas e gravadas em triage_responses.answers, mas nao alimentam as regras de risco nem o score (a task fixa as 9 regras); servem de dado para o app e para regras futuras. Continua VERSION=1 porque nada foi publicado"
   ],
   "files_in_scope": [
     "database/init/01-schema.sql",
@@ -26,7 +27,7 @@
     "src/test/java/br/com/finup/ (TriageIntegrationTests, service/TriageAnswersValidatorTest, service/TriageRiskEvaluatorTest, repository/InMemoryFinUpScoreDataProviderTest)"
   ],
   "validation": {
-    "mvn clean verify": "passed (830 testes, 0 falhas, spotless ok)",
+    "mvn clean verify": "passed (831 testes, 0 falhas, spotless ok)",
     "postgres real": "validado em 2026-11-05: 01-schema.sql aplicado em postgres:16 (JSONB, indices, FKs); fluxo com curl: POST 201 com 9 riscos e perfil AGGRESSIVE, score recalculado (COMPUTED), perfil/interesses/users.financial_profile gravados, reenvio criou 2a linha e limpou investimento, 400 com 12 falhas por campo, 413 acima de 16 KB, 401 sem identidade, outra usuaria recebe 404; remover os usuarios apagou as 2 respostas e 2 avaliacoes (cascade); log da API sem nenhum valor das respostas",
     "regras de risco": "cada uma com teste positivo e negativo; limiares da divida testados nos tres degraus e no limite exato (achou e corrigiu arredondamento que jogava 17.999 em HIGH)"
   },

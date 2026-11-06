@@ -94,7 +94,7 @@ class TriageIntegrationTests {
     mvc.perform(as("ana", get(QUESTIONS)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.version").value(1))
-        .andExpect(jsonPath("$.questions", hasSize(18)))
+        .andExpect(jsonPath("$.questions", hasSize(27)))
         .andExpect(jsonPath("$.questions[0].id").value("INCOME_TYPE"))
         .andExpect(jsonPath("$.questions[0].type").value("SINGLE_CHOICE"))
         .andExpect(jsonPath("$.questions[0].options", hasSize(3)))
@@ -153,6 +153,7 @@ class TriageIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.version").value(1))
         .andExpect(jsonPath("$.answers.MARKET_DROP_REACTION").value("SELL_ALL"))
+        .andExpect(jsonPath("$.answers.FINANCIAL_KNOWLEDGE").value("ADVANCED"))
         .andExpect(jsonPath("$.completedAt").isNotEmpty());
     // O reenvio sem investimento limpa o que o primeiro gravou no perfil e nos interesses.
     UserFinancialProfile profile = profiles.findByUserId(ana.getId()).orElseThrow();
@@ -262,6 +263,9 @@ class TriageIntegrationTests {
     return """
         {"version":1,"answers":{
           "INCOME_TYPE":"VARIABLE","CHILDREN_COUNT":2,"DEPENDENTS_COUNT":1,
+          "HOUSING_TYPE":"RENTED","EXTRA_INCOME":false,"MONTHLY_SAVINGS":0,
+          "BUDGET_TRACKING":"NEVER","USES_CREDIT_CARD":true,"CARD_BILL_PAYMENT":"MINIMUM",
+          "HAS_INSURANCE":false,"GOAL_HORIZON":"SHORT_TERM","FINANCIAL_KNOWLEDGE":"BEGINNER",
           "INCOME_EXPENSE_RELATION":"SPENDS_MORE","MONTHLY_EXPENSES":3000.50,
           "SPENDING_HABIT":"IMPULSIVE","HAS_DEBT":true,
           "DEBT_TYPES":["CREDIT_CARD","PERSONAL_LOAN"],"DEBT_TOTAL_AMOUNT":%s,
@@ -278,6 +282,9 @@ class TriageIntegrationTests {
     return """
         {"version":1,"answers":{
           "INCOME_TYPE":"FIXED","CHILDREN_COUNT":0,"DEPENDENTS_COUNT":0,
+          "HOUSING_TYPE":"OWNED","EXTRA_INCOME":true,"MONTHLY_SAVINGS":500,
+          "BUDGET_TRACKING":"ALWAYS","USES_CREDIT_CARD":false,"HAS_INSURANCE":true,
+          "GOAL_HORIZON":"LONG_TERM","FINANCIAL_KNOWLEDGE":"ADVANCED",
           "INCOME_EXPENSE_RELATION":"SPENDS_LESS","MONTHLY_EXPENSES":1000,
           "SPENDING_HABIT":"CONTROLLED","HAS_DEBT":false,"LATE_PAYMENTS_6M":false,
           "EMERGENCY_RESERVE":"OVER_6_MONTHS","INVESTS":%s,"MAIN_GOAL":"RETIREMENT",

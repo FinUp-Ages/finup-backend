@@ -38,6 +38,14 @@ class TriageAnswersValidatorTest {
     put(a, "LATE_PAYMENTS_6M", "false");
     put(a, "EMERGENCY_RESERVE", "\"UP_TO_3_MONTHS\"");
     put(a, "INVESTS", "false");
+    put(a, "HOUSING_TYPE", "\"RENTED\"");
+    put(a, "EXTRA_INCOME", "false");
+    put(a, "MONTHLY_SAVINGS", "300");
+    put(a, "BUDGET_TRACKING", "\"SOMETIMES\"");
+    put(a, "USES_CREDIT_CARD", "false");
+    put(a, "HAS_INSURANCE", "false");
+    put(a, "GOAL_HORIZON", "\"LONG_TERM\"");
+    put(a, "FINANCIAL_KNOWLEDGE", "\"BEGINNER\"");
     put(a, "MAIN_GOAL", "\"RETIREMENT\"");
     put(a, "MARKET_DROP_REACTION", "\"WAIT\"");
     return a;
@@ -94,6 +102,21 @@ class TriageAnswersValidatorTest {
             "answers.DEBT_TOTAL_AMOUNT",
             "answers.INVESTED_AMOUNT",
             "answers.INVESTMENT_TIME");
+  }
+
+  @Test
+  @DisplayName("forma de pagar a fatura so e exigida para quem usa cartao de credito")
+  void cardBillPaymentIsRequiredOnlyForCardUsers() {
+    Map<String, JsonNode> a = valid();
+    put(a, "USES_CREDIT_CARD", "true");
+
+    assertThat(errorsOf(VERSION, a))
+        .extracting(InvalidField::field)
+        .containsExactly("answers.CARD_BILL_PAYMENT");
+
+    put(a, "CARD_BILL_PAYMENT", "\"MINIMUM\"");
+    assertThat(validator.validate(VERSION, a).normalized())
+        .containsEntry("CARD_BILL_PAYMENT", "MINIMUM");
   }
 
   @Test
