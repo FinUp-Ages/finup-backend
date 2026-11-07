@@ -125,6 +125,10 @@ O usuário é sempre o dono da identidade autenticada (resolvida por
 `X-Mock-Cognito-*` no profile `mock-auth`) — nenhum endpoint recebe um id de usuário do
 cliente.
 
+O valor gravado em `users.fin_up_score` é lido pelo app em `GET /api/v1/users/me` (campo
+`finUpScore`, de 0 a 1000). O campo fica ausente do JSON enquanto nenhum recálculo teve dado
+suficiente. A leitura nunca recalcula: ela só devolve o último valor persistido.
+
 Gatilhos pretendidos (a implementar quando os respectivos fluxos existirem, hoje fora do escopo
 desta tarefa): atualização de renda/perfil financeiro, e criação/edição/exclusão de transação,
 dívida, meta ou investimento. Nenhum desses endpoints de escrita existe ainda no código — quando

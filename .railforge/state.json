@@ -1,43 +1,35 @@
 {
   "stage": "REVIEWING",
-  "task": "[Backend] Triagem financeira (questionario, avaliacao de riscos e perfil)",
-  "objective": "GET /api/v1/triage/questions, POST /api/v1/triage/answers, GET /api/v1/triage/assessment e GET /api/v1/triage/answers: valida e salva as respostas, atualiza o perfil financeiro, recalcula o FinUp Score e devolve riscos por regras fixas (sem IA).",
+  "task": "[Backend] FinUp Score calculado mas nao exposto ao app",
+  "objective": "O score era calculado e gravado em users.fin_up_score, mas nenhuma rota de leitura o devolvia (so POST /users/me/finup-score/recalculate), entao o app nao tinha como exibi-lo. GET /api/v1/users/me passa a devolver finUpScore.",
+  "requirements": [
+    "UserResponse ganha finUpScore (Integer, 0 a 1000) lido de users.fin_up_score",
+    "Ausente do JSON enquanto nenhum recalculo teve dado suficiente (jackson default-property-inclusion non_null, como os demais campos opcionais)",
+    "Ler o usuario nunca dispara recalculo",
+    "Vale para todas as respostas que usam UserResponse (POST /users, GET /users/me, GET /users/{id}, PATCH /users/me/additional-info); todas so devolvem o proprio usuario"
+  ],
   "decisions": [
-    "Contrato (a fechar com o front, o texto da task nao trazia os JSONs): GET /triage/questions -> {version, questions[{id,text,type,required,options[{value,label}],min,max,decimals,requiredWhen{questionId,equals}}]}; POST /triage/answers recebe {version, answers:{ID: valor}} (texto, lista de textos, numero ou booleano) e devolve 201 {assessment:{profile,summary,risks[{code,severity,title,description,suggestion}]}, completedAt}; GET /triage/assessment devolve o mesmo corpo; GET /triage/answers devolve {version, answers, completedAt}",
-    "Questionario fica em codigo (TriageQuestionnaire, VERSION=1), nao em tabela: a task pede 'no back e versionado'. Sobrepoe-se em tema ao PR #61 (financial_profile_questions no banco, rota /financial-profile/questions, de outra pessoa); nao ha dependencia entre os dois, mas o time precisa decidir se mantem os dois modelos",
-    "Perguntas condicionais (requiredWhen): DEBT_TYPES e DEBT_TOTAL_AMOUNT so se HAS_DEBT=true; INVESTED_AMOUNT e INVESTMENT_TIME so se INVESTS=true. Resposta de pergunta que nao se aplica e descartada, nao rejeitada. Valores de investment_experience_time e de investment_type foram definidos aqui (nao havia conjunto no codigo)",
-    "Validacao antes de qualquer escrita e escritas na mesma transacao: tudo ou nada. Reenvio cria nova linha (triage_responses e risk_assessments) e o mais recente vale; o reenvio regrava o perfil por inteiro (limpa investimento e interesses se passou a nao investir)",
-    "Perfil de investidor vem de MARKET_DROP_REACTION (SELL_ALL=CONSERVATIVE, WAIT=MODERATE, BUY_MORE=AGGRESSIVE) e e gravado em users.financial_profile; renda mensal continua vindo do PATCH additional-info, nao do questionario",
-    "Regras de risco v1 em TriageRiskEvaluator com limiares em constantes nomeadas (divida de cartao/cheque especial: >=30% da renda anual HIGH, >=10% MEDIUM, senao LOW; sem renda informada, MEDIUM). Riscos ordenados da maior para a menor gravidade",
-    "InMemoryFinUpScoreDataProvider passou a ler gastos, relacao renda/gasto, investimento e habito do perfil (pilares 1, 3 e 5): sem isso o recalculo apos a triagem nao enxergaria nada. Divida, atraso e metas seguem sem fonte real",
-    "Limite do payload: no maximo 50 respostas (400 em fields) e 16 KB de corpo (413 por Content-Length; corpo sem tamanho declarado e cortado ao passar do teto). Respostas e valores nunca vao para log nem para mensagens de erro",
-    "Admin: GET /admin/users ainda nao existe na develop (PR #60 aberto); nenhuma rota admin expoe respostas da triagem. O PR #60 precisa continuar sem incluir triagem",
-    "Cascade: FKs de triage_responses e risk_assessments com ON DELETE CASCADE em users. user_financial_profiles e user_investment_interests ja existentes seguem sem cascade (fora do escopo)",
-    "Questionario com 27 perguntas e tom levemente mais formal: alem das 18 originais, entraram HOUSING_TYPE, EXTRA_INCOME, MONTHLY_SAVINGS, BUDGET_TRACKING, USES_CREDIT_CARD, CARD_BILL_PAYMENT (so se usa cartao), HAS_INSURANCE, GOAL_HORIZON e FINANCIAL_KNOWLEDGE. Sao validadas e gravadas em triage_responses.answers, mas nao alimentam as regras de risco nem o score (a task fixa as 9 regras); servem de dado para o app e para regras futuras. Continua VERSION=1 porque nada foi publicado"
+    "2026-11-06: expor no GET /users/me em vez de criar GET /users/me/finup-score: o mobile ja chama /users/me na Home e o campo e do proprio usuario autenticado",
+    "Mudanca aditiva no contrato: nenhum consumidor quebra"
+  ],
+  "non_goals": [
+    "Novos gatilhos de recalculo (PATCH additional-info, transacoes): hoje so a triagem e o POST manual recalculam",
+    "Trocar o InMemoryFinUpScoreDataProvider por consultas reais"
   ],
   "files_in_scope": [
-    "database/init/01-schema.sql",
-    "src/main/java/br/com/finup/controller/TriageController.java",
-    "src/main/java/br/com/finup/dto/ (SubmitTriageRequest, TriageAnswersResponse, TriageAssessmentResponse, TriageQuestionResponse, TriageQuestionnaireResponse)",
-    "src/main/java/br/com/finup/exception/ (InvalidTriageAnswersException, ApiExceptionHandler)",
-    "src/main/java/br/com/finup/model/ (RiskAssessment, RiskSeverity, TriageAnswers, TriageResponse, TriageRisk, UserInvestmentInterest, UserFinancialProfile)",
-    "src/main/java/br/com/finup/repository/ (RiskAssessmentRepository, TriageResponseRepository, UserInvestmentInterestRepository, InMemoryFinUpScoreDataProvider)",
-    "src/main/java/br/com/finup/security/TriagePayloadLimitFilter.java",
-    "src/main/java/br/com/finup/service/ (TriageAnswersValidator, TriageQuestionnaire, TriageRiskEvaluator, TriageService)",
-    "src/test/java/br/com/finup/ (TriageIntegrationTests, service/TriageAnswersValidatorTest, service/TriageRiskEvaluatorTest, repository/InMemoryFinUpScoreDataProviderTest)"
+    "src/main/java/br/com/finup/dto/UserResponse.java",
+    "src/main/java/br/com/finup/mapper/UserMapper.java",
+    "src/test/java/br/com/finup/controller/UserControllerTest.java",
+    "README.md",
+    "docs/finup-score.md"
   ],
   "validation": {
-    "mvn clean verify": "passed (831 testes, 0 falhas, spotless ok)",
-    "postgres real": "validado em 2026-11-05: 01-schema.sql aplicado em postgres:16 (JSONB, indices, FKs); fluxo com curl: POST 201 com 9 riscos e perfil AGGRESSIVE, score recalculado (COMPUTED), perfil/interesses/users.financial_profile gravados, reenvio criou 2a linha e limpou investimento, 400 com 12 falhas por campo, 413 acima de 16 KB, 401 sem identidade, outra usuaria recebe 404; remover os usuarios apagou as 2 respostas e 2 avaliacoes (cascade); log da API sem nenhum valor das respostas",
-    "regras de risco": "cada uma com teste positivo e negativo; limiares da divida testados nos tres degraus e no limite exato (achou e corrigiu arredondamento que jogava 17.999 em HIGH)"
+    "mvn clean verify": "2026-11-06: passed (872 testes, 0 falhas, spotless ok)",
+    "postgres real": "2026-11-06: postgres:16 descartavel com database/init, profile dev,mock-auth: GET /me sem score omite o campo; POST recalculate devolve 696 para exemplo.a; GET /me em seguida devolve finUpScore 696; usuario novo sem renda recebe INSUFFICIENT_DATA e segue sem o campo; sem identidade 401; OpenAPI documenta finUpScore"
   },
   "review": "pendente: revisao humana do diff",
-  "updated_at": "2026-11-05",
+  "updated_at": "2026-11-06",
   "open_questions": [
-    "Contrato de request/response e lista final de perguntas (texto, tipo, opcoes e faixas) precisam ser fechados com o front; qualquer mudanca de pergunta sobe TriageQuestionnaire.VERSION",
-    "Sobreposicao com o PR #61 (financial_profile_questions no banco): decidir se o questionario fica em codigo, como aqui, ou migra para tabelas",
-    "A resposta do POST nao traz o FinUp Score recalculado; o app o obtem por POST /users/me/finup-score/recalculate. Incluir no 201 exige combinar com o front",
-    "Banco local existente precisa criar as duas tabelas (docker compose down -v, ou aplicar os CREATE TABLE do 01-schema.sql a mao)",
-    "Divida informada na triagem nao alimenta o pilar 2 do score (nao ha entidade de debts)"
+    "Recalcular tambem no PATCH /users/me/additional-info (renda) e na criacao de transacao, como docs/finup-score.md preve"
   ]
 }
