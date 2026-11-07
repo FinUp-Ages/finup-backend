@@ -136,7 +136,7 @@ consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o b
 |---|---|
 | `POST /api/v1/users/email-availability` | **público, sem token.** Diz se um e-mail já está cadastrado (`{"available": true\|false}`). Usado pelo formulário de cadastro |
 | `POST /api/v1/users` | cria o registro local da identidade autenticada. Corpo vazio |
-| `GET /api/v1/users/me` | devolve o usuário da identidade autenticada, incluindo o último `finUpScore` calculado (ausente se nunca houve cálculo), e registra o último acesso (`last_seen_at`, no máximo uma vez por hora) |
+| `GET /api/v1/users/me` | devolve o usuário da identidade autenticada, incluindo o último `finUpScore` calculado, de 0 a 100 (ausente se nunca houve cálculo), e registra o último acesso (`last_seen_at`, no máximo uma vez por hora) |
 | `GET /api/v1/users/{id}` | devolve o próprio usuário (outro id dá `404`) |
 | `PATCH /api/v1/users/me/additional-info` | grava as informações complementares (Etapas 2 e 3 do cadastro) |
 | `POST /api/v1/users/me/finup-score/recalculate` | recalcula e persiste o FinUp Score |

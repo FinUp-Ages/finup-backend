@@ -154,14 +154,14 @@ class UserControllerTest {
         new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
     User user =
         User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
-    user.updateFinUpScore(696);
+    user.updateFinUpScore(70);
     when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
     when(userService.recordAccess(identity)).thenReturn(user);
 
     mockMvc
         .perform(get("/api/v1/users/me"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.finUpScore").value(696));
+        .andExpect(jsonPath("$.finUpScore").value(70));
   }
 
   @Test

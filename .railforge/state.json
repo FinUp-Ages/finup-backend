@@ -1,34 +1,48 @@
 {
   "stage": "REVIEWING",
-  "task": "[Backend] FinUp Score calculado mas nao exposto ao app",
-  "objective": "O score era calculado e gravado em users.fin_up_score, mas nenhuma rota de leitura o devolvia (so POST /users/me/finup-score/recalculate), entao o app nao tinha como exibi-lo. GET /api/v1/users/me passa a devolver finUpScore.",
+  "task": "[Backend] FinUp Score calculado mas nao exposto ao app; escala 0 a 100",
+  "objective": "O score era calculado e gravado em users.fin_up_score, mas nenhuma rota de leitura o devolvia (so POST /users/me/finup-score/recalculate), entao o app nao tinha como exibi-lo. GET /api/v1/users/me passa a devolver finUpScore. A escala do score passa de 0 a 1000 para 0 a 100, como definido pelo produto.",
   "requirements": [
-    "UserResponse ganha finUpScore (Integer, 0 a 1000) lido de users.fin_up_score",
+    "UserResponse ganha finUpScore (Integer, 0 a 100) lido de users.fin_up_score",
     "Ausente do JSON enquanto nenhum recalculo teve dado suficiente (jackson default-property-inclusion non_null, como os demais campos opcionais)",
     "Ler o usuario nunca dispara recalculo",
-    "Vale para todas as respostas que usam UserResponse (POST /users, GET /users/me, GET /users/{id}, PATCH /users/me/additional-info); todas so devolvem o proprio usuario"
+    "Vale para todas as respostas que usam UserResponse (POST /users, GET /users/me, GET /users/{id}, PATCH /users/me/additional-info); todas so devolvem o proprio usuario",
+    "FinUpScoreCalculator calcula de 0 a 100 (FinUpScoreCalculator.MAX_SCORE): pesos 35/25/20/10/10, penalidade de atraso 7,5",
+    "Scores ja gravados na escala antiga sao convertidos por database/migrations/08-finup-score-escala-0-100.sql"
   ],
   "decisions": [
     "2026-11-06: expor no GET /users/me em vez de criar GET /users/me/finup-score: o mobile ja chama /users/me na Home e o campo e do proprio usuario autenticado",
-    "Mudanca aditiva no contrato: nenhum consumidor quebra"
+    "Mudanca aditiva no contrato: nenhum consumidor quebra",
+    "2026-11-07: escala 0 a 100 pedida pelo produto. Pesos e penalidade divididos por 10, mantendo a mesma formula e as mesmas proporcoes; o total e arredondado uma vez no fim (Exemplos A/C/D: 70/95/11)",
+    "2026-11-07: migration 08 so converte valores acima de 100, para poder ser reaplicada; score antigo entre 20 e 100 so e corrigido no proximo recalculo"
   ],
   "non_goals": [
     "Novos gatilhos de recalculo (PATCH additional-info, transacoes): hoje so a triagem e o POST manual recalculam",
-    "Trocar o InMemoryFinUpScoreDataProvider por consultas reais"
+    "Trocar o InMemoryFinUpScoreDataProvider por consultas reais",
+    "CHECK constraint de 0 a 100 na coluna users.fin_up_score"
   ],
   "files_in_scope": [
     "src/main/java/br/com/finup/dto/UserResponse.java",
+    "src/main/java/br/com/finup/dto/FinUpScoreResponse.java",
     "src/main/java/br/com/finup/mapper/UserMapper.java",
+    "src/main/java/br/com/finup/service/FinUpScoreCalculator.java",
+    "src/main/java/br/com/finup/repository/InMemoryFinUpScoreDataProvider.java",
     "src/test/java/br/com/finup/controller/UserControllerTest.java",
+    "src/test/java/br/com/finup/controller/FinUpScoreControllerTest.java",
+    "src/test/java/br/com/finup/service/FinUpScoreCalculatorTest.java",
+    "src/test/java/br/com/finup/repository/InMemoryFinUpScoreDataProviderTest.java",
+    "database/init/03-test-data.sql",
+    "database/migrations/08-finup-score-escala-0-100.sql",
     "README.md",
     "docs/finup-score.md"
   ],
   "validation": {
-    "mvn clean verify": "2026-11-06: passed (872 testes, 0 falhas, spotless ok)",
-    "postgres real": "2026-11-06: postgres:16 descartavel com database/init, profile dev,mock-auth: GET /me sem score omite o campo; POST recalculate devolve 696 para exemplo.a; GET /me em seguida devolve finUpScore 696; usuario novo sem renda recebe INSUFFICIENT_DATA e segue sem o campo; sem identidade 401; OpenAPI documenta finUpScore"
+    "mvn clean verify": "2026-11-07: passed (872 testes, 0 falhas, spotless ok) com a escala 0 a 100",
+    "postgres real": "2026-11-06: postgres:16 descartavel com database/init, profile dev,mock-auth: GET /me sem score omite o campo; POST recalculate devolve 696 (escala antiga) para exemplo.a; GET /me em seguida devolve o score; usuario novo sem renda recebe INSUFFICIENT_DATA e segue sem o campo; sem identidade 401; OpenAPI documenta finUpScore",
+    "migration 08": "2026-11-07: postgres:16 descartavel com database/init: 658 -> 66, 1000 -> 100, 70 e null inalterados, seed 65 inalterado; segunda execucao UPDATE 0"
   },
   "review": "pendente: revisao humana do diff",
-  "updated_at": "2026-11-06",
+  "updated_at": "2026-11-07",
   "open_questions": [
     "Recalcular tambem no PATCH /users/me/additional-info (renda) e na criacao de transacao, como docs/finup-score.md preve"
   ]

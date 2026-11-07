@@ -29,13 +29,13 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class InMemoryFinUpScoreDataProvider implements FinUpScoreDataProvider {
 
-  /** E-mail do usuario de demonstracao que reproduz o Exemplo A (score 696) do documento. */
+  /** E-mail do usuario de demonstracao que reproduz o Exemplo A (score 70) do documento. */
   public static final String DEMO_FALLBACK_ESTIMATE_EMAIL = "exemplo.a.fallback@finup.local";
 
-  /** E-mail do usuario de demonstracao que reproduz o Exemplo C (score 950) do documento. */
+  /** E-mail do usuario de demonstracao que reproduz o Exemplo C (score 95) do documento. */
   public static final String DEMO_HEALTHY_EMAIL = "exemplo.c.saudavel@finup.local";
 
-  /** E-mail do usuario de demonstracao que reproduz o Exemplo D (score 106) do documento. */
+  /** E-mail do usuario de demonstracao que reproduz o Exemplo D (score 11) do documento. */
   public static final String DEMO_STRUGGLING_EMAIL = "exemplo.d.dificuldade@finup.local";
 
   private final UserFinancialProfileRepository userFinancialProfileRepository;

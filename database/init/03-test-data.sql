@@ -21,7 +21,7 @@ VALUES
     'teste@finup.local',
     '2000-01-01',
     5000.00,
-    650,
+    65,
     'MODERATE'
   )
 ON CONFLICT DO NOTHING;

@@ -36,7 +36,7 @@ public record UserResponse(
     @Schema(description = "Perfil financeiro, se ja preenchido") FinancialProfile financialProfile,
     @Schema(
             description =
-                "Ultimo FinUp Score calculado, de 0 a 1000; ausente enquanto nenhum recalculo"
+                "Ultimo FinUp Score calculado, de 0 a 100; ausente enquanto nenhum recalculo"
                     + " teve dado suficiente")
         Integer finUpScore,
     @Schema(description = "Instante do cadastro, em UTC") Instant createdAt,

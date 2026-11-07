@@ -30,23 +30,23 @@ class InMemoryFinUpScoreDataProviderTest {
   private final FinUpScoreCalculator calculator = new FinUpScoreCalculator();
 
   @Test
-  @DisplayName("fixture do Exemplo A (fallback de estimativa) produz score 696")
+  @DisplayName("fixture do Exemplo A (fallback de estimativa) produz score 70")
   void exampleAFixtureProducesDocumentedScore() {
     assertThat(scoreFor(InMemoryFinUpScoreDataProvider.DEMO_FALLBACK_ESTIMATE_EMAIL, "5000"))
-        .isEqualTo(696);
+        .isEqualTo(70);
   }
 
   @Test
-  @DisplayName("fixture do Exemplo C (usuario saudavel) produz score 950")
+  @DisplayName("fixture do Exemplo C (usuario saudavel) produz score 95")
   void exampleCFixtureProducesDocumentedScore() {
-    assertThat(scoreFor(InMemoryFinUpScoreDataProvider.DEMO_HEALTHY_EMAIL, "8000")).isEqualTo(950);
+    assertThat(scoreFor(InMemoryFinUpScoreDataProvider.DEMO_HEALTHY_EMAIL, "8000")).isEqualTo(95);
   }
 
   @Test
-  @DisplayName("fixture do Exemplo D (usuario em dificuldade) produz score 106")
+  @DisplayName("fixture do Exemplo D (usuario em dificuldade) produz score 11")
   void exampleDFixtureProducesDocumentedScore() {
     assertThat(scoreFor(InMemoryFinUpScoreDataProvider.DEMO_STRUGGLING_EMAIL, "3000"))
-        .isEqualTo(106);
+        .isEqualTo(11);
   }
 
   @Test

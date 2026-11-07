@@ -17,14 +17,17 @@ import org.springframework.stereotype.Component;
 @Component
 public class FinUpScoreCalculator {
 
-  private static final double BUDGET_WEIGHT = 350;
-  private static final double DEBT_WEIGHT = 250;
-  private static final double INVESTMENT_WEIGHT = 200;
-  private static final double GOALS_WEIGHT = 100;
-  private static final double HABIT_WEIGHT = 100;
+  /** Escala do score: inteiro de 0 a 100. A soma dos pesos dos pilares e exatamente este teto. */
+  public static final int MAX_SCORE = 100;
+
+  private static final double BUDGET_WEIGHT = 35;
+  private static final double DEBT_WEIGHT = 25;
+  private static final double INVESTMENT_WEIGHT = 20;
+  private static final double GOALS_WEIGHT = 10;
+  private static final double HABIT_WEIGHT = 10;
 
   private static final double SAVINGS_RATE_CLAMP = 0.30;
-  private static final double LATE_DEBT_PENALTY = 75;
+  private static final double LATE_DEBT_PENALTY = 7.5;
   private static final double EMERGENCY_FUND_MONTHS = 6;
 
   private static final double GOALS_NEUTRAL = GOALS_WEIGHT / 2;
@@ -47,7 +50,7 @@ public class FinUpScoreCalculator {
             + goalsScore(inputs)
             + habitScore(inputs);
 
-    int score = (int) Math.round(clamp(total, 0, 1000));
+    int score = (int) Math.round(clamp(total, 0, MAX_SCORE));
     return new FinUpScoreResult.Computed(score);
   }
 
