@@ -148,6 +148,39 @@ class UserControllerTest {
   }
 
   @Test
+  @DisplayName("GET /me devolve o ultimo FinUp Score gravado")
+  void meReturnsPersistedFinUpScore() throws Exception {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
+    User user =
+        User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
+    user.updateFinUpScore(70);
+    when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
+    when(userService.recordAccess(identity)).thenReturn(user);
+
+    mockMvc
+        .perform(get("/api/v1/users/me"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.finUpScore").value(70));
+  }
+
+  @Test
+  @DisplayName("GET /me omite finUpScore enquanto o score nunca foi calculado")
+  void meOmitsFinUpScoreBeforeFirstCalculation() throws Exception {
+    AuthenticatedIdentity identity =
+        new AuthenticatedIdentity("cognito-sub-123", "Ana Souza", "ana@exemplo.com");
+    User user =
+        User.createFromCognitoIdentity(identity.cognitoId(), identity.name(), identity.email());
+    when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
+    when(userService.recordAccess(identity)).thenReturn(user);
+
+    mockMvc
+        .perform(get("/api/v1/users/me"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.finUpScore").doesNotExist());
+  }
+
+  @Test
   @DisplayName("GET /me antes da Etapa 1 devolve 404, e nao 500")
   void meBeforeCreationReturns404() throws Exception {
     AuthenticatedIdentity identity =

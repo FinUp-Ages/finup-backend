@@ -20,6 +20,9 @@ import java.util.UUID;
  * <p>{@code phone}, {@code profession}, {@code birthDate} e {@code monthlyIncome} vem de {@code
  * user_financial_profiles} e sao nulos ate as informacoes complementares serem preenchidas. {@code
  * financialProfile} ainda vem da tabela {@code users}.
+ *
+ * <p>{@code finUpScore} e o valor gravado em {@code users.fin_up_score} pelo ultimo recalculo com
+ * dado suficiente ({@code FinUpScoreService}). Ler o usuario nunca dispara recalculo.
  */
 @Schema(description = "Usuario cadastrado")
 public record UserResponse(
@@ -31,5 +34,10 @@ public record UserResponse(
     @Schema(description = "Data de nascimento, se ja informada") LocalDate birthDate,
     @Schema(description = "Renda mensal, se ja informada") BigDecimal monthlyIncome,
     @Schema(description = "Perfil financeiro, se ja preenchido") FinancialProfile financialProfile,
+    @Schema(
+            description =
+                "Ultimo FinUp Score calculado, de 0 a 100; ausente enquanto nenhum recalculo"
+                    + " teve dado suficiente")
+        Integer finUpScore,
     @Schema(description = "Instante do cadastro, em UTC") Instant createdAt,
     @Schema(description = "Instante da ultima atualizacao, em UTC") Instant updatedAt) {}

@@ -40,13 +40,13 @@ class FinUpScoreControllerTest {
   @DisplayName("score computado devolve 200 com status COMPUTED e o valor calculado")
   void computedScoreReturns200() throws Exception {
     when(authenticatedIdentityResolver.resolveCurrent()).thenReturn(identity);
-    when(finUpScoreService.recalculate(identity)).thenReturn(new FinUpScoreResult.Computed(696));
+    when(finUpScoreService.recalculate(identity)).thenReturn(new FinUpScoreResult.Computed(70));
 
     mockMvc
         .perform(post("/api/v1/users/me/finup-score/recalculate"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("COMPUTED"))
-        .andExpect(jsonPath("$.score").value(696));
+        .andExpect(jsonPath("$.score").value(70));
   }
 
   @Test

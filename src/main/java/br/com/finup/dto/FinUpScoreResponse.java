@@ -10,6 +10,5 @@ public record FinUpScoreResponse(
                 "COMPUTED quando o score foi calculado e persistido, "
                     + "INSUFFICIENT_DATA quando faltou dado obrigatorio")
         FinUpScoreStatus status,
-    @Schema(description = "Score de 0 a 1000; nulo quando status e INSUFFICIENT_DATA")
-        Integer score,
+    @Schema(description = "Score de 0 a 100; nulo quando status e INSUFFICIENT_DATA") Integer score,
     @Schema(description = "Detalhe legivel do resultado") String message) {}

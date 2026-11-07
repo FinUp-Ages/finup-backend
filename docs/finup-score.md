@@ -7,10 +7,13 @@
 
 ## 1. Escala
 
-Inteiro de **0 a 1000**, quanto maior melhor. Escolhida por analogia com score de crédito (ex.
-Serasa), familiar ao usuário brasileiro, e compatível com o valor fictício (`650`) já usado no
-seed de teste do banco (`database/init/03-test-data.sql`) — aquele valor é só um placeholder do
-fixture, não foi calculado por esta fórmula.
+Inteiro de **0 a 100**, quanto maior melhor (`FinUpScoreCalculator.MAX_SCORE`). A soma dos pesos
+dos 5 pilares é exatamente 100, então cada ponto do score equivale a um ponto de peso. O valor
+fictício (`65`) do seed de teste do banco (`database/init/03-test-data.sql`) é só um placeholder
+do fixture, não foi calculado por esta fórmula.
+
+A primeira versão usava 0 a 1000, com os mesmos pilares e pesos dez vezes maiores. Bancos criados
+antes da troca convertem os scores gravados com `database/migrations/08-finup-score-escala-0-100.sql`.
 
 ## 2. Dado obrigatório (gate global)
 
@@ -23,20 +26,20 @@ se nunca calculado). Não existe "score parcial" nesse caso.
 
 | # | Pilar | Peso | Tabelas/colunas de origem |
 |---|-------|-----:|-----------------|
-| 1 | Equilíbrio orçamentário (renda × gastos) | 350 | `users.monthly_income`, `transactions` (30 dias), `user_financial_profiles.monthly_expenses_estimate`, `.income_expense_relation` |
-| 2 | Endividamento | 250 | `debts.total_amount`, `.paid_amount`, `.status` |
-| 3 | Reserva / investimentos | 200 | `investments.current_amount`, `user_financial_profiles.has_investments`, `.approximate_invested_amount` |
-| 4 | Metas financeiras | 100 | `goals.target_amount`, `.current_amount`, `.status` |
-| 5 | Hábito financeiro autodeclarado | 100 | `user_financial_profiles.spending_habit` |
+| 1 | Equilíbrio orçamentário (renda × gastos) | 35 | `users.monthly_income`, `transactions` (30 dias), `user_financial_profiles.monthly_expenses_estimate`, `.income_expense_relation` |
+| 2 | Endividamento | 25 | `debts.total_amount`, `.paid_amount`, `.status` |
+| 3 | Reserva / investimentos | 20 | `investments.current_amount`, `user_financial_profiles.has_investments`, `.approximate_invested_amount` |
+| 4 | Metas financeiras | 10 | `goals.target_amount`, `.current_amount`, `.status` |
+| 5 | Hábito financeiro autodeclarado | 10 | `user_financial_profiles.spending_habit` |
 
 `FinUpScore = pilar1 + pilar2 + pilar3 + pilar4 + pilar5`, arredondado uma única vez no final (cada
-pilar já é limitado ao seu próprio intervalo, então a soma nunca sai de 0–1000).
+pilar já é limitado ao seu próprio intervalo, então a soma nunca sai de 0–100).
 
-### 3.1 Pilar 1 — Equilíbrio orçamentário (0–350)
+### 3.1 Pilar 1 — Equilíbrio orçamentário (0–35)
 
 ```
 savingsRate = (renda - gastos) / renda
-score1 = 350 * (clamp(savingsRate, -0.30, 0.30) + 0.30) / 0.60
+score1 = 35 * (clamp(savingsRate, -0.30, 0.30) + 0.30) / 0.60
 ```
 
 Fonte de "gastos", nesta ordem de prioridade:
@@ -46,32 +49,32 @@ Fonte de "gastos", nesta ordem de prioridade:
    suficiente.
 3. `user_financial_profiles.income_expense_relation`, convertida numa taxa assumida, se nenhuma
    das anteriores existir: `SPENDS_LESS` → +0,25, `BALANCED` → 0, `SPENDS_MORE` → -0,25.
-4. Se nada disso existir, o pilar usa o ponto neutro (175 = metade de 350).
+4. Se nada disso existir, o pilar usa o ponto neutro (17,5 = metade de 35).
 
 Poupar 30% ou mais da renda satura a nota máxima; gastar 30% a mais que a renda satura a nota
 mínima (zero) — faixa escolhida para que "gastar exatamente a renda" (savingsRate = 0) caia no meio
-da escala (175), nem bom nem ruim.
+da escala (17,5), nem bom nem ruim.
 
-### 3.2 Pilar 2 — Endividamento (0–250)
+### 3.2 Pilar 2 — Endividamento (0–25)
 
 ```
 saldoDevedor = soma(total_amount - paid_amount) das dívidas com status ativo ou atrasado
 ratio = clamp(saldoDevedor / (rendaMensal * 12), 0, 1)
-score2 = 250 * (1 - ratio)
-se alguma dívida tiver status = LATE: score2 = max(0, score2 - 75)
+score2 = 25 * (1 - ratio)
+se alguma dívida tiver status = LATE: score2 = max(0, score2 - 7.5)
 ```
 
 Sem dívida nenhuma, `ratio = 0` e o pilar atinge a nota máxima — ausência de dívida é um resultado
-real e positivo, não "dado faltando". A penalidade de atraso é fixa (75 pontos) e independente do
+real e positivo, não "dado faltando". A penalidade de atraso é fixa (7,5 pontos) e independente do
 valor devido: pesa o comportamento de pagamento, não só o tamanho da dívida.
 
-### 3.3 Pilar 3 — Reserva / investimentos (0–200)
+### 3.3 Pilar 3 — Reserva / investimentos (0–20)
 
 ```
 valorInvestido = soma(investments.current_amount); se não houver linhas em investments mas
                  user_financial_profiles.has_investments = true, usa .approximate_invested_amount
 mesesCobertos = valorInvestido / rendaMensal
-score3 = 200 * clamp(mesesCobertos / 6, 0, 1)
+score3 = 20 * clamp(mesesCobertos / 6, 0, 1)
 ```
 
 O teto de 6 meses segue a referência clássica de reserva de emergência. Sem investimento algum,
@@ -82,26 +85,26 @@ O teto de 6 meses segue a referência clássica de reserva de emergência. Sem i
 investidor, não de saúde financeira atual. Candidatos a uma versão futura (ex.: pequeno bônus por
 experiência), registrados aqui para não serem esquecidos.
 
-### 3.4 Pilar 4 — Metas financeiras (0–100)
+### 3.4 Pilar 4 — Metas financeiras (0–10)
 
 ```
 para cada goal com status IN_PROGRESS: progresso = min(current_amount / target_amount, 1)
 para cada goal com status COMPLETED: progresso = 1
 goals com status CANCELLED são ignoradas
-score4 = 100 * média(progresso)
+score4 = 10 * média(progresso)
 ```
 
 Sem nenhuma meta elegível (nenhuma meta cadastrada, ou só canceladas), o pilar usa o ponto neutro
-(50) — não ter meta não é penalizado.
+(5) — não ter meta não é penalizado.
 
-### 3.5 Pilar 5 — Hábito financeiro autodeclarado (0–100)
+### 3.5 Pilar 5 — Hábito financeiro autodeclarado (0–10)
 
 | `spending_habit` | Pontos |
 |---|---:|
-| `CONTROLLED` | 100 |
-| `MODERATE` | 60 |
-| `IMPULSIVE` | 20 |
-| *(não informado)* | 60 (neutro, igual a `MODERATE`) |
+| `CONTROLLED` | 10 |
+| `MODERATE` | 6 |
+| `IMPULSIVE` | 2 |
+| *(não informado)* | 6 (neutro, igual a `MODERATE`) |
 
 **Não usado nesta versão:** `users.financial_profile` (conservador/moderado/arrojado) reflete
 apetite a risco de investimento, não saúde financeira — um perfil "arrojado" não é pior que um
@@ -124,6 +127,10 @@ O usuário é sempre o dono da identidade autenticada (resolvida por
 `AuthenticatedIdentityResolver` a partir do access token do Cognito, ou dos headers
 `X-Mock-Cognito-*` no profile `mock-auth`) — nenhum endpoint recebe um id de usuário do
 cliente.
+
+O valor gravado em `users.fin_up_score` é lido pelo app em `GET /api/v1/users/me` (campo
+`finUpScore`, de 0 a 100). O campo fica ausente do JSON enquanto nenhum recálculo teve dado
+suficiente. A leitura nunca recalcula: ela só devolve o último valor persistido.
 
 Gatilhos pretendidos (a implementar quando os respectivos fluxos existirem, hoje fora do escopo
 desta tarefa): atualização de renda/perfil financeiro, e criação/edição/exclusão de transação,
@@ -151,42 +158,42 @@ com consultas reais — `FinUpScoreCalculator` e `FinUpScoreService` não mudam.
 
 | Exemplo | Renda | Gastos | Dívida ativa | Investido | Meta | Hábito | Pilares (1 / 2 / 3 / 4 / 5) | Total |
 |---|---:|---|---|---|---|---|---|---:|
-| A — fallback de estimativa | 5000 | 3000 (estimativa; sem histórico de transação suficiente) | 2000, em dia | 2150 | 1500/5000 em andamento | MODERATE | 350 / 241,67 / 14,33 / 30 / 60 | **696** |
+| A — fallback de estimativa | 5000 | 3000 (estimativa; sem histórico de transação suficiente) | 2000, em dia | 2150 | 1500/5000 em andamento | MODERATE | 35 / 24,17 / 1,43 / 3 / 6 | **70** |
 | B — sem renda cadastrada | — | — | — | — | — | — | — | `INSUFFICIENT_DATA` |
-| C — usuário saudável | 8000 | 5000 (estimativa) | nenhuma | 50000 | nenhuma | CONTROLLED | 350 / 250 / 200 / 50 / 100 | **950** |
-| D — usuário em dificuldade | 3000 | 3900 (estimativa) | 20000, com atraso | 0 | 1 cancelada (ignorada) | IMPULSIVE | 0 / 36,11 / 0 / 50 / 20 | **106** |
+| C — usuário saudável | 8000 | 5000 (estimativa) | nenhuma | 50000 | nenhuma | CONTROLLED | 35 / 25 / 20 / 5 / 10 | **95** |
+| D — usuário em dificuldade | 3000 | 3900 (estimativa) | 20000, com atraso | 0 | 1 cancelada (ignorada) | IMPULSIVE | 0 / 3,61 / 0 / 5 / 2 | **11** |
 
 ### Conta por extenso
 
 **Exemplo A** (reproduz o seed de teste `03-test-data.sql`, exceto pelo Score em si, que é
 recalculado por esta fórmula, não copiado do fixture):
-- `savingsRate = (5000 - 3000) / 5000 = 0,40` → clamp em `0,30` → `score1 = 350 * (0,30+0,30)/0,60 = 350`
-- `ratio = 2000 / (5000*12) = 0,0333` → `score2 = 250 * (1 - 0,0333) = 241,67` (sem atraso)
-- `mesesCobertos = 2150 / 5000 = 0,43` → `score3 = 200 * (0,43/6) = 14,33`
-- `score4 = 100 * (1500/5000) = 30`
-- `score5 = 60` (`MODERATE`)
-- **Total = 350 + 241,67 + 14,33 + 30 + 60 = 696**
+- `savingsRate = (5000 - 3000) / 5000 = 0,40` → clamp em `0,30` → `score1 = 35 * (0,30+0,30)/0,60 = 35`
+- `ratio = 2000 / (5000*12) = 0,0333` → `score2 = 25 * (1 - 0,0333) = 24,17` (sem atraso)
+- `mesesCobertos = 2150 / 5000 = 0,43` → `score3 = 20 * (0,43/6) = 1,43`
+- `score4 = 10 * (1500/5000) = 3`
+- `score5 = 6` (`MODERATE`)
+- **Total = 35 + 24,17 + 1,43 + 3 + 6 = 69,6 → arredonda para 70**
 
 **Exemplo B:** `users.monthly_income` nulo ou não positivo → `FinUpScoreCalculator` devolve
 `InsufficientData`, apontando o `PATCH /api/v1/users/me/additional-info`, antes de calcular qualquer
 pilar. A mensagem é voltada para quem chama a API, então não cita nome de coluna.
 
 **Exemplo C:**
-- `savingsRate = (8000-5000)/8000 = 0,375` → clamp em `0,30` → `score1 = 350`
-- sem dívida → `ratio = 0` → `score2 = 250`
-- `mesesCobertos = 50000/8000 = 6,25` → clamp em `1` (após dividir por 6) → `score3 = 200`
-- sem meta elegível → `score4 = 50` (neutro)
-- `score5 = 100` (`CONTROLLED`)
-- **Total = 350 + 250 + 200 + 50 + 100 = 950**
+- `savingsRate = (8000-5000)/8000 = 0,375` → clamp em `0,30` → `score1 = 35`
+- sem dívida → `ratio = 0` → `score2 = 25`
+- `mesesCobertos = 50000/8000 = 6,25` → clamp em `1` (após dividir por 6) → `score3 = 20`
+- sem meta elegível → `score4 = 5` (neutro)
+- `score5 = 10` (`CONTROLLED`)
+- **Total = 35 + 25 + 20 + 5 + 10 = 95**
 
 **Exemplo D:**
 - `savingsRate = (3000-3900)/3000 = -0,30` → já no limite → `score1 = 0`
-- `ratio = 20000/(3000*12) = 0,5556` → `score2 = 250*(1-0,5556) = 111,11`; há dívida em atraso →
-  `score2 = max(0, 111,11 - 75) = 36,11`
+- `ratio = 20000/(3000*12) = 0,5556` → `score2 = 25*(1-0,5556) = 11,11`; há dívida em atraso →
+  `score2 = max(0, 11,11 - 7,5) = 3,61`
 - sem investimento → `score3 = 0`
-- única meta está `CANCELLED` (ignorada) → sem meta elegível → `score4 = 50` (neutro)
-- `score5 = 20` (`IMPULSIVE`)
-- **Total = 0 + 36,11 + 0 + 50 + 20 = 106,11 → arredonda para 106**
+- única meta está `CANCELLED` (ignorada) → sem meta elegível → `score4 = 5` (neutro)
+- `score5 = 2` (`IMPULSIVE`)
+- **Total = 0 + 3,61 + 0 + 5 + 2 = 10,61 → arredonda para 11**
 
 Estes 4 casos são exatamente os usados em `FinUpScoreCalculatorTest` e nos fixtures de
 `InMemoryFinUpScoreDataProvider` (Exemplos A/C/D, ligados via e-mail aos usuários de demonstração

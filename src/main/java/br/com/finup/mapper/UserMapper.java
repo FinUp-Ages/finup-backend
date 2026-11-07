@@ -38,6 +38,7 @@ public final class UserMapper {
         profile != null ? profile.getBirthDate() : null,
         profile != null ? profile.getMonthlyIncome() : null,
         user.getFinancialProfile(),
+        user.getFinUpScore(),
         user.getCreatedAt(),
         latestUpdate(user, profile));
   }
