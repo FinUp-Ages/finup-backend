@@ -57,6 +57,11 @@ finup:
         GPT: ${BEDROCK_GPT_ID:openai.gpt-oss-120b-1:0}
         AMAZON_LITE: ${BEDROCK_AMAZON_ID:us.amazon.nova-2-lite-v1:0}
         MAGISTRAL: ${BEDROCK_MAGISTRAL_ID:mistral.magistral-small-2509}
+      # Guardrail contra prompt injection na mensagem do usuario, criado em infra/ (terraform
+      # output). Id vazio = desligado. A versao e obrigatoria quando ha id: nunca use DRAFT.
+      guardrail:
+        id: ${BEDROCK_GUARDRAIL_ID:}
+        version: ${BEDROCK_GUARDRAIL_VERSION:}
     chat-history:
       # Corpo das conversas do assistente (um JSON por conversa). Bucket vazio = memoria, so para
       # desenvolvimento: o historico some ao reiniciar. O bucket deve ser privado e criptografado.

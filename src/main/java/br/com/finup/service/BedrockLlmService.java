@@ -3,6 +3,7 @@ package br.com.finup.service;
 import br.com.finup.config.BedrockProperties;
 import br.com.finup.exception.AiProviderException;
 import br.com.finup.exception.BusinessException;
+import br.com.finup.exception.UnsafeAiInputException;
 import br.com.finup.model.AiModel;
 import java.util.Objects;
 import org.slf4j.Logger;
@@ -16,11 +17,15 @@ import software.amazon.awssdk.services.bedrockruntime.model.ContentBlock;
 import software.amazon.awssdk.services.bedrockruntime.model.ConversationRole;
 import software.amazon.awssdk.services.bedrockruntime.model.ConverseRequest;
 import software.amazon.awssdk.services.bedrockruntime.model.ConverseResponse;
+import software.amazon.awssdk.services.bedrockruntime.model.GuardrailConfiguration;
+import software.amazon.awssdk.services.bedrockruntime.model.GuardrailConverseContentBlock;
+import software.amazon.awssdk.services.bedrockruntime.model.GuardrailConverseTextBlock;
 import software.amazon.awssdk.services.bedrockruntime.model.InferenceConfiguration;
 import software.amazon.awssdk.services.bedrockruntime.model.Message;
 import software.amazon.awssdk.services.bedrockruntime.model.ModelNotReadyException;
 import software.amazon.awssdk.services.bedrockruntime.model.ModelTimeoutException;
 import software.amazon.awssdk.services.bedrockruntime.model.ServiceUnavailableException;
+import software.amazon.awssdk.services.bedrockruntime.model.StopReason;
 import software.amazon.awssdk.services.bedrockruntime.model.SystemContentBlock;
 import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
 import software.amazon.awssdk.services.bedrockruntime.model.ValidationException;
@@ -48,6 +53,38 @@ public class BedrockLlmService {
    * @throws AiProviderException se o Bedrock falhar ou devolver algo sem texto
    */
   public String invoke(String systemPrompt, String userMessage, AiModel model) {
+    return converse(systemPrompt, ContentBlock.fromText(userMessage), null, model);
+  }
+
+  /**
+   * Como {@link #invoke}, mas a mensagem passa antes pelo guardrail configurado. So ela e avaliada
+   * (guardContent): o prompt de sistema fica de fora. Sem guardrail configurado, equivale a {@link
+   * #invoke}.
+   *
+   * @throws UnsafeAiInputException se o guardrail bloquear a mensagem
+   */
+  public String invokeGuarded(String systemPrompt, String userMessage, AiModel model) {
+    BedrockProperties.Guardrail guardrail = properties.guardrail();
+    if (guardrail == null || !guardrail.enabled()) {
+      return invoke(systemPrompt, userMessage, model);
+    }
+    ContentBlock guarded =
+        ContentBlock.fromGuardContent(
+            GuardrailConverseContentBlock.fromText(
+                GuardrailConverseTextBlock.builder().text(userMessage).build()));
+    GuardrailConfiguration config =
+        GuardrailConfiguration.builder()
+            .guardrailIdentifier(guardrail.id())
+            .guardrailVersion(guardrail.version())
+            .build();
+    return converse(systemPrompt, guarded, config, model);
+  }
+
+  private String converse(
+      String systemPrompt,
+      ContentBlock userContent,
+      GuardrailConfiguration guardrailConfig,
+      AiModel model) {
     AiModel selected = model != null ? model : properties.defaultModel();
     String modelId = resolveModelId(selected);
 
@@ -55,23 +92,27 @@ public class BedrockLlmService {
         ConverseRequest.builder()
             .modelId(modelId)
             .system(SystemContentBlock.fromText(systemPrompt))
-            .messages(
-                Message.builder()
-                    .role(ConversationRole.USER)
-                    .content(ContentBlock.fromText(userMessage))
-                    .build())
+            .messages(Message.builder().role(ConversationRole.USER).content(userContent).build())
             .inferenceConfig(
                 InferenceConfiguration.builder()
                     .maxTokens(properties.maxTokens())
                     .temperature(0f)
                     .build())
+            .guardrailConfig(guardrailConfig)
             .build();
 
+    ConverseResponse response;
     try {
-      return extractText(client.converse(request));
+      response = client.converse(request);
     } catch (SdkException e) {
       throw translate(e, selected);
     }
+    if (response.stopReason() == StopReason.GUARDRAIL_INTERVENED) {
+      // Sem o texto: o log nao pode guardar o que o usuario digitou.
+      log.info("Guardrail bloqueou a mensagem do usuario (model={})", selected);
+      throw new UnsafeAiInputException();
+    }
+    return extractText(response);
   }
 
   private String resolveModelId(AiModel model) {

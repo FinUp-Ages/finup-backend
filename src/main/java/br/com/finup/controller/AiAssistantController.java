@@ -60,7 +60,9 @@ public class AiAssistantController {
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
     @ApiResponse(
         responseCode = "422",
-        description = "Texto nao entendido ou dados insuficientes (categoria, valor)",
+        description =
+            "Texto nao entendido, dados insuficientes (categoria, valor) ou mensagem barrada"
+                + " pelo guardrail contra prompt injection",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
     @ApiResponse(
         responseCode = "429",
