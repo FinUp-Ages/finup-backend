@@ -6,6 +6,7 @@ import br.com.finup.dto.CategoryResponse;
 import br.com.finup.exception.ConflictException;
 import br.com.finup.exception.ForbiddenOperationException;
 import br.com.finup.exception.ResourceNotFoundException;
+import br.com.finup.exception.UnsafeAiInputException;
 import br.com.finup.mapper.CategoryMapper;
 import br.com.finup.model.Category;
 import br.com.finup.model.User;
@@ -23,17 +24,26 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CategoryService {
 
+  static final String BLOCKED_NAME_MESSAGE =
+      "Esse nome de categoria nao e permitido. Use um nome curto, como \"Mercado\".";
+
   private final CategoryRepository categoryRepository;
   private final UserService userService;
+  private final PromptAttackGuard promptAttackGuard;
 
-  public CategoryService(CategoryRepository categoryRepository, UserService userService) {
+  public CategoryService(
+      CategoryRepository categoryRepository,
+      UserService userService,
+      PromptAttackGuard promptAttackGuard) {
     this.categoryRepository = categoryRepository;
     this.userService = userService;
+    this.promptAttackGuard = promptAttackGuard;
   }
 
   @Transactional
   public CategoryResponse create(AuthenticatedIdentity identity, CategoryRequest request) {
     User user = userService.findByAuthenticatedIdentity(identity);
+    requireSafeName(request.name());
     Category category = Category.createForUser(user, request.name(), request.type());
     return CategoryMapper.toResponse(categoryRepository.save(category));
   }
@@ -48,6 +58,9 @@ public class CategoryService {
       throw new ForbiddenOperationException("Não é possível editar uma categoria padrão");
     }
     ensureOwnedByUser(user, category);
+    if (!request.name().equals(category.getName())) {
+      requireSafeName(request.name());
+    }
 
     category.rename(request.name(), request.type());
     return CategoryMapper.toResponse(categoryRepository.save(category));
@@ -107,6 +120,16 @@ public class CategoryService {
     User owner = category.getUser();
     if (owner == null || !owner.getId().equals(user.getId())) {
       throw new ResourceNotFoundException("Categoria nao encontrada: " + category.getId());
+    }
+  }
+
+  /**
+   * O nome da categoria entra nos prompts do assistente e do consultor: instrucao plantada nele
+   * seria lida pelo modelo em toda conversa. Por isso passa pelo guardrail antes de ser gravado.
+   */
+  private void requireSafeName(String name) {
+    if (promptAttackGuard.isAttack(name)) {
+      throw new UnsafeAiInputException(BLOCKED_NAME_MESSAGE);
     }
   }
 }
