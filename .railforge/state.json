@@ -8,7 +8,7 @@
     "Cada caso usa um usuario novo; uma vitima por execucao com despesa marcada para detectar acesso ou alteracao entre usuarios",
     "Checagem automatica de status, transacoes novas, vazamento de trechos dos prompts e conta da vitima; texto livre do modelo fica como REVISAR para leitura manual",
     "Execucao com e sem guardrail, para separar o que o guardrail barra do que o modelo e o backend seguram sozinhos",
-    "Bugs registrados no README do roteiro (B1 a B4); registro como issues e vinculo na task 86e3m95y8 dependem de autorizacao"
+    "Bugs B1 a B4 registrados como cards [ BUG ] no ClickUp (1dfcuabcy29, 1dfcuabcy2a, 1dfcuabcy2b, 1dfcuabcy2c), status refinado, vinculados a task de correcao 86e3m95y8 e a task de QA 86e3m95k3; links no README do roteiro"
   ],
   "files_in_scope": [
     "docs/qa/ia-injection-jailbreak/README.md",
@@ -29,10 +29,9 @@
     "nenhum ataque": "criou transacao indevida, alterou ou expos dados de outro usuario, com ou sem guardrail",
     "ambiente": "banco local sem a tabela spending_alert_dismissals (volume anterior ao schema atual); criada a partir de database/init/01-schema.sql, sem recriar o volume"
   },
-  "review": "Roteiro, executor e relatorios prontos. Bugs B1 (alta) a B4 (baixa) documentados no README. Pendente: revisao com o time, registrar os bugs como issues e vincular na task 86e3m95y8, commit e PR (nao autorizados ainda).",
+  "review": "Roteiro, executor e relatorios no PR #66 (empilhado sobre o #65). Bugs B1 a B4 registrados no ClickUp e vinculados a task 86e3m95y8. Pendente: revisao dos resultados com o time e merge.",
   "updated_at": "2026-11-11",
   "open_questions": [
-    "Onde registrar os bugs: issues do GitHub, tasks/subtasks no ClickUp ou ambos",
     "Risco fora do escopo: a API usa uma access key com permissoes amplas, a mesma usada para administrar a conta",
     "State remoto do Terraform (bucket S3 + lock) para o time"
   ]
