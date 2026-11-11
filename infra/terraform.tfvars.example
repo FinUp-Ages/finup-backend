@@ -1,0 +1,9 @@
+# Copie para terraform.tfvars (nao versionado) e ajuste.
+aws_region  = "us-east-2"
+aws_profile = "finup-admin"
+
+guardrail_prompt_attack_strength = "HIGH"
+
+# Preencha so o principal que a API realmente usa (ver infra/README.md).
+# app_iam_user_name = "finup-api"
+# app_iam_role_name = "finup-api-ec2"

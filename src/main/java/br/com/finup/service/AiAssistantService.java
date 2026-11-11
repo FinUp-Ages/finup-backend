@@ -32,7 +32,9 @@ import org.springframework.stereotype.Service;
  * do usuario — nunca e-mail, nome ou identificadores. O texto nao e logado.
  *
  * <p>Seguranca: o texto do usuario e tratado como dado (vai como mensagem, nao no prompt de
- * sistema) e a saida do modelo passa pela validacao de cada acao antes de tocar no banco.
+ * sistema), passa pelo guardrail do Bedrock contra prompt injection quando configurado e a saida do
+ * modelo passa pela validacao de cada acao antes de tocar no banco. O guardrail roda so aqui: as
+ * acoes chamam o modelo de novo com a mesma mensagem, ja avaliada.
  */
 @Service
 public class AiAssistantService {
@@ -74,7 +76,8 @@ public class AiAssistantService {
     LocalDate today = LocalDate.now(clock);
 
     String raw =
-        llmService.invoke(buildSystemPrompt(today, categories), request.message(), request.model());
+        llmService.invokeGuarded(
+            buildSystemPrompt(today, categories), request.message(), request.model());
     JsonNode payload = parse(raw);
 
     String actionName = payload.path("action").asText(UNKNOWN);

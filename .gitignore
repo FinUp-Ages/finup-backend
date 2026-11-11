@@ -13,3 +13,11 @@ target/
 
 # Token gerado pelos scripts locais do Cognito
 .finup-token.txt
+
+# Terraform (infra/): o lock file e versionado; state, planos e tfvars nao.
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/*.tfplan
+infra/terraform.tfvars
+infra/crash.log
