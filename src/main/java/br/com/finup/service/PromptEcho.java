@@ -18,13 +18,21 @@ final class PromptEcho {
 
   /** {@code true} se {@code text} tiver {@value #MIN_WORDS} ou mais palavras seguidas do prompt. */
   static boolean repeats(String text, String prompt) {
+    return repeats(text, prompt, MIN_WORDS);
+  }
+
+  /**
+   * Como {@link #repeats(String, String)}, com outro minimo: use um maior quando o prompt manda o
+   * modelo dizer frases dele mesmo.
+   */
+  static boolean repeats(String text, String prompt, int minWords) {
     List<String> words = words(text);
-    if (words.size() < MIN_WORDS) {
+    if (words.size() < minWords) {
       return false;
     }
     String haystack = " " + String.join(" ", words(prompt)) + " ";
-    for (int i = 0; i + MIN_WORDS <= words.size(); i++) {
-      String window = " " + String.join(" ", words.subList(i, i + MIN_WORDS)) + " ";
+    for (int i = 0; i + minWords <= words.size(); i++) {
+      String window = " " + String.join(" ", words.subList(i, i + minWords)) + " ";
       if (haystack.contains(window)) {
         return true;
       }
