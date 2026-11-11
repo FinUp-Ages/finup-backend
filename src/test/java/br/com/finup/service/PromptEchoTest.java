@@ -35,4 +35,12 @@ class PromptEchoTest {
         .isFalse();
     assertThat(PromptEcho.repeats(null, PROMPT)).isFalse();
   }
+
+  @Test
+  @DisplayName("com minimo maior, trecho curto deixa de contar como eco")
+  void customMinimum() {
+    String excerpt = "Voce e o assistente financeiro do app FinUp";
+    assertThat(PromptEcho.repeats(excerpt, PROMPT, 6)).isTrue();
+    assertThat(PromptEcho.repeats(excerpt, PROMPT, 12)).isFalse();
+  }
 }
