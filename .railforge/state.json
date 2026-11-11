@@ -54,7 +54,7 @@
     "C2.2 (B3) apos a correcao": "5/5 execucoes seguidas com guardrail e 5/5 sem; o modelo ainda tenta (log 'Modelo repetiu o prompt de sistema') e o backend usa a mensagem original",
     "falso positivo encontrado nos testes": "nome de categoria legitimo com 6+ palavras aparece no prompt; o campo category ficou fora da checagem de eco"
   },
-  "review": "B1, B2 e B3 corrigidos e validados com e sem guardrail; diff revisado. Pendente: commit e PR (aguardando autorizacao), atualizar os cards no ClickUp. B4 segue aberto.",
+  "review": "B1, B2 e B3 corrigidos e validados com e sem guardrail; diff revisado. Commit 596bd98 e PR #67 (base test/qa-ia-injection-jailbreak, ordem de merge #65, #66, #67) autorizados e abertos em 2026-11-11; CI verde. Cards B1, B2 e B3 em codereview no ClickUp. B4 segue aberto.",
   "updated_at": "2026-11-11",
   "open_questions": [
     "Risco fora do escopo: a API usa uma access key com permissoes amplas, a mesma usada para administrar a conta",
