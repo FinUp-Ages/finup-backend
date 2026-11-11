@@ -64,6 +64,10 @@ public class CategoryController {
     @ApiResponse(
         responseCode = "404",
         description = "Usuário não encontrado",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
+        responseCode = "422",
+        description = "Nome barrado pelo guardrail contra prompt injection",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   })
   public ResponseEntity<CategoryResponse> create(@Valid @RequestBody CategoryRequest request) {
@@ -91,6 +95,10 @@ public class CategoryController {
     @ApiResponse(
         responseCode = "404",
         description = "Categoria não encontrada ou não pertence ao usuário",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(
+        responseCode = "422",
+        description = "Nome barrado pelo guardrail contra prompt injection",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   })
   public ResponseEntity<CategoryResponse> update(

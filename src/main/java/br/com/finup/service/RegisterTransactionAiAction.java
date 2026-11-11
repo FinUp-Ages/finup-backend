@@ -27,7 +27,9 @@ public class RegisterTransactionAiAction implements AiAction {
   public static final String NAME = "REGISTER_TRANSACTION";
 
   private static final BigDecimal MAX_AMOUNT = new BigDecimal("9999999999.99");
-  private static final int MAX_DESCRIPTION = 255;
+
+  /** O prompt pede ate 100 caracteres; o codigo garante, sem depender do modelo. */
+  static final int MAX_DESCRIPTION = 100;
 
   private final TransactionService transactionService;
 
@@ -105,10 +107,16 @@ public class RegisterTransactionAiAction implements AiAction {
   }
 
   private Category findCategory(Context context, TransactionType type, JsonNode node) {
-    String wanted = normalize(node.isNull() ? "" : node.asText(""));
+    // Sem as aspas com que o nome aparece no prompt, caso o modelo as repita.
+    String wanted =
+        normalize(node.isNull() ? "" : node.asText("").replaceAll("^\\s*\"|\"\\s*$", ""));
     return context.categories().stream()
         .filter(category -> category.getType() == type)
-        .filter(category -> normalize(category.getName()).equals(wanted))
+        // O prompt mostra o nome cortado (UntrustedText): o modelo pode devolver essa forma.
+        .filter(
+            category ->
+                normalize(category.getName()).equals(wanted)
+                    || normalize(UntrustedText.categoryName(category.getName())).equals(wanted))
         .findFirst()
         .orElseThrow(
             () ->
