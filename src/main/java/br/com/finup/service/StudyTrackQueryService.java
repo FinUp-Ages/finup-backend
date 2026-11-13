@@ -56,7 +56,7 @@ public class StudyTrackQueryService {
       throw new ResourceNotFoundException("Categoria da trilha não encontrada: " + categoryId);
     }
     return questionRepository
-        .findByCategoryIdAndPublishedIsNotNullOrderByCreatedAtAsc(categoryId)
+        .findByCategoryIdAndPublishedIsNotNullOrderByCreatedAtAscIdAsc(categoryId)
         .stream()
         .map(question -> new StudyTrackQuestionResponse(question.getId(), question.getPublished()))
         .toList();
