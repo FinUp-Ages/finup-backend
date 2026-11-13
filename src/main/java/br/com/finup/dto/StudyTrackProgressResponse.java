@@ -1,5 +1,6 @@
 package br.com.finup.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.UUID;
@@ -7,11 +8,15 @@ import java.util.UUID;
 /**
  * Progresso do usuário na trilha (Contrato C6). Só contam as respostas de perguntas publicadas
  * hoje; cada pergunta publicada é um nível, na ordem de {@code GET /categories/{id}/questions}.
+ *
+ * <p>Nulos saem explícitos ({@code ALWAYS}, contra o {@code non_null} global): {@code stars} e
+ * {@code correct} nulos significam "sem nota", e o app distingue isso de campo ausente.
  */
 @Schema(description = "Progresso do usuário autenticado na trilha de estudos")
 public record StudyTrackProgressResponse(List<CategoryProgress> categories, Progress total) {
 
   @Schema(description = "Progresso em uma categoria")
+  @JsonInclude(JsonInclude.Include.ALWAYS)
   public record CategoryProgress(
       UUID categoryId,
       @Schema(description = "Perguntas publicadas (níveis) da categoria") int totalQuestions,
@@ -37,6 +42,7 @@ public record StudyTrackProgressResponse(List<CategoryProgress> categories, Prog
           List<LevelProgress> levels) {}
 
   @Schema(description = "Situação de um nível (pergunta publicada)")
+  @JsonInclude(JsonInclude.Include.ALWAYS)
   public record LevelProgress(
       @Schema(description = "Número do nível, a partir de 1") int level,
       UUID questionId,
@@ -52,6 +58,7 @@ public record StudyTrackProgressResponse(List<CategoryProgress> categories, Prog
           Integer stars) {}
 
   @Schema(description = "Progresso somado de todas as categorias")
+  @JsonInclude(JsonInclude.Include.ALWAYS)
   public record Progress(
       int totalQuestions,
       int answeredQuestions,

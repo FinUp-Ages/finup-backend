@@ -121,6 +121,11 @@ não há estrelas.
 A regra de estrelas por nível (3/1) é provisória até a confirmação do design (Figma,
 nó 185-20958).
 
+Nulos: no `GET /progress` os campos nulos (`stars`, `levels[].correct`,
+`levels[].stars`) vêm explícitos como `null`. Nas respostas do `POST /answers` e do
+`GET /answers` vale a configuração global da API (`non_null`): `stars` e `correct`
+nulos são omitidos, e o cliente deve tratar campo ausente como `null`.
+
 ## GET `/answers`
 
 Lista as respostas gravadas do usuário, agrupadas por categoria, com `stars`,

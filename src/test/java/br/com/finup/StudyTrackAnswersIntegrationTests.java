@@ -1,6 +1,8 @@
 package br.com.finup;
 
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -134,7 +136,9 @@ class StudyTrackAnswersIntegrationTests {
         .andExpect(jsonPath("$.categories[0].answeredQuestions").value(0))
         .andExpect(jsonPath("$.categories[0].currentLevel").value(1))
         .andExpect(jsonPath("$.categories[0].completionPercentage").value(0.0))
-        .andExpect(jsonPath("$.categories[0].stars").doesNotExist())
+        .andExpect(jsonPath("$.categories[0]", hasKey("stars")))
+        .andExpect(jsonPath("$.categories[0].stars").value(nullValue()))
+        .andExpect(jsonPath("$.categories[0].levels[0]", hasKey("correct")))
         .andExpect(jsonPath("$.categories[0].levels", hasSize(3)))
         .andExpect(jsonPath("$.total.completionPercentage").value(0.0));
   }
@@ -193,7 +197,8 @@ class StudyTrackAnswersIntegrationTests {
         .andExpect(jsonPath("$.categories[0].answeredQuestions").value(3))
         .andExpect(jsonPath("$.categories[0].currentLevel").value(3))
         .andExpect(jsonPath("$.categories[0].completionPercentage").value(100.0))
-        .andExpect(jsonPath("$.categories[0].levels[2].stars").doesNotExist());
+        .andExpect(jsonPath("$.categories[0].levels[2]", hasKey("stars")))
+        .andExpect(jsonPath("$.categories[0].levels[2].stars").value(nullValue()));
   }
 
   @Test
