@@ -10,16 +10,20 @@ import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 /**
  * "Gastei 7 reais na PUCRS" vira uma transacao EXPENSE de 7,00 na categoria Educacao, registrada
  * pelo mesmo {@link TransactionService} usado pelo endpoint tradicional.
  *
- * <p>O modelo so sugere; quem decide e este codigo: a categoria precisa ser do usuario (propria ou
- * padrao) e compativel com o tipo, o valor precisa ser positivo e caber na coluna, e a data nao
- * pode ser futura.
+ * <p>O modelo so sugere; quem decide e este codigo: o valor precisa ser positivo e caber na coluna,
+ * e a data nao pode ser futura. A categoria e a do usuario (propria ou padrao) com o nome sugerido
+ * e o mesmo tipo; se nao existir nenhuma com esse nome, e criada para o usuario, desde que o nome
+ * seja curto e passe pelo guardrail. Nome que ja existe com o outro tipo e recusado, para nao
+ * duplicar "Salario" como despesa.
  */
 @Component
 public class RegisterTransactionAiAction implements AiAction {
@@ -31,10 +35,22 @@ public class RegisterTransactionAiAction implements AiAction {
   /** O prompt pede ate 100 caracteres; o codigo garante, sem depender do modelo. */
   static final int MAX_DESCRIPTION = 100;
 
-  private final TransactionService transactionService;
+  /** Nome de categoria nova: curto como no prompt, sem espaco para um comando completo. */
+  static final int MAX_NEW_CATEGORY = UntrustedText.CATEGORY_NAME_MAX;
 
-  public RegisterTransactionAiAction(TransactionService transactionService) {
+  static final int MAX_NEW_CATEGORY_WORDS = 4;
+
+  /** Letras, numeros, espaco, hifen e "&"; sem pontuacao que separe frases. */
+  private static final Pattern NEW_CATEGORY_NAME =
+      Pattern.compile("[\\p{L}\\p{N}][\\p{L}\\p{N} &-]*");
+
+  private final TransactionService transactionService;
+  private final CategoryService categoryService;
+
+  public RegisterTransactionAiAction(
+      TransactionService transactionService, CategoryService categoryService) {
     this.transactionService = transactionService;
+    this.categoryService = categoryService;
   }
 
   @Override
@@ -47,8 +63,19 @@ public class RegisterTransactionAiAction implements AiAction {
     return """
         %s: o usuario relata um gasto (gastei, paguei, comprei) ou um ganho (recebi, ganhei) que JA ACONTECEU. Perguntas como "posso gastar?" nao sao registro.
         Formato: {"action":"%s","type":"EXPENSE|INCOME","amount":<numero positivo>,\
-        "category":"<nome exato de uma categoria da lista com o mesmo tipo, ou null se nenhuma servir>",\
-        "description":"<resumo de ate 100 caracteres>","date":"<YYYY-MM-DD, ou null se nao informada>"}"""
+        "category":"<nome da categoria>",\
+        "description":"<resumo de ate 100 caracteres>","date":"<YYYY-MM-DD, ou null se nao informada>"}
+        Como escolher "category":
+          1. Se o usuario disser a categoria (ex.: "na categoria Pets"), use esse nome, mesmo que nao \
+        esteja na lista: ela sera criada.
+          2. Senao, use uma categoria da lista com o mesmo tipo SO se ela descrever de fato o gasto ou \
+        ganho. Pense em para quem ou para que e o gasto, nao so no tipo do item: tudo de animal de \
+        estimacao (racao, veterinario, petshop) e Pets, nao Alimentação nem Saúde; corte de cabelo \
+        nao e Lazer. Na duvida, nao force uma categoria da lista: va para o passo 3.
+          3. Se nenhuma da lista descrever, use um nome novo, curto e generico, de 1 a 3 palavras, em \
+        portugues do Brasil com a acentuacao correta e com inicial maiuscula (ex.: Pets, Cuidados \
+        pessoais, Presentes, Educação, Transferência, Freelance). Ele sera criado e reaproveitado nas proximas vezes: use o nome da categoria, \
+        nunca o do item (Pets, nao Racao)."""
         .formatted(NAME, NAME);
   }
 
@@ -56,9 +83,11 @@ public class RegisterTransactionAiAction implements AiAction {
   public Result execute(Context context, JsonNode payload) {
     TransactionType type = parseType(payload.path("type"));
     BigDecimal amount = parseAmount(payload.path("amount"));
-    Category category = findCategory(context, type, payload.path("category"));
     LocalDate date = parseDate(payload.path("date"), context.today());
     String description = parseDescription(payload.path("description"), context.originalMessage());
+    String categoryName = parseCategoryName(payload.path("category"));
+    Category existing = findCategory(context, type, categoryName);
+    Category category = existing != null ? existing : createCategory(context, type, categoryName);
 
     Transaction transaction =
         transactionService.register(
@@ -73,11 +102,12 @@ public class RegisterTransactionAiAction implements AiAction {
             null);
 
     String message =
-        "%s de R$ %s registrada em %s."
+        "%s de R$ %s registrada em %s%s."
             .formatted(
                 type == TransactionType.EXPENSE ? "Despesa" : "Receita",
                 amount.toPlainString(),
-                category.getName());
+                category.getName(),
+                existing == null ? " (categoria criada agora)" : "");
     return new Result(message, transaction);
   }
 
@@ -106,21 +136,54 @@ public class RegisterTransactionAiAction implements AiAction {
     return amount;
   }
 
-  private Category findCategory(Context context, TransactionType type, JsonNode node) {
-    // Sem as aspas com que o nome aparece no prompt, caso o modelo as repita.
-    String wanted =
-        normalize(node.isNull() ? "" : node.asText("").replaceAll("^\\s*\"|\"\\s*$", ""));
-    return context.categories().stream()
+  /** Nome sugerido, sem as aspas com que aparece no prompt e com espacos colapsados. */
+  private static String parseCategoryName(JsonNode node) {
+    String text = node.isNull() ? "" : node.asText("");
+    return text.replaceAll("^\\s*\"|\"\\s*$", "").replaceAll("\\s+", " ").strip();
+  }
+
+  /**
+   * A categoria do usuario com esse nome e tipo, ou {@code null} se nenhuma tiver o nome. Nome que
+   * so existe com o outro tipo e recusado.
+   */
+  private Category findCategory(Context context, TransactionType type, String name) {
+    String wanted = normalize(name);
+    if (wanted.isEmpty()) {
+      throw noCompatibleCategory();
+    }
+    // O prompt mostra o nome cortado (UntrustedText): o modelo pode devolver essa forma.
+    List<Category> sameName =
+        context.categories().stream()
+            .filter(
+                category ->
+                    normalize(category.getName()).equals(wanted)
+                        || normalize(UntrustedText.categoryName(category.getName())).equals(wanted))
+            .toList();
+    if (sameName.isEmpty()) {
+      return null;
+    }
+    return sameName.stream()
         .filter(category -> category.getType() == type)
-        // O prompt mostra o nome cortado (UntrustedText): o modelo pode devolver essa forma.
-        .filter(
-            category ->
-                normalize(category.getName()).equals(wanted)
-                    || normalize(UntrustedText.categoryName(category.getName())).equals(wanted))
         .findFirst()
-        .orElseThrow(
-            () ->
-                unprocessable("Nao encontrei uma categoria compativel. Escolha uma manualmente."));
+        .orElseThrow(RegisterTransactionAiAction::noCompatibleCategory);
+  }
+
+  /**
+   * O nome vem do modelo e vai entrar nos prompts seguintes: so nomes curtos, de poucas palavras e
+   * sem pontuacao viram categoria. O guardrail roda no {@link CategoryService}.
+   */
+  private Category createCategory(Context context, TransactionType type, String name) {
+    if (name.length() > MAX_NEW_CATEGORY
+        || name.split(" ").length > MAX_NEW_CATEGORY_WORDS
+        || !NEW_CATEGORY_NAME.matcher(name).matches()) {
+      throw noCompatibleCategory();
+    }
+    String capitalized = name.substring(0, 1).toUpperCase(Locale.ROOT) + name.substring(1);
+    return categoryService.createSuggested(context.user(), capitalized, type);
+  }
+
+  private static BusinessException noCompatibleCategory() {
+    return unprocessable("Nao encontrei uma categoria compativel. Escolha uma manualmente.");
   }
 
   private LocalDate parseDate(JsonNode node, LocalDate today) {

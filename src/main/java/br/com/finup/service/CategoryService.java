@@ -9,6 +9,7 @@ import br.com.finup.exception.ResourceNotFoundException;
 import br.com.finup.exception.UnsafeAiInputException;
 import br.com.finup.mapper.CategoryMapper;
 import br.com.finup.model.Category;
+import br.com.finup.model.TransactionType;
 import br.com.finup.model.User;
 import br.com.finup.repository.CategoryRepository;
 import br.com.finup.security.AuthenticatedIdentity;
@@ -46,6 +47,16 @@ public class CategoryService {
     requireSafeName(request.name());
     Category category = Category.createForUser(user, request.name(), request.type());
     return CategoryMapper.toResponse(categoryRepository.save(category));
+  }
+
+  /**
+   * Cria a categoria que o assistente de IA sugeriu ao registrar uma transacao. O nome vem da saida
+   * do modelo, entao passa pelo mesmo guardrail do cadastro manual.
+   */
+  @Transactional
+  public Category createSuggested(User user, String name, TransactionType type) {
+    requireSafeName(name);
+    return categoryRepository.save(Category.createForUser(user, name, type));
   }
 
   @Transactional
