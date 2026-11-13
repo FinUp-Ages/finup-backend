@@ -7,12 +7,10 @@ import br.com.finup.model.TransactionType;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
-import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 /**
@@ -34,15 +32,6 @@ public class RegisterTransactionAiAction implements AiAction {
 
   /** O prompt pede ate 100 caracteres; o codigo garante, sem depender do modelo. */
   static final int MAX_DESCRIPTION = 100;
-
-  /** Nome de categoria nova: curto como no prompt, sem espaco para um comando completo. */
-  static final int MAX_NEW_CATEGORY = UntrustedText.CATEGORY_NAME_MAX;
-
-  static final int MAX_NEW_CATEGORY_WORDS = 4;
-
-  /** Letras, numeros, espaco, hifen e "&"; sem pontuacao que separe frases. */
-  private static final Pattern NEW_CATEGORY_NAME =
-      Pattern.compile("[\\p{L}\\p{N}][\\p{L}\\p{N} &-]*");
 
   private final TransactionService transactionService;
   private final CategoryService categoryService;
@@ -85,7 +74,7 @@ public class RegisterTransactionAiAction implements AiAction {
     BigDecimal amount = parseAmount(payload.path("amount"));
     LocalDate date = parseDate(payload.path("date"), context.today());
     String description = parseDescription(payload.path("description"), context.originalMessage());
-    String categoryName = parseCategoryName(payload.path("category"));
+    String categoryName = AiCategoryNames.parse(payload.path("category"));
     Category existing = findCategory(context, type, categoryName);
     Category category = existing != null ? existing : createCategory(context, type, categoryName);
 
@@ -136,29 +125,15 @@ public class RegisterTransactionAiAction implements AiAction {
     return amount;
   }
 
-  /** Nome sugerido, sem as aspas com que aparece no prompt e com espacos colapsados. */
-  private static String parseCategoryName(JsonNode node) {
-    String text = node.isNull() ? "" : node.asText("");
-    return text.replaceAll("^\\s*\"|\"\\s*$", "").replaceAll("\\s+", " ").strip();
-  }
-
   /**
    * A categoria do usuario com esse nome e tipo, ou {@code null} se nenhuma tiver o nome. Nome que
    * so existe com o outro tipo e recusado.
    */
   private Category findCategory(Context context, TransactionType type, String name) {
-    String wanted = normalize(name);
-    if (wanted.isEmpty()) {
+    if (name.isEmpty()) {
       throw noCompatibleCategory();
     }
-    // O prompt mostra o nome cortado (UntrustedText): o modelo pode devolver essa forma.
-    List<Category> sameName =
-        context.categories().stream()
-            .filter(
-                category ->
-                    normalize(category.getName()).equals(wanted)
-                        || normalize(UntrustedText.categoryName(category.getName())).equals(wanted))
-            .toList();
+    List<Category> sameName = AiCategoryNames.withName(context.categories(), name);
     if (sameName.isEmpty()) {
       return null;
     }
@@ -168,18 +143,12 @@ public class RegisterTransactionAiAction implements AiAction {
         .orElseThrow(RegisterTransactionAiAction::noCompatibleCategory);
   }
 
-  /**
-   * O nome vem do modelo e vai entrar nos prompts seguintes: so nomes curtos, de poucas palavras e
-   * sem pontuacao viram categoria. O guardrail roda no {@link CategoryService}.
-   */
+  /** Cria a categoria sugerida, se o nome for aceitavel ({@link AiCategoryNames}). */
   private Category createCategory(Context context, TransactionType type, String name) {
-    if (name.length() > MAX_NEW_CATEGORY
-        || name.split(" ").length > MAX_NEW_CATEGORY_WORDS
-        || !NEW_CATEGORY_NAME.matcher(name).matches()) {
+    if (!AiCategoryNames.isAcceptable(name)) {
       throw noCompatibleCategory();
     }
-    String capitalized = name.substring(0, 1).toUpperCase(Locale.ROOT) + name.substring(1);
-    return categoryService.createSuggested(context.user(), capitalized, type);
+    return categoryService.createSuggested(context.user(), AiCategoryNames.capitalize(name), type);
   }
 
   private static BusinessException noCompatibleCategory() {
@@ -207,14 +176,6 @@ public class RegisterTransactionAiAction implements AiAction {
       text = originalMessage.strip();
     }
     return text.length() > MAX_DESCRIPTION ? text.substring(0, MAX_DESCRIPTION) : text;
-  }
-
-  /** Ignora acento e caixa: "educacao" casa com "Educação". */
-  private static String normalize(String value) {
-    return Normalizer.normalize(value, Normalizer.Form.NFD)
-        .replaceAll("\\p{M}", "")
-        .strip()
-        .toLowerCase(Locale.ROOT);
   }
 
   private static BusinessException unprocessable(String message) {
