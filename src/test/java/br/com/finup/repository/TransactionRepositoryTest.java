@@ -35,7 +35,7 @@ class TransactionRepositoryTest {
     jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS users (id UUID PRIMARY KEY)");
     jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS categories (id UUID PRIMARY KEY)");
     jdbcTemplate.execute(
-        "CREATE TABLE IF NOT EXISTS payment_methods (id UUID PRIMARY KEY, user_id UUID NOT NULL)");
+        "CREATE TABLE IF NOT EXISTS payment_methods (id UUID PRIMARY KEY, user_id UUID)");
   }
 
   private UUID insertUser() {
@@ -69,7 +69,10 @@ class TransactionRepositoryTest {
   private UUID insertPaymentMethod(UUID ownerId) {
     UUID paymentMethodId = UUID.randomUUID();
     jdbcTemplate.update(
-        "INSERT INTO payment_methods (id, user_id) VALUES (?, ?)", paymentMethodId, ownerId);
+        "INSERT INTO payment_methods (id, user_id, is_default) VALUES (?, ?, ?)",
+        paymentMethodId,
+        ownerId,
+        ownerId == null);
     return paymentMethodId;
   }
 
@@ -114,6 +117,16 @@ class TransactionRepositoryTest {
         .contains("EXPENSE");
     assertThat(transactionRepository.findAvailableCategoryTypeForUser(otherUsersCategoryId, userId))
         .isEmpty();
+  }
+
+  @Test
+  @DisplayName("aceita a forma de pagamento padrao do sistema")
+  void findsDefaultPaymentMethod() {
+    UUID userId = insertUser();
+    UUID defaultPaymentMethodId = insertPaymentMethod(null);
+
+    assertThat(transactionRepository.existsPaymentMethodForUser(defaultPaymentMethodId, userId))
+        .isTrue();
   }
 
   @Test

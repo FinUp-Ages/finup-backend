@@ -8,7 +8,8 @@
     "PATCH /api/v1/transactions/{id}/category recebe somente categoryId e responde TransactionResponse; identidade vem do token, recurso alheio responde 404, receita ou categoria de receita responde 422.",
     "Editar apenas a transacao selecionada; preservar pagamento, descricao, valor, datas e metadados da recorrencia. Somente categoryId e updatedAt podem mudar.",
     "Adicionar Educacao ao seed e migracao idempotente para bancos existentes.",
-    "Integrar origin/develop 8760d7d (PR #69) na branch da correcao: unico conflito em .railforge/state.json, resolvido mantendo o estado desta task e preservando integralmente as mudancas de codigo da develop."
+    "Integrar origin/develop 84512c4 (PR #70), preservando formas de pagamento e categorias de receita padrao; resolver os conflitos no seed e no estado da task.",
+    "Renumerar a migracao de Educacao de 09 para 11: origin/develop ja usa 09 para formas de pagamento e 10 para categorias de receita. Preservar integralmente o SQL e atualizar referencias."
   ],
   "files_in_scope": [
     "src/main/java/br/com/finup/controller/TransactionController.java",
@@ -20,26 +21,28 @@
     "src/test/java/br/com/finup/TransactionCategoryIntegrationTests.java",
     "src/test/java/br/com/finup/OpenApiIntegrationTests.java",
     "database/init/02-required-data.sql",
-    "database/migrations/09-categoria-educacao.sql",
+    "database/migrations/11-categoria-educacao.sql",
     "docs/transaction-category-edit.md",
     ".railforge/state.json"
   ],
   "plan": [
     "Implementar contrato e validacoes na API.",
     "Cobrir persistencia, manual/IA, autorizacao, categorias e preservacao dos dados.",
-    "Validar Maven e migracao PostgreSQL; reiniciar API e repetir fluxo no Expo."
+    "Validar Maven e migracao PostgreSQL; reiniciar API e repetir fluxo no Expo.",
+    "Ajuste solicitado na revisao: integrar a develop atual, renomear a migracao para 11, atualizar documentacao e validar numeracao, conteudo SQL e integracao."
   ],
   "validation": {
     "baseline": "Usuario criou despesa de R$ 1,23 no Expo e confirmou ausencia de edicao. API publicada tinha somente GET e POST de transacoes.",
-    "mvn clean verify": "Passou apos integrar origin/develop 8760d7d (PR #69): 923 testes, zero falhas/erros, build e Spotless aprovados.",
+    "mvn clean verify": "Passou apos integrar origin/develop 84512c4 (PR #70) e renumerar a migration: 927 testes, zero falhas/erros, build e Spotless aprovados.",
     "category_integration": "10 testes novos com HTTP, seguranca e persistencia reais: manual, acao de IA sem Bedrock, reload, dados financeiros e recorrencia preservados, categorias padrao, isolamento, validacao e retry.",
-    "postgres_migration": "09 aplicada no banco local: INSERT 0 1; reaplicada: INSERT 0 0. Educacao e Lazer presentes como EXPENSE, uma categoria padrao de cada.",
+    "postgres_migration": "SQL de Educacao, agora na migration 11, validado anteriormente no banco local: INSERT 0 1 e reaplicacao INSERT 0 0. Conteudo preservado byte a byte na renumeracao; nao houve nova execucao no banco neste ajuste.",
     "review": "Diff revisado e restrito a edicao de categoria. Sem credenciais, dependencias novas ou alteracoes nas branches anteriores. Usuario autorizou commit e push; abertura dos PRs sera manual pelo usuario.",
     "device": "Android/Expo Go: usuario confirmou salvamento da troca de categoria e persistencia apos recarregar o app na despesa de R$ 1,23. Captura do editor fornecida; espacamento corrigido depois. iOS e falha de rede/cancelamento no aparelho nao executados.",
     "docker_build": "Dockerfile original construiu a imagem com sucesso usando configuracao Docker temporaria sem credenciais; o helper GPG local havia bloqueado a primeira tentativa. Login/configuracao do usuario preservados.",
     "isolated_postgres": "Imagem da API iniciou com PostgreSQL 16 descartavel e scripts de inicializacao do repo. PATCH Lazer -> Educacao, leitura apos salvar, preservacao dos campos persistidos e persistencia apos reiniciar a API passaram. Erros 400/404/422 e isolamento entre usuarios passaram. Somente esse ambiente usou mock-auth; banco do aplicativo nao foi usado. Containers/rede de teste removidos.",
-    "merge_develop": "Unico conflito em .railforge/state.json resolvido. Nenhum conflito de codigo; alteracoes da develop preservadas. Diff final contra develop restrito aos 12 arquivos da correcao."
+    "merge_develop": "Integracao da develop 84512c4: conflitos no seed e em .railforge/state.json resolvidos. Seed remoto preservado integralmente com o INSERT de Educacao adicional; migrations 09 e 10 identicas as remotas; TransactionRepository preserva formas de pagamento padrao e busca do gasto por proprietario. Diff contra develop restrito aos 12 arquivos da task.",
+    "migration_renumbering": "Migration 09-categoria-educacao.sql renomeada para 11-categoria-educacao.sql, com conteudo identico byte a byte. Migrations remotas 09 e 10 e seed do PR #70 preservados; numeracao sem duplicidade, excluindo rollback."
   },
-  "review": "Codigo revisado; integracao da develop validada em 923 testes, build e formatacao. Conflito somente no estado do Railforge resolvido; funcionalidade e mudancas do PR #69 preservadas. Commit/push da resolucao dentro da publicacao autorizada pelo usuario; PR sera aberto manualmente.",
-  "updated_at": "2026-11-12"
+  "review": "Ajuste solicitado concluido: migration 11 com SQL inalterado, referencias atualizadas e develop 84512c4 integrada. Numeracao sem duplicidade, migrations remotas preservadas e 927 testes/build/formatacao aprovados. Commit e push na mesma branch dentro da publicacao autorizada pelo usuario.",
+  "updated_at": "2026-11-13"
 }

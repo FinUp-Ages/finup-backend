@@ -19,7 +19,7 @@ pelo mesmo endpoint, sem consultar o modelo novamente.
 
 ## Bancos existentes
 
-Aplicar `database/migrations/09-categoria-educacao.sql` para disponibilizar Educação
+Aplicar `database/migrations/11-categoria-educacao.sql` para disponibilizar Educação
 como categoria padrão. É idempotente e preserva categorias pessoais e transações.
 O seed `database/init/02-required-data.sql` cobre instalações novas. Não recriar volumes.
 
