@@ -187,16 +187,3 @@ WHERE
       pm.name = padrao.name
       AND pm.is_default = TRUE
   );
-
-INSERT INTO
-  categories (user_id, name, type, is_default)
-SELECT
-  NULL,
-  'Educação',
-  'EXPENSE',
-  TRUE
-WHERE
-  NOT EXISTS (
-    SELECT 1 FROM categories
-    WHERE name = 'Educação' AND type = 'EXPENSE' AND is_default = TRUE
-  );

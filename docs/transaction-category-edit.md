@@ -17,17 +17,19 @@ Outros campos enviados no JSON não são usados. Repetir a categoria já salva �
 operação sem alteração. Gastos da IA usam a mesma entidade e podem ser corrigidos
 pelo mesmo endpoint, sem consultar o modelo novamente.
 
-## Bancos existentes
+## Categorias disponíveis
 
-Aplicar `database/migrations/11-categoria-educacao.sql` para disponibilizar Educação
-como categoria padrão. É idempotente e preserva categorias pessoais e transações.
-O seed `database/init/02-required-data.sql` cobre instalações novas. Não recriar volumes.
+A troca aceita qualquer categoria de despesa disponível para o usuário, pessoal ou
+padrão existente, independentemente do nome. Não cria categorias automaticamente.
+Educação, por exemplo, só estará disponível se for cadastrada pelo usuário.
+
+Esta funcionalidade não altera o schema nem o seed e não exige migration.
 
 ## Validação
 
 `TransactionCategoryIntegrationTests` usa HTTP, segurança e JPA reais com H2 e decoder
 JWT simulado. Cobre cadastro manual, registro pela ação da IA sem Bedrock, persistência
-após recarga, Educação/Lazer, categorias padrão/pessoais, dados preservados, retry,
+após recarga, categorias padrão/pessoais de nomes livres, dados preservados, retry,
 validação e isolamento entre usuários. O contrato PATCH também é verificado no OpenAPI.
 
 Executar `./mvnw clean verify` com Java 21. A conferência no PostgreSQL e no Expo deve

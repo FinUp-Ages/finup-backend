@@ -124,6 +124,37 @@ class TransactionCategoryIntegrationTests {
   }
 
   @Test
+  void editsExpenseUsingCategoryCreatedByUserWithoutCreatingCategories() throws Exception {
+    String response =
+        mvc.perform(
+                post("/api/v1/categories")
+                    .header("Authorization", "Bearer user")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+            {"name":"Manutenção da bicicleta","type":"EXPENSE"}
+            """))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    UUID categoryId = UUID.fromString(json.readTree(response).path("id").asText());
+    long categoryCount = categories.count();
+    Transaction expense = expense(user, leisure, TransactionType.EXPENSE);
+
+    change(expense.getId(), categoryId, 200);
+    em.clear();
+
+    assertThat(transactions.findById(expense.getId()).orElseThrow().getCategoryId())
+        .isEqualTo(categoryId);
+    Category selected = categories.findById(categoryId).orElseThrow();
+    assertThat(selected.getName()).isEqualTo("Manutenção da bicicleta");
+    assertThat(selected.getUser().getId()).isEqualTo(user.getId());
+    assertThat(selected.isDefault()).isFalse();
+    assertThat(categories.count()).isEqualTo(categoryCount);
+  }
+
+  @Test
   void editsExpenseRegisteredByAiWithoutCallingBedrock() throws Exception {
     Transaction expense =
         registerAi
