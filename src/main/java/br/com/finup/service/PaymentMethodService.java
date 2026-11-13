@@ -22,7 +22,7 @@ public class PaymentMethodService {
   public List<PaymentMethodResponse> findActiveByUser(AuthenticatedIdentity identity) {
     User user = userService.findByAuthenticatedIdentity(identity);
 
-    return paymentMethodRepository.findByUserIdAndIsActiveTrue(user.getId()).stream()
+    return paymentMethodRepository.findActiveAvailableForUser(user.getId()).stream()
         .map(pm -> new PaymentMethodResponse(pm.getId(), pm.getName()))
         .toList();
   }
