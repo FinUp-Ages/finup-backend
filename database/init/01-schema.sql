@@ -67,9 +67,11 @@ CREATE TABLE IF NOT EXISTS categories (
   CONSTRAINT fk_categories_user FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
+-- Forma de pagamento padrao do sistema (is_default TRUE) nao tem dono e vale para todo usuario,
+-- como as categorias padrao. Forma criada para um usuario sempre tem dono.
 CREATE TABLE IF NOT EXISTS payment_methods (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
+  user_id UUID,
   type VARCHAR(50),
   name VARCHAR(255),
   institution VARCHAR(255),
@@ -77,9 +79,20 @@ CREATE TABLE IF NOT EXISTS payment_methods (
   due_day INTEGER,
   credit_limit DECIMAL(12, 2),
   is_active BOOLEAN DEFAULT TRUE,
+  is_default BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_payment_methods_user FOREIGN KEY (user_id) REFERENCES users (id)
+  CONSTRAINT fk_payment_methods_user FOREIGN KEY (user_id) REFERENCES users (id),
+  CONSTRAINT chk_payment_methods_owner CHECK (
+    (
+      is_default = TRUE
+      AND user_id IS NULL
+    )
+    OR (
+      is_default = FALSE
+      AND user_id IS NOT NULL
+    )
+  )
 );
 
 CREATE TABLE IF NOT EXISTS goals (

@@ -21,7 +21,8 @@ public class PaymentMethod {
   @Column(name = "id", updatable = false, nullable = false)
   private UUID id;
 
-  @Column(name = "user_id", nullable = false)
+  /** Dono da forma de pagamento. Nulo nas formas padrao do sistema ({@link #isDefault}). */
+  @Column(name = "user_id")
   private UUID userId;
 
   @Column(name = "type", length = 50)
@@ -44,6 +45,10 @@ public class PaymentMethod {
 
   @Column(name = "is_active")
   private Boolean isActive = true;
+
+  /** Forma padrao do sistema (Pix, Dinheiro...), sem dono e disponivel para todo usuario. */
+  @Column(name = "is_default", nullable = false)
+  private Boolean isDefault = false;
 
   @Column(name = "created_at", updatable = false)
   private OffsetDateTime createdAt;
@@ -118,6 +123,10 @@ public class PaymentMethod {
 
   public Boolean getIsActive() {
     return isActive;
+  }
+
+  public Boolean getIsDefault() {
+    return isDefault;
   }
 
   public OffsetDateTime getCreatedAt() {
