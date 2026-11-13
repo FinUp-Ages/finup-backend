@@ -15,7 +15,18 @@ public interface StudyQuestionRepository extends JpaRepository<StudyQuestion, UU
 
   boolean existsByCategoryId(UUID categoryId);
 
-  List<StudyQuestion> findByCategoryIdAndPublishedIsNotNullOrderByCreatedAtAsc(UUID categoryId);
+  /**
+   * Perguntas publicadas da categoria na ordem da trilha: cada uma é um nível. O {@code id}
+   * desempata perguntas criadas no mesmo instante, para a ordem (e o nível) não variar entre
+   * chamadas.
+   */
+  List<StudyQuestion> findByCategoryIdAndPublishedIsNotNullOrderByCreatedAtAscIdAsc(
+      UUID categoryId);
+
+  /**
+   * Todas as perguntas publicadas, na mesma ordem da trilha, para montar o progresso de uma vez.
+   */
+  List<StudyQuestion> findByPublishedIsNotNullOrderByCreatedAtAscIdAsc();
 
   @Query(
       """
