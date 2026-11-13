@@ -2,6 +2,7 @@ package br.com.finup.service;
 
 import br.com.finup.dto.TransactionListItemResponse;
 import br.com.finup.dto.TransactionListResponse;
+import br.com.finup.exception.ExpenseCategoryEditException;
 import br.com.finup.exception.IncompatibleTransactionCategoryException;
 import br.com.finup.exception.InvalidTransactionPeriodException;
 import br.com.finup.exception.InvalidTransactionRecurrenceException;
@@ -84,6 +85,28 @@ public class TransactionService {
     return transaction;
   }
 
+  /** Reclassifica uma despesa do usuario, seja ela cadastrada manualmente ou pelo assistente. */
+  @Transactional
+  public Transaction changeCategory(
+      AuthenticatedIdentity identity, UUID transactionId, UUID categoryId) {
+    User user = userService.findByAuthenticatedIdentity(identity);
+    Transaction transaction =
+        transactionRepository
+            .findByIdAndUserId(transactionId, user.getId())
+            .orElseThrow(() -> new ResourceNotFoundException("Transacao nao encontrada"));
+
+    if (transaction.getType() != TransactionType.EXPENSE) {
+      throw new ExpenseCategoryEditException();
+    }
+    requireAvailableCategory(user.getId(), categoryId, transaction.getType());
+    if (transaction.getCategoryId().equals(categoryId)) {
+      return transaction;
+    }
+
+    transaction.changeCategory(categoryId);
+    return transactionRepository.saveAndFlush(transaction);
+  }
+
   @Transactional(readOnly = true)
   public TransactionListResponse list(
       AuthenticatedIdentity identity, LocalDate from, LocalDate to) {
@@ -136,6 +159,16 @@ public class TransactionService {
   private void requireAvailableReferences(
       UUID userId, UUID categoryId, TransactionType type, UUID paymentMethodId) {
 
+    requireAvailableCategory(userId, categoryId, type);
+
+    if (paymentMethodId != null
+        && !transactionRepository.existsPaymentMethodForUser(paymentMethodId, userId)) {
+      throw new ResourceNotFoundException("Meio de pagamento nao encontrado: " + paymentMethodId);
+    }
+  }
+
+  private void requireAvailableCategory(UUID userId, UUID categoryId, TransactionType type) {
+
     TransactionType categoryType =
         transactionRepository
             .findAvailableCategoryTypeForUser(categoryId, userId)
@@ -145,11 +178,6 @@ public class TransactionService {
 
     if (categoryType != type) {
       throw new IncompatibleTransactionCategoryException(categoryType, type);
-    }
-
-    if (paymentMethodId != null
-        && !transactionRepository.existsPaymentMethodForUser(paymentMethodId, userId)) {
-      throw new ResourceNotFoundException("Meio de pagamento nao encontrado: " + paymentMethodId);
     }
   }
 

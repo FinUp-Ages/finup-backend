@@ -77,6 +77,32 @@ class CategoryServiceTest {
   }
 
   @Test
+  @DisplayName("categoria sugerida pelo assistente e criada como pessoal do usuario")
+  void createsSuggestedCategoryForUser() {
+    User user = mockUser();
+    when(categoryRepository.save(any(Category.class))).thenAnswer(i -> i.getArgument(0));
+
+    Category category = categoryService.createSuggested(user, "Pets", TransactionType.EXPENSE);
+
+    assertThat(category.getUser()).isSameAs(user);
+    assertThat(category.getName()).isEqualTo("Pets");
+    assertThat(category.getType()).isEqualTo(TransactionType.EXPENSE);
+    assertThat(category.isDefault()).isFalse();
+    verify(promptAttackGuard).isAttack("Pets");
+  }
+
+  @Test
+  @DisplayName("categoria sugerida barrada pelo guardrail nao e gravada")
+  void suggestedCategoryBlockedByGuardrailIsNotSaved() {
+    when(promptAttackGuard.isAttack("Pets")).thenReturn(true);
+
+    assertThatThrownBy(
+            () -> categoryService.createSuggested(mockUser(), "Pets", TransactionType.EXPENSE))
+        .isInstanceOf(UnsafeAiInputException.class);
+    verify(categoryRepository, never()).save(any());
+  }
+
+  @Test
   @DisplayName("criar categoria com usuario inexistente lanca ResourceNotFoundException")
   void createThrowsWhenUserNotFound() {
     AuthenticatedIdentity identity =

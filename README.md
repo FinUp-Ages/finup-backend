@@ -146,7 +146,7 @@ consulta de e-mail do cadastro, explicada abaixo da tabela). No Swagger, use o b
 | `DELETE /api/v1/categories/{id}` | remove categoria do usuário. Em uso devolve `409` |
 | `POST /api/v1/transactions` | registra uma transação, avulsa ou abrindo uma série recorrente |
 | `GET /api/v1/transactions?from=yyyy-MM-dd&to=yyyy-MM-dd` | lista as transações e o saldo do usuário no período informado |
-| `GET /api/v1/payment-methods` | lista os meios de pagamento ativos do usuário |
+| `GET /api/v1/payment-methods` | meios de pagamento ativos: os padrão do sistema (Pix, cartões, Dinheiro...) e os do usuário |
 | `POST /api/v1/ai/assistant` | interpreta um texto livre e executa a ação financeira correspondente |
 | `GET /api/v1/assistant/conversations` | lista o histórico de conversas do usuário, ordenado pela atualização mais recente |
 | `GET /api/v1/assistant/conversations/{id}/messages` | lista as mensagens de uma conversa do usuário em ordem cronológica |
@@ -169,7 +169,7 @@ Nas métricas, "ativo" é quem registrou ao menos uma transação no período (o
 recorrência não conta), e os meses seguem o fuso de Brasília.
 
 Categoria e meio de pagamento referenciados por uma transação precisam ser do
-próprio usuário — categoria padrão do sistema também vale. Referência de outro usuário responde
+próprio usuário — categoria e meio de pagamento padrão do sistema também valem. Referência de outro usuário responde
 `404`, e não `403`: um `403` confirmaria a existência do id para quem não deveria saber dela.
 
 A categoria também precisa ser **do mesmo tipo da transação**: categoria `EXPENSE` não classifica

@@ -13,6 +13,8 @@ import org.springframework.data.repository.query.Param;
 /** Acesso a transacoes e verificacao das referencias exigidas para cadastra-las. */
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
 
+  Optional<Transaction> findByIdAndUserId(UUID id, UUID userId);
+
   /**
    * Tipo da categoria, quando ela esta disponivel para o usuario: ou e dele, ou e padrao do sistema
    * — mesma regra que o CRUD de categorias aplica na listagem. Sem o filtro por dono, daria para
@@ -34,11 +36,13 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
       @Param("id") UUID id, @Param("userId") UUID userId);
 
   /**
-   * Meio de pagamento tem que ser do proprio usuario: a coluna {@code user_id} e {@code NOT NULL},
-   * entao todo cartao ou conta tem dono e nao existe equivalente de "padrao do sistema" aqui.
+   * Meio de pagamento disponivel para o usuario: o proprio ou uma forma padrao do sistema (Pix,
+   * Dinheiro...), que nao tem dono. Meio de outro usuario nao conta.
    */
   @Query(
-      value = "SELECT EXISTS (SELECT 1 FROM payment_methods WHERE id = :id AND user_id = :userId)",
+      value =
+          "SELECT EXISTS (SELECT 1 FROM payment_methods WHERE id = :id"
+              + " AND (user_id = :userId OR is_default = true))",
       nativeQuery = true)
   boolean existsPaymentMethodForUser(@Param("id") UUID id, @Param("userId") UUID userId);
 

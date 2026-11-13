@@ -56,6 +56,7 @@ class OpenApiIntegrationTests {
         .andExpect(jsonPath("$.paths['/api/v1/users']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/transactions'].post").exists())
         .andExpect(jsonPath("$.paths['/api/v1/transactions'].get").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/transactions/{id}/category'].patch").exists())
         .andExpect(
             jsonPath("$.paths['/api/v1/transactions'].get.parameters[*].name")
                 .value(org.hamcrest.Matchers.containsInAnyOrder("from", "to")))
