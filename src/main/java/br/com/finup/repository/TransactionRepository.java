@@ -13,6 +13,8 @@ import org.springframework.data.repository.query.Param;
 /** Acesso a transacoes e verificacao das referencias exigidas para cadastra-las. */
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
 
+  Optional<Transaction> findByIdAndUserId(UUID id, UUID userId);
+
   /**
    * Tipo da categoria, quando ela esta disponivel para o usuario: ou e dele, ou e padrao do sistema
    * — mesma regra que o CRUD de categorias aplica na listagem. Sem o filtro por dono, daria para
