@@ -37,7 +37,8 @@
     "banco novo (postgres:16, init da branch)": "8 formas padrao + Cartao Teste; reaplicar 02-required-data nao duplica; CHECK barra padrao com dono e forma sem dono",
     "migration 09 sobre o schema da origin/develop": "rodada 2 vezes sem erro; coluna, CHECK e as 8 formas criadas; Cartao Teste preservado",
     "teste real (API mock-auth, porta 18081)": "usuario recem-criado lista as 8 padrao; usuario de teste lista as 8 + Cartao Teste; transacao com Pix padrao 201; com Cartao Teste de outro usuario 404",
-    "categorias de receita (postgres:16)": "banco novo: 7 de receita (Salario + 6) e 5 de gasto, reaplicar 02 nao duplica; banco da origin/develop com 09 e 10 rodadas 2 vezes: mesmo resultado, 8 formas padrao. Sem mudanca em Java desde o mvn clean verify"
+    "categorias de receita (postgres:16)": "banco novo: 7 de receita (Salario + 6) e 5 de gasto, reaplicar 02 nao duplica; banco da origin/develop com 09 e 10 rodadas 2 vezes: mesmo resultado, 8 formas padrao. Sem mudanca em Java desde o mvn clean verify",
+    "mvn clean verify (com develop + #69)": "passed em 2026-11-12: 917 testes, 0 falhas, spotless ok"
   },
   "review": "Diff revisado. Contrato da API inalterado. Banco ja existente precisa rodar as migrations 09 e 10, antes do deploy do jar (jar novo sem a 09 quebra GET /payment-methods). Pendente: autorizacao para commit e PR.",
   "updated_at": "2026-11-12",
