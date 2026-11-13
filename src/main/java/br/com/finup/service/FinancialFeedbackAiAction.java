@@ -108,7 +108,7 @@ public class FinancialFeedbackAiAction implements AiAction {
   public String promptInstructions() {
     return """
         %s: QUALQUER pergunta ou pedido de opiniao sobre as proprias financas do usuario que nao \
-        seja registrar um gasto ou ganho. Exemplos: saldo (qual meu saldo?, quanto sobrou?), quanto \
+        seja registrar um gasto ou ganho nem criar uma categoria. Exemplos: saldo (qual meu saldo?, quanto sobrou?), quanto \
         gastou ou ganhou, resumo do mes, onde gasta mais, se pode gastar, se esta bem, dicas para \
         economizar, se fez algum gasto errado ou repetido.
         Formato: {"action":"%s"}"""
