@@ -3,6 +3,7 @@ package br.com.finup.controller;
 import br.com.finup.dto.CreateTransactionRequest;
 import br.com.finup.dto.TransactionListResponse;
 import br.com.finup.dto.TransactionResponse;
+import br.com.finup.dto.UpdateTransactionCategoryRequest;
 import br.com.finup.mapper.TransactionMapper;
 import br.com.finup.model.Transaction;
 import br.com.finup.security.AuthenticatedIdentity;
@@ -18,9 +19,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.time.LocalDate;
+import java.util.UUID;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,7 +39,9 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/transactions")
-@Tag(name = "Transactions", description = "Cadastro e consulta de transacoes financeiras")
+@Tag(
+    name = "Transactions",
+    description = "Cadastro, consulta e reclassificacao de transacoes financeiras")
 public class TransactionController {
 
   private final TransactionService transactionService;
@@ -89,6 +95,27 @@ public class TransactionController {
     TransactionResponse response = TransactionMapper.toResponse(transaction);
     URI location = URI.create("/api/v1/transactions/%s".formatted(response.id()));
     return ResponseEntity.created(location).body(response);
+  }
+
+  @PatchMapping("/{id}/category")
+  @Operation(
+      summary = "Altera somente a categoria de uma despesa do usuario autenticado",
+      description = "Aplica-se ao gasto selecionado, sem alterar outras ocorrencias de uma serie.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Despesa com a categoria atualizada"),
+    @ApiResponse(responseCode = "400", description = "Identificador ou corpo invalido"),
+    @ApiResponse(responseCode = "401", description = "Identidade autenticada ausente ou invalida"),
+    @ApiResponse(
+        responseCode = "404",
+        description = "Usuario, transacao ou categoria indisponivel"),
+    @ApiResponse(responseCode = "422", description = "Transacao ou categoria nao e de despesa")
+  })
+  public ResponseEntity<TransactionResponse> changeCategory(
+      @PathVariable UUID id, @Valid @RequestBody UpdateTransactionCategoryRequest request) {
+    AuthenticatedIdentity identity = authenticatedIdentityResolver.resolveCurrent();
+    return ResponseEntity.ok(
+        TransactionMapper.toResponse(
+            transactionService.changeCategory(identity, id, request.categoryId())));
   }
 
   @GetMapping

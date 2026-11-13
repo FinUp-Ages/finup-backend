@@ -1,49 +1,44 @@
 {
   "stage": "REVIEWING",
-  "task": "Formas de pagamento padrao do sistema e mais categorias padrao de receita, disponiveis para todo usuario",
-  "objective": "GET /api/v1/payment-methods devolve, para qualquer usuario (novo ou existente), as formas de pagamento padrao (Pix, Cartao de credito, Cartao de debito, Dinheiro, Boleto, Transferencia bancaria, Apple Pay, Google Pay) junto com as proprias, e POST /api/v1/transactions aceita uma forma padrao como paymentMethodId. Alem de Salario, todo usuario ve as categorias padrao de receita Freelance, Rendimentos, Vendas, Reembolso, Presentes recebidos e Outras receitas.",
+  "task": "[ BUG ] - Permitir editar a categoria dos gastos (ClickUp 1dfcuabck3w)",
+  "objective": "Reclassificar gastos manuais e da IA entre quaisquer categorias de despesa disponiveis ao usuario, sem cadastrar categorias automaticamente nem alterar os demais dados do gasto.",
   "decisions": [
-    "Branch feat/formas-pagamento-e-receitas-padrao a partir de origin/develop; categorias de receita na mesma branch a pedido do solicitante (2026-11-12)",
-    "Mesmo padrao das categorias padrao: linha global com user_id NULL e is_default TRUE, sem copia por usuario (pedido do solicitante em 2026-11-12: ja vir cadastrado para os usuarios)",
-    "CHECK no banco: forma padrao nao tem dono e forma do usuario sempre tem dono",
-    "Ordem da lista: padrao primeiro, na ordem do seed (created_at escalonado), depois as do usuario",
-    "Contrato da API inalterado (id e name); nao cria POST/PUT/DELETE de forma de pagamento",
-    "Categorias de receita com nomes sem ambiguidade com gasto: 'Presentes recebidos' em vez de 'Presentes' e 'Rendimentos' em vez de 'Investimentos', porque o assistente de IA (tarefa em revisao) recusa nome que so existe com o outro tipo"
+    "Ausencia da edicao reproduzida pelo usuario no Expo: toque no gasto nao oferece acao.",
+    "Branches fix/editar-categoria-gastos em worktrees separados da develop; branches da trilha preservadas.",
+    "PATCH /api/v1/transactions/{id}/category recebe somente categoryId e responde TransactionResponse; identidade vem do token, recurso alheio responde 404, receita ou categoria de receita responde 422.",
+    "Editar apenas a transacao selecionada; preservar pagamento, descricao, valor, datas e metadados da recorrencia. Somente categoryId e updatedAt podem mudar.",
+    "Integrar origin/develop 84512c4 (PR #70), preservando formas de pagamento e categorias de receita padrao; resolver os conflitos no seed e no estado da task.",
+    "Correcao de escopo esclarecida pelo usuario: Educacao e apenas um exemplo e so deve existir se cadastrada pelo usuario. Remover o INSERT do seed e a migration; o endpoint recebe qualquer categoryId de despesa disponivel."
   ],
   "files_in_scope": [
-    "database/init/01-schema.sql",
-    "database/init/02-required-data.sql",
-    "database/migrations/09-payment-methods-padrao.sql",
-    "database/migrations/10-categorias-receita-padrao.sql",
-    "src/main/java/br/com/finup/model/PaymentMethod.java",
-    "src/main/java/br/com/finup/repository/PaymentMethodRepository.java",
+    "src/main/java/br/com/finup/controller/TransactionController.java",
+    "src/main/java/br/com/finup/dto/UpdateTransactionCategoryRequest.java",
+    "src/main/java/br/com/finup/exception/ExpenseCategoryEditException.java",
+    "src/main/java/br/com/finup/model/Transaction.java",
     "src/main/java/br/com/finup/repository/TransactionRepository.java",
-    "src/main/java/br/com/finup/service/PaymentMethodService.java",
-    "src/test/java/br/com/finup/repository/PaymentMethodRepositoryTest.java",
-    "src/test/java/br/com/finup/repository/TransactionRepositoryTest.java",
-    "README.md",
+    "src/main/java/br/com/finup/service/TransactionService.java",
+    "src/test/java/br/com/finup/TransactionCategoryIntegrationTests.java",
+    "src/test/java/br/com/finup/OpenApiIntegrationTests.java",
+    "docs/transaction-category-edit.md",
     ".railforge/state.json"
   ],
   "plan": [
-    "Schema: user_id nullable, is_default NOT NULL DEFAULT FALSE e CHECK de dono; seed das 8 formas padrao em 02-required-data.sql; migration 09 reaplicavel para bancos existentes.",
-    "Entidade com isDefault; repositorio lista ativas do usuario + padrao, padrao primeiro.",
-    "TransactionRepository aceita forma padrao na validacao de referencia.",
-    "Seed das 6 categorias padrao de receita em 02-required-data.sql e migration 10 reaplicavel.",
-    "Testes de repositorio; mvn clean verify.",
-    "Teste real: banco isolado criado do zero e migration aplicada sobre o schema antigo."
+    "Preservar o endpoint generico e as validacoes de propriedade e tipo.",
+    "Remover a migration e a alteracao do seed, mantendo os arquivos de banco identicos a develop.",
+    "Cobrir troca para categoria com nome arbitrario cadastrada pela API, persistencia e ausencia de criacao de categorias ao editar.",
+    "Atualizar documentacao e validar testes, build e diff antes de publicar na mesma branch."
   ],
   "validation": {
-    "mvn clean verify": "passed em 2026-11-12: 905 testes, 0 falhas, spotless ok",
-    "banco novo (postgres:16, init da branch)": "8 formas padrao + Cartao Teste; reaplicar 02-required-data nao duplica; CHECK barra padrao com dono e forma sem dono",
-    "migration 09 sobre o schema da origin/develop": "rodada 2 vezes sem erro; coluna, CHECK e as 8 formas criadas; Cartao Teste preservado",
-    "teste real (API mock-auth, porta 18081)": "usuario recem-criado lista as 8 padrao; usuario de teste lista as 8 + Cartao Teste; transacao com Pix padrao 201; com Cartao Teste de outro usuario 404",
-    "categorias de receita (postgres:16)": "banco novo: 7 de receita (Salario + 6) e 5 de gasto, reaplicar 02 nao duplica; banco da origin/develop com 09 e 10 rodadas 2 vezes: mesmo resultado, 8 formas padrao. Sem mudanca em Java desde o mvn clean verify",
-    "mvn clean verify (com develop + #69)": "passed em 2026-11-12: 917 testes, 0 falhas, spotless ok"
+    "baseline": "Usuario criou despesa de R$ 1,23 no Expo e confirmou ausencia de edicao. API publicada tinha somente GET e POST de transacoes.",
+    "mvn clean verify": "Passou apos remover a criacao automatica de Educacao: 928 testes, zero falhas/erros, build e Spotless aprovados.",
+    "category_integration": "11 testes com HTTP, seguranca e persistencia reais: inclui POST de categoria pessoal de nome livre e PATCH do gasto para ela, verificando proprietario, isDefault false, persistencia e quantidade de categorias inalterada apos editar. Demais casos cobrem manual/IA, autorizacao, validacao, retry e dados preservados.",
+    "review": "Diff revisado e restrito a edicao de categoria. Sem credenciais, dependencias novas ou alteracoes nas branches anteriores. Usuario autorizou commit e push; abertura dos PRs sera manual pelo usuario.",
+    "device": "Android/Expo Go: usuario confirmou salvamento da troca de categoria e persistencia apos recarregar o app na despesa de R$ 1,23. Captura do editor fornecida; espacamento corrigido depois. iOS e falha de rede/cancelamento no aparelho nao executados.",
+    "docker_build": "Dockerfile original construiu a imagem com sucesso usando configuracao Docker temporaria sem credenciais; o helper GPG local havia bloqueado a primeira tentativa. Login/configuracao do usuario preservados.",
+    "isolated_postgres": "Imagem da API iniciou com PostgreSQL 16 descartavel e scripts de inicializacao do repo. PATCH Lazer -> Educacao, leitura apos salvar, preservacao dos campos persistidos e persistencia apos reiniciar a API passaram. Erros 400/404/422 e isolamento entre usuarios passaram. Somente esse ambiente usou mock-auth; banco do aplicativo nao foi usado. Containers/rede de teste removidos.",
+    "merge_develop": "Base origin/develop 84512c4 preservada, incluindo formas de pagamento e categorias de receita padrao do PR #70. Diff contra develop restrito aos 10 arquivos de API, testes, documentacao e estado da task.",
+    "database_scope": "Diff de database contra origin/develop vazio: seed restaurado integralmente e migration de Educacao removida. Esta feature nao altera schema, nao cadastra categorias automaticamente e nao exige migration."
   },
-  "review": "Diff revisado. Contrato da API inalterado. Banco ja existente precisa rodar as migrations 09 e 10, antes do deploy do jar (jar novo sem a 09 quebra GET /payment-methods). Pendente: autorizacao para commit e PR.",
-  "updated_at": "2026-11-12",
-  "open_questions": [
-    "Risco fora do escopo: a API usa uma access key com permissoes amplas, a mesma usada para administrar a conta",
-    "State remoto do Terraform (bucket S3 + lock) para o time"
-  ]
+  "review": "Escopo corrigido conforme esclarecimento do usuario: troca generica entre categorias de despesa disponiveis, sem novas categorias padrao. Categoria pessoal de nome livre criada por POST e usada no PATCH coberta por teste. 928 testes, build e formatacao aprovados. Commit/push na mesma branch dentro da publicacao autorizada. Dados existentes no banco local nao foram alterados neste ajuste.",
+  "updated_at": "2026-11-13"
 }

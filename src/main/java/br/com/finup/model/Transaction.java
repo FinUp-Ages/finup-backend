@@ -150,6 +150,11 @@ public class Transaction {
         });
   }
 
+  /** Reclassifica somente esta transacao, preservando os demais dados e ocorrencias da serie. */
+  public void changeCategory(UUID categoryId) {
+    this.categoryId = Objects.requireNonNull(categoryId);
+  }
+
   @PreUpdate
   void markAsUpdated() {
     updatedAt = Instant.now();
