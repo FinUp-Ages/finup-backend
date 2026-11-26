@@ -20,9 +20,14 @@ import java.util.List;
  */
 public final class TriageQuestionnaire {
 
-  public static final int VERSION = 1;
+  /**
+   * Versão 2: pergunta {@link #MONTHLY_INCOME}. A renda passou a ser confirmada aqui porque é a
+   * base do FinUp Score e o cadastro a deixa opcional.
+   */
+  public static final int VERSION = 2;
 
   public static final String INCOME_TYPE = "INCOME_TYPE";
+  public static final String MONTHLY_INCOME = "MONTHLY_INCOME";
   public static final String CHILDREN_COUNT = "CHILDREN_COUNT";
   public static final String DEPENDENTS_COUNT = "DEPENDENTS_COUNT";
   public static final String INCOME_EXPENSE_RELATION = "INCOME_EXPENSE_RELATION";
@@ -68,6 +73,7 @@ public final class TriageQuestionnaire {
               opt("FIXED", "Fixa (salário ou benefício regular)"),
               opt("VARIABLE", "Variável (autônomo ou comissionado)"),
               opt("MIXED", "Mista (parte fixa e parte variável)")),
+          number(MONTHLY_INCOME, "Qual é a sua renda mensal?", MAX_MONEY, 2, null),
           number(CHILDREN_COUNT, "Quantos filhos você possui?", MAX_COUNT, 0, null),
           number(
               DEPENDENTS_COUNT,

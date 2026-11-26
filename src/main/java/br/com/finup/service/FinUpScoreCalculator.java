@@ -38,8 +38,8 @@ public class FinUpScoreCalculator {
     BigDecimal income = inputs.monthlyIncome();
     if (income == null || income.signum() <= 0) {
       return new FinUpScoreResult.InsufficientData(
-          "Renda mensal nao informada. Preencha-a em PATCH /api/v1/users/me/additional-info"
-              + " para calcular o FinUp Score.");
+          "Renda mensal nao informada. Informe-a na triagem (POST /api/v1/triage/answers) ou em"
+              + " PATCH /api/v1/users/me/additional-info para calcular o FinUp Score.");
     }
     double monthlyIncome = income.doubleValue();
 

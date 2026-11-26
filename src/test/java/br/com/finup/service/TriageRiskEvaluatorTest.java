@@ -48,6 +48,7 @@ class TriageRiskEvaluatorTest {
     TriageAnswers build() {
       return new TriageAnswers(
           incomeType,
+          INCOME,
           children,
           dependents,
           relation,

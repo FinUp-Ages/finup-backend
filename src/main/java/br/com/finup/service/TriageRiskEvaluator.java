@@ -44,8 +44,8 @@ public class TriageRiskEvaluator {
   static final Set<DebtType> COSTLY_DEBT_TYPES = Set.of(DebtType.CREDIT_CARD, DebtType.OVERDRAFT);
 
   /**
-   * Avalia as respostas. {@code monthlyIncome} vem do perfil (PATCH de informações complementares),
-   * não do questionário, e pode ser nulo.
+   * Avalia as respostas. {@code monthlyIncome} é a renda informada na própria triagem; pode ser
+   * nula ou zero, e aí a dívida não é comparada com a renda.
    */
   public List<TriageRisk> evaluate(TriageAnswers a, BigDecimal monthlyIncome) {
     List<TriageRisk> risks = new ArrayList<>();

@@ -10,6 +10,7 @@ import java.util.Set;
  */
 public record TriageAnswers(
     IncomeType incomeType,
+    BigDecimal monthlyIncome,
     int childrenCount,
     int dependentsCount,
     IncomeExpenseRelation incomeExpenseRelation,
