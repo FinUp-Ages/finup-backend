@@ -158,6 +158,7 @@ public class TriageAnswersValidator {
     boolean invests = (boolean) a.get(TriageQuestionnaire.INVESTS);
     return new TriageAnswers(
         IncomeType.valueOf(text(a, TriageQuestionnaire.INCOME_TYPE)),
+        (BigDecimal) a.get(TriageQuestionnaire.MONTHLY_INCOME),
         (int) a.get(TriageQuestionnaire.CHILDREN_COUNT),
         (int) a.get(TriageQuestionnaire.DEPENDENTS_COUNT),
         IncomeExpenseRelation.valueOf(text(a, TriageQuestionnaire.INCOME_EXPENSE_RELATION)),

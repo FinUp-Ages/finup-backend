@@ -44,13 +44,13 @@ public class TriageRiskEvaluator {
   static final Set<DebtType> COSTLY_DEBT_TYPES = Set.of(DebtType.CREDIT_CARD, DebtType.OVERDRAFT);
 
   /**
-   * Avalia as respostas. {@code monthlyIncome} vem do perfil (PATCH de informações complementares),
-   * não do questionário, e pode ser nulo.
+   * Avalia as respostas. A dívida é comparada com a renda informada na própria triagem; com renda
+   * nula ou zero, essa comparação não é feita.
    */
-  public List<TriageRisk> evaluate(TriageAnswers a, BigDecimal monthlyIncome) {
+  public List<TriageRisk> evaluate(TriageAnswers a) {
     List<TriageRisk> risks = new ArrayList<>();
     overspending(a, risks);
-    costlyDebt(a, monthlyIncome, risks);
+    costlyDebt(a, risks);
     latePayments(a, risks);
     noEmergencyReserve(a, risks);
     dependentsWithoutReserve(a, risks);
@@ -79,14 +79,14 @@ public class TriageRiskEvaluator {
     }
   }
 
-  private void costlyDebt(TriageAnswers a, BigDecimal monthlyIncome, List<TriageRisk> out) {
+  private void costlyDebt(TriageAnswers a, List<TriageRisk> out) {
     if (!a.hasDebt() || a.debtTypes().stream().noneMatch(COSTLY_DEBT_TYPES::contains)) {
       return;
     }
     out.add(
         risk(
             "COSTLY_DEBT",
-            debtSeverity(a.debtTotalAmount(), monthlyIncome),
+            debtSeverity(a.debtTotalAmount(), a.monthlyIncome()),
             "Dívida de cartão ou cheque especial",
             "Essas dívidas têm os juros mais altos do mercado e crescem rápido.",
             "Priorize quitá-las e, se possível, troque por uma dívida com juros menores."));

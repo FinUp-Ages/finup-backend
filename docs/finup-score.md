@@ -22,6 +22,14 @@ sem ela não há base para nenhuma conta. Se a renda estiver ausente, zerada ou 
 é **dado insuficiente**: `users.fin_up_score` **não é sobrescrito** (permanece como estava, `null`
 se nunca calculado). Não existe "score parcial" nesse caso.
 
+A renda é lida de `user_financial_profiles.monthly_income` e entra por dois caminhos:
+
+- **Cadastro (Etapa 2):** opcional, via `PATCH /api/v1/users/me/additional-info`.
+- **Triagem (Perfil de investidor):** obrigatória desde a versão 2 do questionário (pergunta
+  `MONTHLY_INCOME`). O envio grava a renda no perfil antes de recalcular o score, então quem pulou a
+  renda no cadastro passa a ter score ao concluir a triagem, e quem muda a renda na triagem tem o
+  score recalculado com o valor novo. O app pré-preenche a pergunta com a renda atual.
+
 ## 3. Pilares e pesos
 
 | # | Pilar | Peso | Tabelas/colunas de origem |
@@ -117,7 +125,8 @@ e `payment_methods` (metadados de classificação/meio de pagamento, não de vol
 
 ## 4. Quando recalcular
 
-Disparado sob demanda por `FinUpScoreService.recalculate(identity)`, exposto via:
+Disparado por `FinUpScoreService.recalculate(identity)` ao concluir a triagem
+(`POST /api/v1/triage/answers`) e sob demanda via:
 
 ```
 POST /api/v1/users/me/finup-score/recalculate
@@ -175,7 +184,7 @@ recalculado por esta fórmula, não copiado do fixture):
 - **Total = 35 + 24,17 + 1,43 + 3 + 6 = 69,6 → arredonda para 70**
 
 **Exemplo B:** `users.monthly_income` nulo ou não positivo → `FinUpScoreCalculator` devolve
-`InsufficientData`, apontando o `PATCH /api/v1/users/me/additional-info`, antes de calcular qualquer
+`InsufficientData`, apontando a triagem e o `PATCH /api/v1/users/me/additional-info`, antes de calcular qualquer
 pilar. A mensagem é voltada para quem chama a API, então não cita nome de coluna.
 
 **Exemplo C:**

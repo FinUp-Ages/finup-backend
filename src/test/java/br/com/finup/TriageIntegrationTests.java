@@ -93,12 +93,16 @@ class TriageIntegrationTests {
   void questionnaireIsVersionedAndRequiresToken() throws Exception {
     mvc.perform(as("ana", get(QUESTIONS)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.version").value(1))
-        .andExpect(jsonPath("$.questions", hasSize(27)))
+        .andExpect(jsonPath("$.version").value(2))
+        .andExpect(jsonPath("$.questions", hasSize(28)))
         .andExpect(jsonPath("$.questions[0].id").value("INCOME_TYPE"))
         .andExpect(jsonPath("$.questions[0].type").value("SINGLE_CHOICE"))
         .andExpect(jsonPath("$.questions[0].options", hasSize(3)))
-        .andExpect(jsonPath("$.questions[1].decimals").value(0));
+        .andExpect(jsonPath("$.questions[1].id").value("MONTHLY_INCOME"))
+        .andExpect(jsonPath("$.questions[1].type").value("NUMBER"))
+        .andExpect(jsonPath("$.questions[1].required").value(true))
+        .andExpect(jsonPath("$.questions[1].decimals").value(2))
+        .andExpect(jsonPath("$.questions[2].decimals").value(0));
 
     mvc.perform(get(QUESTIONS)).andExpect(status().isUnauthorized());
     mvc.perform(post(ANSWERS).contentType(MediaType.APPLICATION_JSON).content(full()))
@@ -130,7 +134,8 @@ class TriageIntegrationTests {
     assertThat(profile.getHasInvestments()).isTrue();
     assertThat(profile.getApproximateInvestedAmount()).isEqualByComparingTo("1500");
     assertThat(profile.getInvestmentExperienceTime()).isEqualTo("LESS_THAN_1_YEAR");
-    assertThat(profile.getMonthlyIncome()).isEqualByComparingTo("5000");
+    // A renda da triagem substitui a do cadastro (5000).
+    assertThat(profile.getMonthlyIncome()).isEqualByComparingTo("6200");
     assertThat(interests.findAll())
         .extracting("investmentType")
         .containsExactlyInAnyOrder("CDB", "CRYPTO");
@@ -151,7 +156,8 @@ class TriageIntegrationTests {
         .andExpect(jsonPath("$.completedAt").isNotEmpty());
     mvc.perform(as("ana", get(ANSWERS)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.version").value(1))
+        .andExpect(jsonPath("$.version").value(2))
+        .andExpect(jsonPath("$.answers.MONTHLY_INCOME").value(4000))
         .andExpect(jsonPath("$.answers.MARKET_DROP_REACTION").value("SELL_ALL"))
         .andExpect(jsonPath("$.answers.FINANCIAL_KNOWLEDGE").value("ADVANCED"))
         .andExpect(jsonPath("$.completedAt").isNotEmpty());
@@ -161,6 +167,48 @@ class TriageIntegrationTests {
     assertThat(profile.getApproximateInvestedAmount()).isNull();
     assertThat(interests.findAll()).isEmpty();
     assertThat(ana.getFinancialProfile()).isEqualTo(FinancialProfile.CONSERVATIVE);
+  }
+
+  @Test
+  void userWithoutIncomeFromSignUpGetsIncomeAndScoreFromTriage() throws Exception {
+    User bia = users.saveAndFlush(User.createFromCognitoIdentity("sub-bia", "Bia", "bia@x.com"));
+
+    mvc.perform(as("bia", submit(simple("WAIT", "false")))).andExpect(status().isCreated());
+
+    UserFinancialProfile profile = profiles.findByUserId(bia.getId()).orElseThrow();
+    assertThat(profile.getMonthlyIncome()).isEqualByComparingTo("4000");
+    assertThat(bia.getFinUpScore()).isBetween(0, 100);
+    mvc.perform(as("bia", get("/api/v1/users/me")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.monthlyIncome").value(4000))
+        .andExpect(jsonPath("$.finUpScore").value(bia.getFinUpScore()));
+  }
+
+  @Test
+  void changingIncomeInTriageRecalculatesScore() throws Exception {
+    mvc.perform(as("ana", submit(simple("WAIT", "false")))).andExpect(status().isCreated());
+    Integer withIncome = ana.getFinUpScore();
+
+    String lowerIncome =
+        simple("WAIT", "false").replace("\"MONTHLY_INCOME\":4000", "\"MONTHLY_INCOME\":1100");
+    mvc.perform(as("ana", submit(lowerIncome))).andExpect(status().isCreated());
+
+    assertThat(profiles.findByUserId(ana.getId()).orElseThrow().getMonthlyIncome())
+        .isEqualByComparingTo("1100");
+    assertThat(ana.getFinUpScore()).isNotNull().isLessThan(withIncome);
+  }
+
+  @Test
+  void missingIncomeIsRejectedAndKeepsTheSignUpIncome() throws Exception {
+    String body = full().replace("\"MONTHLY_INCOME\":6200,", "");
+
+    mvc.perform(as("ana", submit(body)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.fields[0].field").value("answers.MONTHLY_INCOME"));
+
+    assertThat(profiles.findByUserId(ana.getId()).orElseThrow().getMonthlyIncome())
+        .isEqualByComparingTo("5000");
+    assertThat(ana.getFinUpScore()).isNull();
   }
 
   @Test
@@ -180,14 +228,15 @@ class TriageIntegrationTests {
 
   @Test
   void staleVersionUnknownQuestionAndMissingRequiredAreRejected() throws Exception {
-    mvc.perform(as("ana", submit(full().replace("\"version\":1", "\"version\":0"))))
+    // Versão 1 é a de antes da pergunta da renda: app desatualizado recebe 400 e baixa a nova.
+    mvc.perform(as("ana", submit(full().replace("\"version\":2", "\"version\":1"))))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.fields[0].field").value("version"));
     mvc.perform(as("ana", submit(full().replace("\"CHILDREN_COUNT\":2,", "\"NOPE\":1,"))))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.fields[?(@.field=='answers.NOPE')]").exists())
         .andExpect(jsonPath("$.fields[?(@.field=='answers.CHILDREN_COUNT')]").exists());
-    mvc.perform(as("ana", submit("{\"version\":1,\"answers\":{}}")))
+    mvc.perform(as("ana", submit("{\"version\":2,\"answers\":{}}")))
         .andExpect(status().isBadRequest());
     mvc.perform(as("ana", submit("{\"answers\":{\"HAS_DEBT\":false}}")))
         .andExpect(status().isBadRequest());
@@ -195,7 +244,7 @@ class TriageIntegrationTests {
 
   @Test
   void tooManyAnswersAreRejected() throws Exception {
-    StringBuilder many = new StringBuilder("{\"version\":1,\"answers\":{");
+    StringBuilder many = new StringBuilder("{\"version\":2,\"answers\":{");
     for (int i = 0; i < 51; i++) {
       many.append(i == 0 ? "" : ",").append("\"Q").append(i).append("\":1");
     }
@@ -212,7 +261,7 @@ class TriageIntegrationTests {
     String padding = "x".repeat(17 * 1024);
 
     mvc.perform(
-            as("ana", submit("{\"version\":1,\"answers\":{\"INCOME_TYPE\":\"" + padding + "\"}}")))
+            as("ana", submit("{\"version\":2,\"answers\":{\"INCOME_TYPE\":\"" + padding + "\"}}")))
         .andExpect(status().isPayloadTooLarge())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
     assertThat(responses.findAll()).isEmpty();
@@ -261,8 +310,8 @@ class TriageIntegrationTests {
   /** Envio completo: variável, com filhos, gasta mais, dívida de cartão, investe e se arrisca. */
   private static String full() {
     return """
-        {"version":1,"answers":{
-          "INCOME_TYPE":"VARIABLE","CHILDREN_COUNT":2,"DEPENDENTS_COUNT":1,
+        {"version":2,"answers":{
+          "INCOME_TYPE":"VARIABLE","MONTHLY_INCOME":6200,"CHILDREN_COUNT":2,"DEPENDENTS_COUNT":1,
           "HOUSING_TYPE":"RENTED","EXTRA_INCOME":false,"MONTHLY_SAVINGS":0,
           "BUDGET_TRACKING":"NEVER","USES_CREDIT_CARD":true,"CARD_BILL_PAYMENT":"MINIMUM",
           "HAS_INSURANCE":false,"GOAL_HORIZON":"SHORT_TERM","FINANCIAL_KNOWLEDGE":"BEGINNER",
@@ -280,8 +329,8 @@ class TriageIntegrationTests {
   /** Envio mínimo, sem dívida, sem investimento e sem hábitos de risco. */
   private static String simple(String reaction, String invests) {
     return """
-        {"version":1,"answers":{
-          "INCOME_TYPE":"FIXED","CHILDREN_COUNT":0,"DEPENDENTS_COUNT":0,
+        {"version":2,"answers":{
+          "INCOME_TYPE":"FIXED","MONTHLY_INCOME":4000,"CHILDREN_COUNT":0,"DEPENDENTS_COUNT":0,
           "HOUSING_TYPE":"OWNED","EXTRA_INCOME":true,"MONTHLY_SAVINGS":500,
           "BUDGET_TRACKING":"ALWAYS","USES_CREDIT_CARD":false,"HAS_INSURANCE":true,
           "GOAL_HORIZON":"LONG_TERM","FINANCIAL_KNOWLEDGE":"ADVANCED",

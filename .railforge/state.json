@@ -1,49 +1,49 @@
 {
   "stage": "REVIEWING",
-  "task": "[BUG] Trilha: back não registra progresso por nível, só o lote completo da categoria (ClickUp 1dfcuabd1ja)",
-  "objective": "Com o back real, o app consegue saber quais níveis (perguntas publicadas) o usuário alcançou e as estrelas de cada nível: POST /study-tracks/answers aceita respostas parciais e GET /study-tracks/progress expõe o progresso por nível, separando acertos (percentage) de avanço (completionPercentage).",
-  "decisions": [
-    "Opção A aprovada pelo usuário em 2026-11-12: progresso por pergunta no back, sem migration (study_track_answers já é uma linha por usuário e pergunta).",
-    "Nível = pergunta publicada na ordem created_at, id (id desempata, também no GET /categories/{id}/questions).",
-    "Concluído = tem resposta, certa ou errada; nível atual = primeiro não concluído (1 sem respostas, total com tudo concluído, 0 sem perguntas); alcançado = level <= currentLevel.",
-    "Estrelas por nível: 3 no acerto, 1 no erro, null sem nota (provisório até o design). Estrelas da categoria seguem a regra 50/80 sobre as respostas atuais.",
-    "Só contam respostas de perguntas publicadas hoje (corrige answeredQuestions acima do total após despublicar).",
-    "POST aceita qualquer subconjunto não vazio das perguntas publicadas; lote completo continua válido; vale a última resposta.",
-    "GET /progress com JsonInclude ALWAYS (nulos explícitos), porque a API serializa com non_null.",
-    "Tabela study_track_answers ausente em database/init: PR separado fix/schema-study-track-answers."
+  "task": "[Backend] Renda mensal na triagem para o FinUp Score nao sumir (ClickUp 1dfcuabd3g7)",
+  "objective": "O cadastro deixa a renda opcional e nenhuma tela do app a atualiza; sem renda o FinUp Score nunca e calculado. A triagem (Perfil de investidor) passa a perguntar a renda mensal, grava-a no perfil e recalcula o score com ela.",
+  "requirements": [
+    "TriageQuestionnaire.VERSION sobe de 1 para 2; envio com versao 1 recebe 400 no campo version",
+    "Nova pergunta obrigatoria MONTHLY_INCOME (NUMBER, 0 a 100.000.000, 2 casas), logo apos INCOME_TYPE",
+    "O envio grava user_financial_profiles.monthly_income (substitui a do cadastro) antes do finUpScoreService.recalculate",
+    "A avaliacao de riscos usa a renda informada na triagem",
+    "Envio invalido continua tudo ou nada: renda ausente nao altera o perfil nem o score"
   ],
+  "decisions": [
+    "2026-11-24: opcao recomendada do card (renda na triagem), e nao um campo novo no Perfil: reaproveita o fluxo que ja recalcula o score e o app ja renderiza o questionario vindo do back",
+    "Renda como NUMBER (valor), como os outros valores da triagem; o cadastro manda o limite superior da faixa, que vira o valor pre-preenchido",
+    "Pre-preenchimento fica no mobile (renda do GET /users/me), para cobrir quem tem renda no cadastro e ainda nao fez a triagem; GET /triage/answers nao muda",
+    "Minimo 0, como o PATCH additional-info: renda zero e resposta valida, mas continua sem score pelo gate do FinUpScoreCalculator",
+    "Mensagem de dado insuficiente passa a apontar a triagem alem do PATCH",
+    "2026-11-25 (code review): TriageRiskEvaluator.evaluate le a renda de TriageAnswers (parametro redundante removido). applyTriage mantem os parametros posicionais, como ja estava na develop.",
+    "2026-11-25: decisao do usuario: renda zero continua aceita na triagem (minimo 0); quem informa 0 conclui a triagem e segue sem FinUp Score pelo gate renda > 0."
+  ],
+  "non_goals": [
+    "Recalcular o score no PATCH /users/me/additional-info",
+    "Campo de renda editavel fora da triagem",
+    "Mudar o gate de renda > 0 do FinUpScoreCalculator"
+  ],
+  "consumers": "finup-mobile (branch feat/atualizar-renda-pelo-app): pre-preenche a renda e reabre o formulario quando as respostas salvas sao de versao antiga. App antigo continua funcionando: renderiza a pergunta nova sem pre-preenchimento.",
+  "data_impact": "Sem migration. triage_responses antigas ficam com questionnaire_version 1; o proximo envio grava a versao 2.",
   "files_in_scope": [
-    "src/main/java/br/com/finup/service/StudyTrackAnswerService.java",
-    "src/main/java/br/com/finup/service/StudyTrackQueryService.java",
-    "src/main/java/br/com/finup/repository/StudyQuestionRepository.java",
-    "src/main/java/br/com/finup/dto/StudyTrackProgressResponse.java",
-    "src/main/java/br/com/finup/controller/StudyTrackAnswerController.java",
-    "src/test/java/br/com/finup/service/StudyTrackAnswerServiceTest.java",
-    "src/test/java/br/com/finup/StudyTrackAnswersIntegrationTests.java",
-    "contracts/study-track-answers-c6.md",
+    "src/main/java/br/com/finup/service/TriageQuestionnaire.java",
+    "src/main/java/br/com/finup/service/TriageAnswersValidator.java",
+    "src/main/java/br/com/finup/service/TriageService.java",
+    "src/main/java/br/com/finup/service/TriageRiskEvaluator.java",
+    "src/main/java/br/com/finup/service/FinUpScoreCalculator.java",
+    "src/main/java/br/com/finup/model/TriageAnswers.java",
+    "src/main/java/br/com/finup/model/UserFinancialProfile.java",
+    "src/test/java/br/com/finup/TriageIntegrationTests.java",
+    "src/test/java/br/com/finup/service/TriageAnswersValidatorTest.java",
+    "src/test/java/br/com/finup/service/TriageRiskEvaluatorTest.java",
+    "src/test/java/br/com/finup/repository/InMemoryFinUpScoreDataProviderTest.java",
+    "docs/finup-score.md",
     ".railforge/state.json"
   ],
-  "plan": [
-    "Validação de subconjunto, upsert por pergunta e totais sobre as respostas atuais no POST.",
-    "Progresso por nível (levels, currentLevel, completionPercentage) com filtro de perguntas publicadas e uma consulta só.",
-    "Contrato C6 e Swagger.",
-    "Testes unitários e de integração; mvn clean verify; roteiro manual com Postgres temporário."
-  ],
   "validation": {
-    "mvn clean verify": "passed em 2026-11-12: 921 testes, 0 falhas, spotless ok",
-    "testes novos": "14 unitários (StudyTrackAnswerServiceTest) e 8 de integração (StudyTrackAnswersIntegrationTests): sem respostas, parcial, fora de ordem, completo, 1 pergunta, sem perguntas, despublicada, publicada depois, isolamento por usuário, 400/404/401",
-    "roteiro manual": "Jar da branch com dev,mock-auth contra Postgres temporário criado do database/init corrigido: POST parcial 200 e nível atual 2; pergunta draft 400 sem gravar; lote completo 200; progresso 100% de avanço; Swagger com currentLevel, levels e completionPercentage",
-    "paridade com o app": "Funções do finup-mobile contra o back real: progresso idêntico ao calculado pelo mock em 3 estados",
-    "banco local": "Confirmado (leitura) que o volume local criado do database/init não tem study_track_answers"
+    "mvn clean verify": "2026-11-25: passed (955 testes, 0 falhas, spotless ok)",
+    "cenarios novos": "TriageIntegrationTests: usuario sem renda no cadastro recebe renda e score (0 a 100) pela triagem e GET /users/me devolve os dois; mudar a renda na triagem recalcula o score; renda ausente da 400 e nao altera perfil nem score; versao 1 da 400"
   },
-  "review": "Diff revisado. Compatível com clientes atuais (campos aditivos; lote completo aceito). Mudança de semântica documentada: answeredQuestions/estrelas ignoram respostas de perguntas despublicadas, e a coluna stars passa a guardar a estrela da pergunta (nada a lia). App consome no PR fix/trilha-progresso-real do finup-mobile.",
-  "updated_at": "2026-11-12",
-  "open_questions": [
-    "Design: regra de estrelas por nível (3/1) e estrelas em LEARNING (Figma 185-20958 sem acesso pelo MCP).",
-    "Fora do escopo: GET /answers ainda lista respostas de perguntas despublicadas (histórico, documentado no C6).",
-    "Fora do escopo: apagar pergunta com respostas falha pela FK sem ON DELETE em study_track_answers.",
-    "Fora do escopo: pergunta republicada com conteúdo novo mantém a correção da resposta antiga.",
-    "Risco fora do escopo: a API usa uma access key com permissoes amplas, a mesma usada para administrar a conta",
-    "State remoto do Terraform (bucket S3 + lock) para o time"
-  ]
+  "review": "2026-11-25: /code-review (standards e spec) feito; ajustes pequenos aplicados. Pendente: revisao humana no PR.",
+  "updated_at": "2026-11-25"
 }

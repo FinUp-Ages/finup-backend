@@ -29,9 +29,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Triagem financeira: valida e grava as respostas, atualiza o perfil financeiro, recalcula o FinUp
- * Score e devolve a avaliação de riscos. O envio é tudo ou nada: a validação roda antes de qualquer
- * escrita e as escritas dividem uma transação.
+ * Triagem financeira: valida e grava as respostas, atualiza o perfil financeiro (inclusive a renda
+ * mensal, base do FinUp Score), recalcula o score e devolve a avaliação de riscos. O envio é tudo
+ * ou nada: a validação roda antes de qualquer escrita e as escritas dividem uma transação.
  *
  * <p>As respostas são dado financeiro pessoal e nunca entram em log: só ids e contagens.
  */
@@ -93,7 +93,7 @@ public class TriageService {
         profileRepository
             .findByUserId(user.getId())
             .orElseGet(() -> UserFinancialProfile.createFor(user));
-    List<TriageRisk> risks = evaluator.evaluate(answers, profile.getMonthlyIncome());
+    List<TriageRisk> risks = evaluator.evaluate(answers);
     FinancialProfile investorProfile = evaluator.profileOf(answers);
     Instant now = Instant.now(clock);
 
@@ -106,6 +106,7 @@ public class TriageService {
         new RiskAssessment(user.getId(), response.getId(), investorProfile, summary, risks, now));
 
     profile.applyTriage(
+        answers.monthlyIncome(),
         answers.monthlyExpenses(),
         answers.incomeExpenseRelation(),
         answers.spendingHabit(),

@@ -29,6 +29,7 @@ class TriageAnswersValidatorTest {
   private static Map<String, JsonNode> valid() {
     Map<String, JsonNode> a = new LinkedHashMap<>();
     put(a, "INCOME_TYPE", "\"FIXED\"");
+    put(a, "MONTHLY_INCOME", "4200.00");
     put(a, "CHILDREN_COUNT", "1");
     put(a, "DEPENDENTS_COUNT", "0");
     put(a, "INCOME_EXPENSE_RELATION", "\"BALANCED\"");
@@ -80,6 +81,7 @@ class TriageAnswersValidatorTest {
     Validated result = validator.validate(VERSION, valid());
 
     TriageAnswers typed = result.typed();
+    assertThat(typed.monthlyIncome()).isEqualByComparingTo("4200");
     assertThat(typed.childrenCount()).isEqualTo(1);
     assertThat(typed.monthlyExpenses()).isEqualByComparingTo("2500.50");
     assertThat(typed.hasDebt()).isFalse();
@@ -172,11 +174,13 @@ class TriageAnswersValidatorTest {
   void missingRequiredIsRejected() {
     Map<String, JsonNode> a = valid();
     a.remove("INCOME_TYPE");
+    a.remove("MONTHLY_INCOME");
     put(a, "SPENDING_HABIT", "null");
 
     assertThat(errorsOf(VERSION, a))
         .extracting(InvalidField::field)
-        .containsExactlyInAnyOrder("answers.INCOME_TYPE", "answers.SPENDING_HABIT");
+        .containsExactlyInAnyOrder(
+            "answers.INCOME_TYPE", "answers.MONTHLY_INCOME", "answers.SPENDING_HABIT");
   }
 
   @ParameterizedTest
@@ -185,6 +189,10 @@ class TriageAnswersValidatorTest {
       value = {
         "INCOME_TYPE|\"DAILY\"",
         "INCOME_TYPE|3",
+        "MONTHLY_INCOME|-1",
+        "MONTHLY_INCOME|100000001",
+        "MONTHLY_INCOME|3500.555",
+        "MONTHLY_INCOME|\"3500\"",
         "CHILDREN_COUNT|21",
         "CHILDREN_COUNT|-1",
         "CHILDREN_COUNT|1.5",

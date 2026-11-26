@@ -72,12 +72,13 @@ class InMemoryFinUpScoreDataProviderTest {
 
   @Test
   @DisplayName(
-      "usuario sem fixture usa gastos, relacao, investimento e habito do perfil da triagem")
+      "usuario sem fixture usa renda, gastos, relacao, investimento e habito do perfil da triagem")
   void unknownUserUsesTriageFieldsFromProfile() {
     User user = User.createFromCognitoIdentity("mock-sub-novo", "Usuario Novo", "novo@exemplo.com");
     UserFinancialProfile profile = UserFinancialProfile.createFor(user);
     profile.apply(null, null, null, new BigDecimal("4000"));
     profile.applyTriage(
+        new BigDecimal("4500"),
         new BigDecimal("2500"),
         IncomeExpenseRelation.SPENDS_LESS,
         SpendingHabit.IMPULSIVE,
@@ -88,7 +89,7 @@ class InMemoryFinUpScoreDataProviderTest {
 
     FinUpScoreInputs inputs = provider.loadInputs(user);
 
-    assertThat(inputs.monthlyIncome()).isEqualByComparingTo("4000");
+    assertThat(inputs.monthlyIncome()).isEqualByComparingTo("4500");
     assertThat(inputs.monthlyExpensesEstimate()).isEqualByComparingTo("2500");
     assertThat(inputs.incomeExpenseRelation()).isEqualTo(IncomeExpenseRelation.SPENDS_LESS);
     assertThat(inputs.totalInvestedAmount()).isEqualByComparingTo("12000");
@@ -100,7 +101,8 @@ class InMemoryFinUpScoreDataProviderTest {
   void notInvestingMeansZeroInvested() {
     User user = User.createFromCognitoIdentity("mock-sub-novo", "Usuario Novo", "novo@exemplo.com");
     UserFinancialProfile profile = UserFinancialProfile.createFor(user);
-    profile.applyTriage(null, null, null, false, new BigDecimal("999"), "OVER_3_YEARS");
+    profile.applyTriage(
+        new BigDecimal("3000"), null, null, null, false, new BigDecimal("999"), "OVER_3_YEARS");
     when(profileRepository.findByUserId(user.getId())).thenReturn(Optional.of(profile));
 
     assertThat(provider.loadInputs(user).totalInvestedAmount()).isEqualByComparingTo("0");

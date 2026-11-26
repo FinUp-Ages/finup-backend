@@ -22,8 +22,8 @@ import org.hibernate.annotations.UuidGenerator;
  * — um registro por usuario, criado na primeira vez que {@code PATCH
  * /api/v1/users/me/additional-info} e chamado.
  *
- * <p>Mapeia so as colunas que o cadastro usa; as demais da tabela (estimativas de gasto, habitos,
- * investimentos) ficam para quem for consumi-las.
+ * <p>A renda mensal entra pelo cadastro ({@link #apply}) ou pela triagem ({@link #applyTriage}); as
+ * estimativas de gasto, habitos e investimentos so pela triagem.
  */
 @Entity
 @Table(name = "user_financial_profiles")
@@ -113,15 +113,18 @@ public class UserFinancialProfile {
   /**
    * Triagem: regrava os campos que o questionário cobre, inclusive limpando os de investimento
    * quando a pessoa passou a responder que não investe. Diferente de {@link #apply}, aqui um envio
-   * é sempre completo, então {@code null} significa "não se aplica", não "não informado".
+   * é sempre completo, então {@code null} significa "não se aplica", não "não informado". A renda é
+   * obrigatória no questionário e substitui a do cadastro.
    */
   public void applyTriage(
+      BigDecimal income,
       BigDecimal expensesEstimate,
       IncomeExpenseRelation relation,
       SpendingHabit habit,
       boolean invests,
       BigDecimal investedAmount,
       String investmentTime) {
+    this.monthlyIncome = Objects.requireNonNull(income);
     this.monthlyExpensesEstimate = expensesEstimate;
     this.incomeExpenseRelation = relation;
     this.spendingHabit = habit;
