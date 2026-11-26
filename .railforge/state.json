@@ -15,7 +15,8 @@
     "Pre-preenchimento fica no mobile (renda do GET /users/me), para cobrir quem tem renda no cadastro e ainda nao fez a triagem; GET /triage/answers nao muda",
     "Minimo 0, como o PATCH additional-info: renda zero e resposta valida, mas continua sem score pelo gate do FinUpScoreCalculator",
     "Mensagem de dado insuficiente passa a apontar a triagem alem do PATCH",
-    "2026-11-25 (code review): TriageRiskEvaluator.evaluate le a renda de TriageAnswers (parametro redundante removido). applyTriage mantem os parametros posicionais, como ja estava na develop."
+    "2026-11-25 (code review): TriageRiskEvaluator.evaluate le a renda de TriageAnswers (parametro redundante removido). applyTriage mantem os parametros posicionais, como ja estava na develop.",
+    "2026-11-25: decisao do usuario: renda zero continua aceita na triagem (minimo 0); quem informa 0 conclui a triagem e segue sem FinUp Score pelo gate renda > 0."
   ],
   "non_goals": [
     "Recalcular o score no PATCH /users/me/additional-info",
@@ -44,8 +45,5 @@
     "cenarios novos": "TriageIntegrationTests: usuario sem renda no cadastro recebe renda e score (0 a 100) pela triagem e GET /users/me devolve os dois; mudar a renda na triagem recalcula o score; renda ausente da 400 e nao altera perfil nem score; versao 1 da 400"
   },
   "review": "2026-11-25: /code-review (standards e spec) feito; ajustes pequenos aplicados. Pendente: revisao humana no PR.",
-  "updated_at": "2026-11-25",
-  "open_questions": [
-    "Renda zero informada na triagem segue sem score (gate renda > 0): confirmar com o produto se a pergunta deve exigir valor positivo"
-  ]
+  "updated_at": "2026-11-25"
 }
