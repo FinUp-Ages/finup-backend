@@ -31,6 +31,7 @@ class TriageRiskEvaluatorTest {
   /** Respostas sem nenhum risco: cada teste muda só o que quer provar. */
   private static final class A {
     IncomeType incomeType = IncomeType.FIXED;
+    BigDecimal income = INCOME;
     int children = 0;
     int dependents = 0;
     IncomeExpenseRelation relation = IncomeExpenseRelation.BALANCED;
@@ -48,7 +49,7 @@ class TriageRiskEvaluatorTest {
     TriageAnswers build() {
       return new TriageAnswers(
           incomeType,
-          INCOME,
+          income,
           children,
           dependents,
           relation,
@@ -70,7 +71,7 @@ class TriageRiskEvaluatorTest {
   }
 
   private List<TriageRisk> risks(UnaryOperator<A> change) {
-    return evaluator.evaluate(change.apply(new A()).build(), INCOME);
+    return evaluator.evaluate(change.apply(new A()).build());
   }
 
   private static List<String> codes(List<TriageRisk> risks) {
@@ -133,9 +134,11 @@ class TriageRiskEvaluatorTest {
   @DisplayName("COSTLY_DEBT: sem renda informada assume a gravidade padrao")
   void costlyDebtWithoutIncomeUsesDefaultSeverity() {
     A a = debt(new A(), Set.of(DebtType.CREDIT_CARD), "999999");
-    assertThat(evaluator.evaluate(a.build(), null).get(0).severity())
+    a.income = null;
+    assertThat(evaluator.evaluate(a.build()).get(0).severity())
         .isEqualTo(TriageRiskEvaluator.DEBT_WITHOUT_INCOME_SEVERITY);
-    assertThat(evaluator.evaluate(a.build(), BigDecimal.ZERO).get(0).severity())
+    a.income = BigDecimal.ZERO;
+    assertThat(evaluator.evaluate(a.build()).get(0).severity())
         .isEqualTo(TriageRiskEvaluator.DEBT_WITHOUT_INCOME_SEVERITY);
   }
 

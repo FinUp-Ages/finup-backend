@@ -93,7 +93,7 @@ public class TriageService {
         profileRepository
             .findByUserId(user.getId())
             .orElseGet(() -> UserFinancialProfile.createFor(user));
-    List<TriageRisk> risks = evaluator.evaluate(answers, answers.monthlyIncome());
+    List<TriageRisk> risks = evaluator.evaluate(answers);
     FinancialProfile investorProfile = evaluator.profileOf(answers);
     Instant now = Instant.now(clock);
 
